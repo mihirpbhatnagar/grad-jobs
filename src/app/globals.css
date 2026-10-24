@@ -9,6 +9,11 @@
   --border: #e6e5df;
   --accent: #1f6f5c;
   --accent-soft: #e3efe9;
+  --chip: #f0efea;
+  --amber: #8a5a00;
+  --amber-soft: #f8edd5;
+  --rose: #a2353a;
+  --rose-soft: #f9e4e3;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -20,6 +25,11 @@
     --border: #2c2c2a;
     --accent: #5fbf9f;
     --accent-soft: #1c2d27;
+    --chip: #252523;
+    --amber: #e5b65a;
+    --amber-soft: #33291a;
+    --rose: #ec8d8d;
+    --rose-soft: #3a2223;
   }
 }
 
@@ -31,6 +41,11 @@
   --color-border: var(--border);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
+  --color-chip: var(--chip);
+  --color-amber: var(--amber);
+  --color-amber-soft: var(--amber-soft);
+  --color-rose: var(--rose);
+  --color-rose-soft: var(--rose-soft);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }

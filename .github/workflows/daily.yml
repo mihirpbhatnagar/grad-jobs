@@ -1,0 +1,33 @@
+name: Daily data job
+
+on:
+  schedule:
+    # 05:00 UTC = 05:00 UK time in winter, 06:00 in summer.
+    - cron: "0 5 * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: daily-data-job
+  cancel-in-progress: false
+
+jobs:
+  daily:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --omit=dev
+      - run: |
+          if [ -z "$SUPABASE_URL" ]; then
+            echo "::notice::Repository secrets not set yet; skipping the daily job."
+            exit 0
+          fi
+          npm run daily
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          REED_API_KEY: ${{ secrets.REED_API_KEY }}
