@@ -15,7 +15,6 @@ const SEARCHES: Record<string, string>[] = [
   { keywords: "graduate scheme" },
   { keywords: "graduate programme" },
   { keywords: "entry level" },
-  { keywords: "2027" },
 ];
 
 type SearchResult = {

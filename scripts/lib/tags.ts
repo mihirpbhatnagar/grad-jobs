@@ -88,6 +88,25 @@ function findLengthMonths(text: string): number | null {
   return m[2].toLowerCase() === "year" ? n * 12 : n;
 }
 
+// Scope rule: does this listing read as a graduate / entry-level role? Reed's own graduate
+// flag and keyword searches also return senior roles and, for "2027", contracts ending in
+// 2027, so every source listing passes through this before it joins the feed.
+const SENIOR_TITLE = /\b(senior|snr|sr|principal|head of|director|vp|chief|consultant surgeon|partner)\b|\b(team|tech|technical|project|engineering|design|mechanical|electrical|site|shift)\s+lead\b/i;
+const EARLY_TITLE = /\b(graduate|grad|trainee|junior|entry[- ]level|apprentice|intern|internship|placement|assistant|associate|analyst|coordinator|executive|administrator|advisor|adviser)\b/i;
+const EARLY_TEXT = /\b(graduates?|grad (scheme|programme)|entry[- ]level|trainee|recent(ly)? graduated?|no (prior |previous )?experience (is )?(required|needed|necessary)|full training (is )?(given|provided)|early careers?|first (step|role) in your career|(start|intake|cohort|join\w*)\b[^.\n]{0,25}\b2027|2027 (start|intake|cohort|graduate))\b/i;
+
+export function isEarlyCareer(title: string, description: string): boolean {
+  if (SENIOR_TITLE.test(title) && !/\b(graduate|trainee|junior)\b/i.test(title)) return false;
+  if (/\b(graduate|grad|trainee|entry[- ]level|junior)\b/i.test(title)) return true;
+  return EARLY_TEXT.test(`${title}\n${description}`) && (EARLY_TITLE.test(title) || /\bgraduates?\b/i.test(description));
+}
+
+// Cross-check sources come from graduate-specific searches but have no description, so
+// they're only rejected when the title is clearly senior.
+export function isSeniorTitle(title: string): boolean {
+  return SENIOR_TITLE.test(title) && !/(graduate|trainee|junior)/i.test(title);
+}
+
 export function tagListing(title: string, description: string): RoleTags {
   const text = `${title}\n${description}`;
 

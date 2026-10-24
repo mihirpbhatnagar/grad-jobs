@@ -22,7 +22,7 @@ jobs:
           cache: npm
       - run: npm ci --omit=dev
       - run: |
-          if [ -z "$SUPABASE_URL" ]; then
+          if [ -z "$SUPABASE_SECRET_KEY" ] || [ -z "$REED_API_KEY" ]; then
             echo "::notice::Repository secrets not set yet; skipping the daily job."
             exit 0
           fi
@@ -31,3 +31,5 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           REED_API_KEY: ${{ secrets.REED_API_KEY }}
+          DATAFORSEO_LOGIN: ${{ secrets.DATAFORSEO_LOGIN }}
+          DATAFORSEO_PASSWORD: ${{ secrets.DATAFORSEO_PASSWORD }}

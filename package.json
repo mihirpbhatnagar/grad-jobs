@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "daily": "node scripts/daily.ts",
-    "db": "supabase"
+    "db": "supabase",
+    "adzuna-test": "node scripts/adzuna-overlap.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",

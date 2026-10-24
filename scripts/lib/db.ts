@@ -9,15 +9,25 @@ export function adminClient(): SupabaseClient {
   });
 }
 
+type Result<T> = { data: T | null; error: { message: string } | null };
+
+// Runs a Supabase request and returns its data, retrying brief network drops
+// (the first full load lost its connection once mid-save).
+export async function must<T>(make: () => PromiseLike<Result<T>>, attempts = 4): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    const { data, error } = await make();
+    if (!error) return data as T;
+    const transient = /terminated|ECONNRESET|fetch failed|timed? ?out|socket|50[234]/i.test(error.message);
+    if (!transient || attempt >= attempts) throw new Error(error.message);
+    await new Promise((r) => setTimeout(r, 1500 * attempt));
+  }
+}
+
 // Supabase returns at most 1,000 rows per request, so read big tables page by page.
-export async function selectAll<T>(
-  build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
-  pageSize = 1000,
-): Promise<T[]> {
+export async function selectAll<T>(build: (from: number, to: number) => PromiseLike<Result<T[]>>, pageSize = 1000): Promise<T[]> {
   const rows: T[] = [];
   for (let from = 0; ; from += pageSize) {
-    const { data, error } = await build(from, from + pageSize - 1);
-    if (error) throw error;
+    const data = await must(() => build(from, from + pageSize - 1));
     rows.push(...(data ?? []));
     if (!data || data.length < pageSize) return rows;
   }

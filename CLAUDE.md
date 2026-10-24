@@ -96,9 +96,9 @@ Each question has a "Use in For You" switch. On = shapes For You. Off = saved, a
 
 ## Build stages (about 7 focused build days)
 ### Stage 0: Setup (day 1, morning)
-- [ ] Accounts: GitHub first; Vercel and Supabase via "Sign in with GitHub"; Anthropic Console (new separate individual organization for Grad Jobs, created from the existing login; own card, GBP 10 credit, monthly spend limit, API key); Reed (Adzuna account already created; free test calls only)
-- [ ] Create the repository and a blank Next.js app, deploy to Vercel
-- Done when: a blank page is live at its free web address.
+- [x] Accounts: GitHub first; Vercel and Supabase via "Sign in with GitHub"; Anthropic Console (new separate individual organization for Grad Jobs, created from the existing login; own card, GBP 10 credit, monthly spend limit, API key); Reed (Adzuna account already created; free test calls only)
+- [x] Create the repository and a blank Next.js app, deploy to Vercel
+- Done when: a blank page is live at its free web address. (Live at https://grad-jobs-six.vercel.app; Supabase project "grad-jobs" in eu-west-1.)
 ### Stage 1: Data engine (day 1)
 - [ ] Daily pull from Reed (graduate / entry-level / 2027); measure Adzuna overlap with its 25 free test calls
 - [ ] Duplicate removal
