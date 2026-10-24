@@ -51,11 +51,30 @@ type JobDetails = {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// Reed caps requests per hour. When the cap is hit, details fetching pauses until the hour
+// resets (at most MAX_HOURLY_WAITS times per run); anything still missing is retried next run.
+class HourlyLimitError extends Error {}
+const HOURLY_WAIT_MS = 61 * 60_000;
+const MAX_HOURLY_WAITS = Number(process.env.REED_MAX_HOURLY_WAITS ?? 6);
+let hourlyWaits = 0;
+let resumeAt = 0;
+
 async function reedGet<T>(path: string): Promise<T> {
   const auth = `Basic ${Buffer.from(`${requireEnv("REED_API_KEY")}:`).toString("base64")}`;
   for (let attempt = 1; ; attempt++) {
     const res = await fetch(`${API}${path}`, { headers: { Authorization: auth } });
     if (res.ok) return (await res.json()) as T;
+    if (res.status === 403 && /per-hour request limit/i.test(await res.text())) {
+      if (Date.now() >= resumeAt) {
+        if (hourlyWaits >= MAX_HOURLY_WAITS) throw new HourlyLimitError();
+        hourlyWaits++;
+        resumeAt = Date.now() + HOURLY_WAIT_MS;
+        console.log(`  Reed hourly limit reached; pausing until ${new Date(resumeAt).toTimeString().slice(0, 5)}`);
+      }
+      await sleep(resumeAt - Date.now());
+      attempt--;
+      continue;
+    }
     if (attempt >= 6 || (res.status !== 429 && res.status < 500)) {
       throw new Error(`Reed ${path} returned ${res.status}`);
     }
@@ -95,7 +114,9 @@ export async function reedDetails(ids: number[], concurrency = 2): Promise<Map<n
       try {
         details.set(id, await reedGet<JobDetails>(`/jobs/${id}`));
       } catch (err) {
-        console.warn(`Reed details failed for ${id}: ${(err as Error).message}`);
+        // Out of hourly allowance for this run: stop; the rest is fetched next run.
+        if (err instanceof HourlyLimitError) next = ids.length;
+        else console.warn(`Reed details failed for ${id}: ${(err as Error).message}`);
       }
       await sleep(250);
     }
