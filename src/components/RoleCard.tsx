@@ -73,7 +73,9 @@ export function RoleCard({ role }: { role: Role }) {
         )}
         {t.sponsorship === "not_offered" && <Chip className="bg-rose-soft text-rose">Says no sponsorship</Chip>}
         {t.graduateScheme && <Chip>Graduate scheme</Chip>}
-        {t.startText && <Chip>Starts {t.startText}</Chip>}
+        <Chip className="bg-accent-soft text-accent">
+          {role.start_status === "confirmed" && t.startText ? `Starts ${t.startText}` : "2027 intake"}
+        </Chip>
         {t.degree && <Chip>{t.degree} required</Chip>}
         {t.lengthMonths && <Chip>{t.lengthMonths} months</Chip>}
         {t.drivingLicence && <Chip>Driving licence</Chip>}

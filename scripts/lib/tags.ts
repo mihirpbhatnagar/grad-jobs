@@ -11,6 +11,8 @@ export type RoleTags = {
   deadline: string | null;
   lengthMonths: number | null;
   graduateScheme: boolean;
+  immediateStart: boolean;
+  aimedAt2027: boolean;
 };
 
 const MONTHS = [
@@ -88,23 +90,45 @@ function findLengthMonths(text: string): number | null {
   return m[2].toLowerCase() === "year" ? n * 12 : n;
 }
 
-// Scope rule: does this listing read as a graduate / entry-level role? Reed's own graduate
-// flag and keyword searches also return senior roles and, for "2027", contracts ending in
-// 2027, so every source listing passes through this before it joins the feed.
-const SENIOR_TITLE = /\b(senior|snr|sr|principal|head of|director|vp|chief|consultant surgeon|partner)\b|\b(team|tech|technical|project|engineering|design|mechanical|electrical|site|shift)\s+lead\b/i;
-const EARLY_TITLE = /\b(graduate|grad|trainee|junior|entry[- ]level|apprentice|intern|internship|placement|assistant|associate|analyst|coordinator|executive|administrator|advisor|adviser)\b/i;
-const EARLY_TEXT = /\b(graduates?|grad (scheme|programme)|entry[- ]level|trainee|recent(ly)? graduated?|no (prior |previous )?experience (is )?(required|needed|necessary)|full training (is )?(given|provided)|early careers?|first (step|role) in your career|(start|intake|cohort|join\w*)\b[^.\n]{0,25}\b2027|2027 (start|intake|cohort|graduate))\b/i;
+// Scope rule: does this listing read as a graduate / early-career role at all? Reed's own
+// graduate flag also returns senior roles, so every listing passes through this first.
+const SENIOR_TITLE = /\b(senior|snr|sr|principal|head of|director|vp|chief|partner)\b|\b(team|tech|technical|project|engineering|design|mechanical|electrical|site|shift)\s+lead\b/i;
+const EARLY_TITLE = /\b(graduate|grad|trainee|junior|entry[- ]level|early careers?|apprentice|intern|internship|placement|assistant|associate|analyst|coordinator|executive|administrator|advisor|adviser)\b/i;
+const EARLY_TEXT = /\b(graduates?|grad (scheme|programme)|entry[- ]level|trainee|recent(ly)? graduated?|final[- ]year (students?|undergraduates?)|no (prior |previous )?experience (is )?(required|needed|necessary)|full training (is )?(given|provided)|early careers?|first (step|role) in your career|class of 2027|2027 (start|intake|cohort|graduates?))\b/i;
+const GRAD_IN_TITLE = /\b(graduate|grad|trainee|junior|entry[- ]level|early careers?)\b/i;
+
+export function isSeniorTitle(title: string): boolean {
+  return SENIOR_TITLE.test(title) && !GRAD_IN_TITLE.test(title);
+}
 
 export function isEarlyCareer(title: string, description: string): boolean {
-  if (SENIOR_TITLE.test(title) && !/\b(graduate|trainee|junior)\b/i.test(title)) return false;
-  if (/\b(graduate|grad|trainee|entry[- ]level|junior)\b/i.test(title)) return true;
+  if (isSeniorTitle(title)) return false;
+  if (GRAD_IN_TITLE.test(title)) return true;
   return EARLY_TEXT.test(`${title}\n${description}`) && (EARLY_TITLE.test(title) || /\bgraduates?\b/i.test(description));
 }
 
-// Cross-check sources come from graduate-specific searches but have no description, so
-// they're only rejected when the title is clearly senior.
-export function isSeniorTitle(title: string): boolean {
-  return SENIOR_TITLE.test(title) && !/(graduate|trainee|junior)/i.test(title);
+// Internships, placements and apprenticeships are stored but kept out of the main list.
+export function roleKind(title: string): "job" | "internship" | "apprenticeship" {
+  if (/\b(intern|internship|placement|insight (day|week|programme)|spring week|summer analyst)\b/i.test(title)) return "internship";
+  if (/\bapprentice(ship)?\b/i.test(title)) return "apprenticeship";
+  return "job";
+}
+
+// When does the role start, relative to the earliest start users can take (June 2027)?
+//   confirmed: the listing states a start on or after that date
+//   likely:    no exact date, but it's aimed at 2027 starters ("2027 intake", "final-year students")
+//   before:    it states an earlier start, or an immediate / ASAP start
+//   unknown:   it doesn't say; confirming needs the employer's own page (Stage 4)
+export type StartStatus = "confirmed" | "likely" | "before" | "unknown";
+
+export function startStatus(tags: RoleTags, earliestStart: string): StartStatus {
+  if (tags.startDate && tags.startText !== tags.startDate.slice(0, 4)) {
+    return tags.startDate >= earliestStart ? "confirmed" : "before";
+  }
+  if (tags.immediateStart) return "before";
+  if (tags.startText && Number(tags.startText) >= Number(earliestStart.slice(0, 4))) return "likely";
+  if (tags.aimedAt2027) return "likely";
+  return "unknown";
 }
 
 export function tagListing(title: string, description: string): RoleTags {
@@ -131,5 +155,7 @@ export function tagListing(title: string, description: string): RoleTags {
     deadline: findDeadline(text),
     lengthMonths: findLengthMonths(text),
     graduateScheme: /\bgraduate\s+(scheme|programme|program|trainee|development programme|training scheme)\b/i.test(text),
+    immediateStart: /\b(immediate(ly)? start|start(ing)? (asap|immediately|straight away)|asap start|available to start immediately|start date:?\s*(asap|immediate))/i.test(text),
+    aimedAt2027: /\b(class of 2027|2027 (graduates?|intake|cohort|start|entry)|graduating (in |summer )?2027|final[- ]year (students?|undergraduates?)|penultimate[- ]year|(due to )?graduate in 2027|for 2027 start)\b/i.test(text),
   };
 }

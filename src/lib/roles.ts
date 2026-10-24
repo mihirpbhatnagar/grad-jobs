@@ -9,6 +9,7 @@ export type RoleTags = {
   deadline: string | null;
   lengthMonths: number | null;
   graduateScheme: boolean;
+  aimedAt2027: boolean;
 };
 
 export type Role = {
@@ -26,6 +27,7 @@ export type Role = {
   sponsor_status: "likely" | "unclear" | "not_listed" | null;
   sponsor_name: string | null;
   sources: string[];
+  start_status: "confirmed" | "likely";
 };
 
 export type RoleFilters = {
@@ -57,10 +59,16 @@ export async function fetchRoles(f: RoleFilters) {
   let query = db
     .from("roles")
     .select(
-      "id,title,employer,location,locations,salary_min,salary_max,apply_url,posted_at,expires_at,tags,sponsor_status,sponsor_name,sources",
+      "id,title,employer,location,locations,salary_min,salary_max,apply_url,posted_at,expires_at,tags,sponsor_status,sponsor_name,sources,start_status",
       { count: "exact" },
     )
-    .eq("is_open", true);
+    // Main list: full-time jobs starting on or after the earliest start (June 2027), stated
+    // or clearly aimed at 2027 starters. Part-time roles, internships and apprenticeships are
+    // stored for their own sections later.
+    .eq("is_open", true)
+    .eq("kind", "job")
+    .eq("part_time", false)
+    .in("start_status", ["confirmed", "likely"]);
 
   if (f.q) query = query.textSearch("search", f.q, { type: "websearch", config: "english" });
   if (f.sponsor) query = query.eq("sponsor_status", f.sponsor);

@@ -11,6 +11,7 @@ export type Listing = {
   salaryText: string | null;
   contractType: string | null;
   fullTime: boolean | null;
+  partTime: boolean;
   description: string;
   applyUrl: string | null;
   postedAt: string | null;

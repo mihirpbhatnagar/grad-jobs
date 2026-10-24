@@ -1,12 +1,12 @@
 // Daily data job. Run locally with `npm run daily`, and every morning by GitHub Actions.
-// Flags: --retag  re-run text tagging and sponsor matching on every open role.
+// Flags: --retag  re-run the scope check, tagging, start status and sponsor matching on every open role.
 
 import { adminClient, chunks, must, selectAll } from "./lib/db.ts";
 import { loadEnv } from "./lib/env.ts";
 import { knownRoleIndex } from "./lib/match.ts";
 import { dedupeKey } from "./lib/normalise.ts";
 import { refreshSponsors, sponsorMatcher, type SponsorMatch } from "./lib/sponsors.ts";
-import { isEarlyCareer, isSeniorTitle, tagListing } from "./lib/tags.ts";
+import { isEarlyCareer, isSeniorTitle, roleKind, startStatus, tagListing } from "./lib/tags.ts";
 import { GOOGLE_JOBS_QUERIES, searchGoogleJobs } from "./sources/googleJobs.ts";
 import { reedDetails, searchReed, toListing } from "./sources/reed.ts";
 import type { Listing } from "./sources/types.ts";
@@ -18,6 +18,9 @@ const retagAll = process.argv.includes("--retag");
 const CLOSE_AFTER_DAYS = 2;
 // New Reed listings are fetched and saved this many at a time, so progress is never lost.
 const REED_BATCH = 250;
+// Earliest start users can take; read from settings in main(). Roles starting earlier are
+// stored but kept out of the main list.
+let earliestStart = "2027-06-01";
 
 type Matcher = (employer: string, location: string | null) => SponsorMatch;
 type ExistingRole = { id: number; dedupe_key: string; sources: string[]; locations: string[]; first_seen: string };
@@ -25,6 +28,7 @@ type ExistingRole = { id: number; dedupe_key: string; sources: string[]; locatio
 const keyOf = (l: Listing) => dedupeKey(l.employer, l.title, l.description);
 
 function roleRow(l: Listing, match: SponsorMatch, existing: ExistingRole | undefined, now: string) {
+  const tags = tagListing(l.title, l.description);
   const locations = [...new Set([...(existing?.locations ?? []), ...(l.location ? [l.location] : [])])];
   return {
     dedupe_key: keyOf(l),
@@ -37,11 +41,14 @@ function roleRow(l: Listing, match: SponsorMatch, existing: ExistingRole | undef
     salary_text: l.salaryText,
     contract_type: l.contractType,
     full_time: l.fullTime,
+    part_time: l.partTime,
     description: l.description,
     apply_url: l.applyUrl,
     posted_at: l.postedAt,
     expires_at: l.expiresAt,
-    tags: tagListing(l.title, l.description),
+    tags,
+    kind: roleKind(l.title),
+    start_status: startStatus(tags, earliestStart),
     sponsor_status: match.status,
     sponsor_name: match.name,
     sources: [...new Set([...(existing?.sources ?? []), l.source])],
@@ -126,10 +133,18 @@ async function pullReed(match: Matcher, byKey: Map<string, ExistingRole>) {
   const newIds = [...results.keys()].filter((id) => !knownIds.has(String(id)));
   console.log(`Reed: ${results.size} listings found (${calls} searches), ${newIds.length} not seen before`);
 
-  const totals = { found: results.size, searches: calls, new: newIds.length, kept: 0, excluded: 0, newRoles: 0, mergedDuplicates: 0 };
-  for (const [i, batch] of chunks(newIds, REED_BATCH).entries()) {
+  // Clearly senior titles are ruled out from the search result alone, saving a details call each.
+  const senior = new Set(newIds.filter((id) => isSeniorTitle(results.get(id)!.jobTitle)));
+  await saveExcluded([...senior].map((id) => toListing(results.get(id)!, undefined)), "senior title");
+  const toFetch = newIds.filter((id) => !senior.has(id));
+
+  const totals = { found: results.size, searches: calls, new: newIds.length, kept: 0, excluded: senior.size, newRoles: 0, mergedDuplicates: 0, detailsFailed: 0 };
+  for (const [i, batch] of chunks(toFetch, REED_BATCH).entries()) {
     const details = await reedDetails(batch);
-    const listings = batch.map((id) => toListing(results.get(id)!, details.get(id)));
+    // A listing whose details didn't arrive is left for tomorrow's run rather than judged on
+    // Reed's short preview text.
+    const listings = batch.filter((id) => details.has(id)).map((id) => toListing(results.get(id)!, details.get(id)));
+    totals.detailsFailed += batch.length - listings.length;
     const keep = listings.filter((l) => isEarlyCareer(l.title, l.description));
     const drop = listings.filter((l) => !keep.includes(l));
     const saved = await saveListings(keep, match, byKey);
@@ -138,7 +153,7 @@ async function pullReed(match: Matcher, byKey: Map<string, ExistingRole>) {
     totals.excluded += drop.length;
     totals.newRoles += saved.newRoles;
     totals.mergedDuplicates += saved.mergedDuplicates;
-    console.log(`  batch ${i + 1}/${Math.ceil(newIds.length / REED_BATCH)}: kept ${keep.length}, excluded ${drop.length}`);
+    console.log(`  batch ${i + 1}/${Math.ceil(toFetch.length / REED_BATCH)}: kept ${keep.length}, excluded ${drop.length}`);
   }
 
   await markSeen("reed", [...results.keys()].map(String).filter((id) => linkedIds.has(id)));
@@ -198,21 +213,45 @@ async function closeStaleRoles(): Promise<number> {
   return stale.length + expired.length;
 }
 
-// Re-applies tagging and sponsor matching to open roles; only changed rows are written.
-async function retag(match: Matcher): Promise<number> {
-  type Row = { id: number; title: string; employer: string; location: string | null; description: string | null; tags: unknown; sponsor_status: string | null; sponsor_name: string | null };
+// The database stores JSON with its keys reordered, so compare with keys sorted.
+function sameJson(a: unknown, b: unknown): boolean {
+  const sorted = (v: unknown): unknown =>
+    v && typeof v === "object" && !Array.isArray(v)
+      ? Object.fromEntries(Object.entries(v).sort(([x], [y]) => x.localeCompare(y)).map(([k, val]) => [k, sorted(val)]))
+      : v;
+  return JSON.stringify(sorted(a)) === JSON.stringify(sorted(b));
+}
+
+// Re-applies the early-career check, tagging and sponsor matching to open roles. Roles that
+// no longer pass the check are removed and remembered as excluded; only changed rows are written.
+async function retag(match: Matcher) {
+  type Row = { id: number; title: string; employer: string; location: string | null; description: string | null; tags: unknown; sponsor_status: string | null; sponsor_name: string | null; kind: string; start_status: string | null };
   const roles = await selectAll<Row>((from, to) =>
-    db.from("roles").select("id,title,employer,location,description,tags,sponsor_status,sponsor_name").eq("is_open", true).order("id").range(from, to),
+    db.from("roles").select("id,title,employer,location,description,tags,sponsor_status,sponsor_name,kind,start_status").eq("is_open", true).order("id").range(from, to),
   );
+
+  const outOfScope = roles.filter((r) => (r.description ? !isEarlyCareer(r.title, r.description) : isSeniorTitle(r.title)));
+  const removeIds = outOfScope.map((r) => r.id);
+  for (const batch of chunks(removeIds, 200)) {
+    const links = await must(() => db.from("role_sources").select("source,source_id").in("role_id", batch));
+    const now = new Date().toISOString();
+    const excluded = links.map((l) => ({ ...l, reason: "not early-career", last_seen: now }));
+    if (excluded.length) await must(() => db.from("excluded_listings").upsert(excluded, { onConflict: "source,source_id" }));
+    await must(() => db.from("roles").delete().in("id", batch));
+  }
+
   let changed = 0;
+  const removed = new Set(removeIds);
   for (const r of roles) {
+    if (removed.has(r.id)) continue;
     const tags = tagListing(r.title, r.description ?? "");
     const m = match(r.employer, r.location);
-    if (JSON.stringify(tags) === JSON.stringify(r.tags) && m.status === r.sponsor_status && m.name === r.sponsor_name) continue;
-    await must(() => db.from("roles").update({ tags, sponsor_status: m.status, sponsor_name: m.name }).eq("id", r.id));
+    const next = { tags, sponsor_status: m.status, sponsor_name: m.name, kind: roleKind(r.title), start_status: startStatus(tags, earliestStart) };
+    if (sameJson(next, { tags: r.tags, sponsor_status: r.sponsor_status, sponsor_name: r.sponsor_name, kind: r.kind, start_status: r.start_status })) continue;
+    await must(() => db.from("roles").update(next).eq("id", r.id));
     changed++;
   }
-  return changed;
+  return { removedOutOfScope: removeIds.length, updated: changed };
 }
 
 async function main() {
@@ -220,6 +259,7 @@ async function main() {
   const stats: Record<string, unknown> = {};
 
   try {
+    earliestStart = await setting("feed.earliest_start", earliestStart);
     const { sponsors, refreshed } = await refreshSponsors(db);
     stats.sponsors = sponsors.length;
     stats.sponsorRegisterRefreshed = refreshed;
