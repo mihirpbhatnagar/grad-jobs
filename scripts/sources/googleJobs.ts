@@ -50,11 +50,20 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function call<T>(path: string, body?: unknown): Promise<T> {
   const auth = Buffer.from(`${requireEnv("DATAFORSEO_LOGIN")}:${requireEnv("DATAFORSEO_PASSWORD")}`).toString("base64");
-  const res = await fetch(`${API}${path}`, {
-    method: body ? "POST" : "GET",
-    headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json" },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let res: Response | undefined;
+  for (let attempt = 1; !res; attempt++) {
+    try {
+      res = await fetch(`${API}${path}`, {
+        method: body ? "POST" : "GET",
+        headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json" },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+    } catch (err) {
+      // Network blip: wait and retry rather than losing tasks already paid for.
+      if (attempt >= 6) throw err;
+      await sleep(10_000 * attempt);
+    }
+  }
   if (!res.ok) throw new Error(`DataForSEO ${path} returned ${res.status}: ${(await res.text()).slice(0, 300)}`);
   const json = (await res.json()) as { status_code: number; status_message: string };
   if (json.status_code !== 20000) throw new Error(`DataForSEO: ${json.status_message}`);
