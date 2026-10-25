@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Role } from "@/lib/roles";
 
 const SPONSOR_BADGE = {
@@ -42,14 +43,9 @@ export function RoleCard({ role }: { role: Role }) {
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h2 className="text-[15px] font-semibold leading-snug tracking-tight">
-            <a
-              href={role.apply_url ?? "#"}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="after:absolute after:inset-0 focus-visible:outline-none"
-            >
+            <Link href={`/roles/${role.id}`} className="after:absolute after:inset-0 focus-visible:outline-none">
               {role.title}
-            </a>
+            </Link>
           </h2>
           <p className="mt-1 text-sm text-muted">
             {role.employer}

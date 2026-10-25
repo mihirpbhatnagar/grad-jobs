@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { RoleCard } from "@/components/RoleCard";
+import { SidePanel } from "@/components/SidePanel";
 import { fetchRoles, PAGE_SIZE, parseFilters, type RoleFilters } from "@/lib/roles";
 
 // Builds a link to this page with some filters changed (and back to page 1).
@@ -42,21 +43,24 @@ function updatedLabel(iso: string | undefined): string {
 
 export default function Home(props: PageProps<"/">) {
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 pb-24 sm:px-6">
-      <header className="flex items-center gap-3 py-6">
-        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent-soft font-semibold text-accent">G</span>
-        <span className="font-semibold tracking-tight">Grad Jobs</span>
-      </header>
+    <div className="mx-auto grid w-full max-w-6xl gap-10 px-4 pb-24 sm:px-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="min-w-0">
+        <h1 className="pt-8 text-3xl font-semibold tracking-tight">All roles</h1>
+        <Suspense fallback={<RolesSkeleton />}>
+          <Roles searchParams={props.searchParams} />
+        </Suspense>
 
-      <h1 className="pt-6 text-3xl font-semibold tracking-tight">All roles</h1>
-      <Suspense fallback={<RolesSkeleton />}>
-        <Roles searchParams={props.searchParams} />
-      </Suspense>
+        <footer className="mt-16 text-xs text-muted">
+          Listings from <a href="https://www.reed.co.uk" className="underline underline-offset-2">reed.co.uk</a> and Google
+          Jobs. Sponsor status is from the Home Office register of licensed sponsors and is information only.
+        </footer>
+      </div>
 
-      <footer className="mt-16 text-xs text-muted">
-        Listings from <a href="https://www.reed.co.uk" className="underline underline-offset-2">reed.co.uk</a>. Sponsor
-        status is from the Home Office register of licensed sponsors and is information only.
-      </footer>
+      <aside className="hidden pt-8 lg:block">
+        <Suspense fallback={<div className="h-96 animate-pulse rounded-2xl bg-chip" />}>
+          <SidePanel />
+        </Suspense>
+      </aside>
     </div>
   );
 }
