@@ -19,7 +19,8 @@ const MONTHS = [
   "january", "february", "march", "april", "may", "june",
   "july", "august", "september", "october", "november", "december",
 ];
-const MONTH_RE = MONTHS.join("|");
+// Full names first so "september" wins over "sep"; abbreviations catch titles like "(Sept 2027)".
+const MONTH_RE = [...MONTHS, "sept", "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "oct", "nov", "dec"].join("|");
 const SEASON_MONTH: Record<string, number> = { spring: 3, summer: 6, autumn: 9, winter: 12 };
 const NUMBER_WORDS: Record<string, number> = {
   one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, eighteen: 18, twelve: 12, "twenty-four": 24,
@@ -47,13 +48,15 @@ const STAGES: [string, RegExp][] = [
 ];
 
 function parseMonthYear(month: string, year: string): string {
-  const m = MONTHS.indexOf(month.toLowerCase()) + 1 || SEASON_MONTH[month.toLowerCase()] || 1;
+  const key = month.toLowerCase();
+  const m = MONTHS.findIndex((full) => full.startsWith(key.slice(0, 3))) + 1 || SEASON_MONTH[key] || 1;
   return `${year}-${String(m).padStart(2, "0")}-01`;
 }
 
 function findStart(text: string): { startText: string | null; startDate: string | null } {
   const patterns = [
     new RegExp(`\\b(${MONTH_RE}|spring|summer|autumn|winter)\\s+(202[6-9])\\s+(start|intake|cohort|entry)`, "i"),
+    new RegExp(`\\((${MONTH_RE})\\s+(202[6-9])(?:\\s+(?:start|intake))?\\)`, "i"),
     new RegExp(`\\b(?:start(?:ing|s)?|commenc\\w*|join(?:ing)?|intake)\\b[^.\\n]{0,40}?\\b(${MONTH_RE}|spring|summer|autumn|winter)\\s+(202[6-9])`, "i"),
     /\b(202[6-9])\s+(?:graduate\s+)?(?:intake|start|cohort|programme|scheme)\b/i,
   ];
@@ -156,6 +159,6 @@ export function tagListing(title: string, description: string): RoleTags {
     lengthMonths: findLengthMonths(text),
     graduateScheme: /\bgraduate\s+(scheme|programme|program|trainee|development programme|training scheme)\b/i.test(text),
     immediateStart: /\b(immediate(ly)? start|start(ing)? (asap|immediately|straight away)|asap start|available to start immediately|start date:?\s*(asap|immediate))/i.test(text),
-    aimedAt2027: /\b(class of 2027|2027 (graduates?|intake|cohort|start|entry)|graduating (in |summer )?2027|final[- ]year (students?|undergraduates?)|penultimate[- ]year|(due to )?graduate in 2027|for 2027 start)\b/i.test(text),
+    aimedAt2027: /\b(graduate|programme|program|scheme|intake|rotation|cohort)\b[^\n.]{0,40}\b2027\b|\b2027\b[^\n.]{0,25}\b(graduate|programme|program|scheme|intake|cohort)\b|\b(class of 2027|2027 (graduates?|intake|cohort|start|entry)|graduating (in |summer )?2027|final[- ]year (students?|undergraduates?)|penultimate[- ]year|(due to )?graduate in 2027|for 2027 start)\b/i.test(text),
   };
 }

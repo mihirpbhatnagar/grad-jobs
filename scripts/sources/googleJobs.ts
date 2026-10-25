@@ -55,7 +55,7 @@ async function call<T>(path: string, body?: unknown): Promise<T> {
     headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json" },
     body: body ? JSON.stringify(body) : undefined,
   });
-  if (!res.ok) throw new Error(`DataForSEO ${path} returned ${res.status}`);
+  if (!res.ok) throw new Error(`DataForSEO ${path} returned ${res.status}: ${(await res.text()).slice(0, 300)}`);
   const json = (await res.json()) as { status_code: number; status_message: string };
   if (json.status_code !== 20000) throw new Error(`DataForSEO: ${json.status_message}`);
   return json as T;
@@ -94,11 +94,13 @@ export async function searchGoogleJobs(
   const deadline = Date.now() + 20 * 60_000;
   while (pending.size > 0 && Date.now() < deadline) {
     await sleep(20_000);
-    const ready = await call<{ tasks: { result: { id: string }[] | null }[] }>("/tasks_ready");
-    for (const { id } of ready.tasks.flatMap((t) => t.result ?? [])) {
-      if (!pending.delete(id)) continue;
-      const got = await call<{ tasks: { result: { items: JobItem[] | null }[] | null }[] }>(`/task_get/advanced/${id}`);
-      for (const r of got.tasks[0]?.result ?? []) items.push(...(r.items ?? []).filter((i) => i.type === "google_jobs_item"));
+    // Ask for each task's results directly; a task still queued answers with a non-20000 status.
+    for (const id of [...pending]) {
+      const got = await call<{ tasks: { status_code: number; result: { items: JobItem[] | null }[] | null }[] }>(`/task_get/advanced/${id}`);
+      const task = got.tasks[0];
+      if (task?.status_code !== 20000) continue;
+      pending.delete(id);
+      for (const r of task.result ?? []) items.push(...(r.items ?? []).filter((i) => i.type === "google_jobs_item"));
     }
   }
   if (pending.size > 0) console.warn(`${pending.size} Google Jobs tasks were not ready in time`);
@@ -113,7 +115,7 @@ export async function searchGoogleJobs(
       sourceUrl: i.source_url,
       title: i.title.trim(),
       employer: i.employer_name.trim(),
-      location: i.location?.replace(/,?\s*(UK|United Kingdom)$/i, "").trim() || null,
+      location: i.location?.replace(/\s*\(\+\d+ others?\)/i, "").replace(/,?\s*(UK|United Kingdom)$/i, "").trim() || null,
       salaryMin: pay.min,
       salaryMax: pay.max,
       salaryText: i.salary,
