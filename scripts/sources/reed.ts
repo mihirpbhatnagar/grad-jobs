@@ -62,7 +62,15 @@ let resumeAt = 0;
 async function reedGet<T>(path: string): Promise<T> {
   const auth = `Basic ${Buffer.from(`${requireEnv("REED_API_KEY")}:`).toString("base64")}`;
   for (let attempt = 1; ; attempt++) {
-    const res = await fetch(`${API}${path}`, { headers: { Authorization: auth } });
+    let res: Response;
+    try {
+      res = await fetch(`${API}${path}`, { headers: { Authorization: auth } });
+    } catch (err) {
+      // Network blip (e.g. Wi-Fi drop): wait and retry rather than failing the run.
+      if (attempt >= 6) throw err;
+      await sleep(10_000 * attempt);
+      continue;
+    }
     if (res.ok) return (await res.json()) as T;
     if (res.status === 403 && /per-hour request limit/i.test(await res.text())) {
       if (Date.now() >= resumeAt) {

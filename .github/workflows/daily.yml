@@ -31,6 +31,6 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           REED_API_KEY: ${{ secrets.REED_API_KEY }}
-          REED_MAX_HOURLY_WAITS: "1"
+          REED_MAX_HOURLY_WAITS: "2"
           DATAFORSEO_LOGIN: ${{ secrets.DATAFORSEO_LOGIN }}
           DATAFORSEO_PASSWORD: ${{ secrets.DATAFORSEO_PASSWORD }}
