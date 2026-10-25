@@ -26,7 +26,8 @@ jobs:
             echo "::notice::Repository secrets not set yet; skipping the daily job."
             exit 0
           fi
-          npm run daily
+          # A manual run also re-applies the rules to every stored role.
+          npm run daily -- ${{ github.event_name == 'workflow_dispatch' && '--retag' || '' }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
