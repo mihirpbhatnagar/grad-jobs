@@ -40,7 +40,7 @@ export type RoleFilters = {
   sectors: string[];
   locs: string[];
   salary: number;
-  start: "" | "summer" | "sept" | "later";
+  start: "" | "summer" | "sept" | "later" | "unstated";
   closingSoon: boolean;
   source: "" | "reed" | "google_jobs";
 };
@@ -62,7 +62,7 @@ export function parseFilters(params: Record<string, string | string[] | undefine
     sectors: list("sector").filter((id) => FIELDS.some((f) => f.id === id)),
     locs: list("loc").map((l) => l.replace(/[^\p{L} '-]/gu, "")).filter(Boolean),
     salary: Math.max(0, Math.min(200000, Number(one("salary")) || 0)),
-    start: start === "summer" || start === "sept" || start === "later" ? start : "",
+    start: start === "summer" || start === "sept" || start === "later" || start === "unstated" ? start : "",
     closingSoon: one("closing") === "1",
     source: source === "reed" || source === "google_jobs" ? source : "",
   };
@@ -103,7 +103,7 @@ export async function fetchRoles(f: RoleFilters) {
     .eq("is_open", true)
     .eq("kind", "job")
     .eq("part_time", false)
-    .in("start_status", ["confirmed", "likely"]);
+    .in("start_status", f.start === "unstated" ? ["unknown"] : ["confirmed", "likely"]);
 
   if (f.q) query = query.textSearch("search", f.q, { type: "websearch", config: "english" });
   if (f.sponsor) query = query.eq("sponsor_status", f.sponsor);

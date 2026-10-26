@@ -47,6 +47,7 @@ export function FilterBar({ filters }: { filters: RoleFilters }) {
         <option value="summer">June–August 2027</option>
         <option value="sept">September 2027</option>
         <option value="later">October 2027 or later</option>
+        <option value="unstated">Start date not stated</option>
       </Select>
       <Select label="Sponsor" value={filters.sponsor} onChange={(v) => go({ sponsor: v as RoleFilters["sponsor"] })}>
         <option value="">Any employer</option>

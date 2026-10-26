@@ -89,7 +89,7 @@ async function Roles({ searchParams }: { searchParams: PageProps<"/">["searchPar
       <section>
         <p className="mt-2 text-muted">
           {result
-            ? `${result.total.toLocaleString("en-GB")} UK graduate roles starting June 2027 or later. ${updatedLabel(result.updatedAt)}`
+            ? `${result.total.toLocaleString("en-GB")} UK graduate roles ${f.start === "unstated" ? "that don't state a start date" : "starting June 2027 or later"}. ${updatedLabel(result.updatedAt)}`
             : "Connecting to the role database…"}
         </p>
 
