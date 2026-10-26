@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
 import { withDefaults, type ProfileAnswers } from "@/lib/profile";
 
@@ -16,4 +17,29 @@ export async function saveProfile(displayName: string, answers: ProfileAnswers):
   if (error) return { ok: false, error: error.message };
   revalidatePath("/", "layout");
   return { ok: true };
+}
+
+export async function recordCv(path: string, name: string): Promise<void> {
+  const { db, user } = await currentUser();
+  if (!user || !path.startsWith(`${user.id}/`)) throw new Error("Not allowed");
+  const { error } = await db.from("profiles").upsert({
+    user_id: user.id,
+    cv_path: path,
+    cv_name: name.slice(0, 120),
+    cv_uploaded_at: new Date().toISOString(),
+  });
+  if (error) throw error;
+  revalidatePath("/profile");
+}
+
+// UK GDPR: removes the user's CV files, then the account (which cascades to all their rows).
+export async function deleteAccount(): Promise<void> {
+  const { db, user } = await currentUser();
+  if (!user) redirect("/");
+  const { data: files } = await db.storage.from("cvs").list(user.id);
+  if (files?.length) await db.storage.from("cvs").remove(files.map((f) => `${user.id}/${f.name}`));
+  const { error } = await db.rpc("delete_my_account");
+  if (error) throw error;
+  await db.auth.signOut();
+  redirect("/");
 }

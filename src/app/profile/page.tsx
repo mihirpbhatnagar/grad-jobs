@@ -2,12 +2,27 @@ import { Suspense } from "react";
 import { requireUser } from "@/lib/auth";
 import { withDefaults } from "@/lib/profile";
 import { signOut } from "../sign-in/actions";
+import { CvUpload } from "./CvUpload";
+import { DeleteAccount } from "./DeleteAccount";
 import { ProfileForm } from "./ProfileForm";
 
 async function Profile() {
   const { db, user } = await requireUser("/profile");
-  const { data } = await db.from("profiles").select("display_name,answers").maybeSingle();
-  return <ProfileForm initialName={data?.display_name ?? ""} initial={withDefaults(data?.answers)} email={user.email ?? ""} />;
+  const { data } = await db.from("profiles").select("display_name,answers,cv_name,cv_uploaded_at").maybeSingle();
+  const cv = (
+    <CvUpload
+      url={process.env.SUPABASE_URL!}
+      publishableKey={process.env.SUPABASE_PUBLISHABLE_KEY!}
+      userId={user.id}
+      current={data?.cv_name && data.cv_uploaded_at ? { name: data.cv_name, uploadedAt: data.cv_uploaded_at } : null}
+    />
+  );
+  return (
+    <div className="space-y-4">
+      <ProfileForm initialName={data?.display_name ?? ""} initial={withDefaults(data?.answers)} email={user.email ?? ""} cvSlot={cv} />
+      <DeleteAccount />
+    </div>
+  );
 }
 
 export default function ProfilePage() {

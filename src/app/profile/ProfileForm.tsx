@@ -57,7 +57,7 @@ function Pill({ on, onClick, children }: { on: boolean; onClick: () => void; chi
   );
 }
 
-export function ProfileForm({ initialName, initial, email }: { initialName: string; initial: ProfileAnswers; email: string }) {
+export function ProfileForm({ initialName, initial, email, cvSlot }: { initialName: string; initial: ProfileAnswers; email: string; cvSlot: React.ReactNode }) {
   const [name, setName] = useState(initialName);
   const [a, setA] = useState(initial);
   const [status, setStatus] = useState<"idle" | "saved" | "error">("idle");
@@ -83,8 +83,8 @@ export function ProfileForm({ initialName, initial, email }: { initialName: stri
         />
       </Question>
 
-      <Question title="CV" hint="Upload your CV and we'll suggest answers for the questions below.">
-        <p className="text-sm text-muted">CV upload is coming next.</p>
+      <Question title="CV" hint="PDF or Word, up to 5 MB. Private to you.">
+        {cvSlot}
       </Question>
 
       <Question title="What roles are you looking for?" forYou={a.fields.forYou} onForYou={(v) => set("fields", { forYou: v })}>
