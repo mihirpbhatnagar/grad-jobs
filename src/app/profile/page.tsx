@@ -8,7 +8,7 @@ import { ProfileForm } from "./ProfileForm";
 
 async function Profile() {
   const { db, user } = await requireUser("/profile");
-  const { data } = await db.from("profiles").select("display_name,answers,cv_name,cv_uploaded_at").maybeSingle();
+  const { data } = await db.from("profiles").select("display_name,answers,cv_name,cv_uploaded_at,cv_suggested_fields").maybeSingle();
   const cv = (
     <CvUpload
       url={process.env.SUPABASE_URL!}
@@ -19,7 +19,7 @@ async function Profile() {
   );
   return (
     <div className="space-y-4">
-      <ProfileForm initialName={data?.display_name ?? ""} initial={withDefaults(data?.answers)} email={user.email ?? ""} cvSlot={cv} />
+      <ProfileForm initialName={data?.display_name ?? ""} initial={withDefaults(data?.answers)} email={user.email ?? ""} cvSlot={cv} cvSuggestions={data?.cv_suggested_fields ?? []} />
       <DeleteAccount />
     </div>
   );

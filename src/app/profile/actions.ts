@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
+import { cvToText, suggestFields } from "@/lib/cv";
 import { withDefaults, type ProfileAnswers } from "@/lib/profile";
 
 export async function saveProfile(
@@ -27,11 +28,25 @@ export async function saveProfile(
 export async function recordCv(path: string, name: string): Promise<void> {
   const { db, user } = await currentUser();
   if (!user || !path.startsWith(`${user.id}/`)) throw new Error("Not allowed");
+
+  // Read the CV's text (free, no AI) to suggest role types and for the later CV tools.
+  let cvText = "";
+  const { data: file } = await db.storage.from("cvs").download(path);
+  if (file) {
+    try {
+      cvText = (await cvToText(await file.arrayBuffer(), name)).slice(0, 50000);
+    } catch {
+      cvText = "";
+    }
+  }
+
   const { error } = await db.from("profiles").upsert({
     user_id: user.id,
     cv_path: path,
     cv_name: name.slice(0, 120),
     cv_uploaded_at: new Date().toISOString(),
+    cv_text: cvText || null,
+    cv_suggested_fields: suggestFields(cvText),
   });
   if (error) throw error;
   revalidatePath("/profile");

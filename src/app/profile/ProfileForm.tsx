@@ -58,7 +58,19 @@ function Pill({ on, onClick, children }: { on: boolean; onClick: () => void; chi
   );
 }
 
-export function ProfileForm({ initialName, initial, email, cvSlot }: { initialName: string; initial: ProfileAnswers; email: string; cvSlot: React.ReactNode }) {
+export function ProfileForm({
+  initialName,
+  initial,
+  email,
+  cvSlot,
+  cvSuggestions = [],
+}: {
+  initialName: string;
+  initial: ProfileAnswers;
+  email: string;
+  cvSlot: React.ReactNode;
+  cvSuggestions?: string[];
+}) {
   const [name, setName] = useState(initialName);
   const [a, setA] = useState(initial);
   const [status, setStatus] = useState<"idle" | "saved" | "error">("idle");
@@ -99,6 +111,23 @@ export function ProfileForm({ initialName, initial, email, cvSlot }: { initialNa
             </Pill>
           ))}
         </div>
+        {cvSuggestions.some((id) => !a.fields.value.includes(id)) && (
+          <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl bg-accent-soft px-4 py-3">
+            <span className="text-sm text-accent">From your CV:</span>
+            {cvSuggestions
+              .filter((id) => !a.fields.value.includes(id))
+              .map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => set("fields", { value: [...a.fields.value, id] })}
+                  className="rounded-full border border-accent/30 bg-surface px-3 py-1 text-sm text-accent hover:opacity-80"
+                >
+                  + {FIELDS.find((f) => f.id === id)?.label}
+                </button>
+              ))}
+          </div>
+        )}
       </Question>
 
       <Question
