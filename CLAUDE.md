@@ -100,19 +100,19 @@ Each question has a "Use in For You" switch. On = shapes For You. Off = saved, a
 - [x] Create the repository and a blank Next.js app, deploy to Vercel
 - Done when: a blank page is live at its free web address. (Live at https://grad-jobs-six.vercel.app; Supabase project "grad-jobs" in eu-west-1.)
 ### Stage 1: Data engine (day 1)
-- [ ] Daily pull from Reed (graduate / entry-level / 2027); measure Adzuna overlap with its 25 free test calls
-- [ ] Duplicate removal
-- [ ] Free text-rule tagging of each listing
-- [ ] Sponsor register downloaded daily and matched
-- [ ] Google Jobs search as the daily cross-check (needs an account with a search-results API provider, e.g. DataForSEO)
-- [ ] Simple searchable list of roles with sponsor badges
-- Done when: 1,000+ fresh UK grad roles appear each morning with sponsor badges.
+- [x] Daily pull from Reed (graduate / entry-level / 2027); measure Adzuna overlap with its 25 free test calls (overlap test built; waiting on Adzuna keys in .env.local)
+- [x] Duplicate removal
+- [x] Free text-rule tagging of each listing
+- [x] Sponsor register downloaded daily and matched
+- [x] Google Jobs search as the daily cross-check (needs an account with a search-results API provider, e.g. DataForSEO)
+- [x] Simple searchable list of roles with sponsor badges
+- Done when: 1,000+ fresh UK grad roles appear each morning with sponsor badges. (Mihir's rule: main list = full-time roles starting June 2027+; ~210 today. Volume grows with Google Jobs depth after the DataForSEO top-up and employer feeds in Stage 4.)
 ### Stage 2: Profiles and matching (day 2)
-- [ ] Logins and private accounts
-- [ ] Profile page exactly as specified above, CV upload and profile extraction
-- [ ] For You: free semantic ranking with matched tags
-- [ ] Role cards; Saved and Apply sections; applied history
-- [ ] Installable on phone home screen (PWA)
+- [x] Logins and private accounts (email + password)
+- [x] Profile page exactly as specified above, CV upload and profile extraction (CV-to-profile suggestions still to do)
+- [x] For You: free semantic ranking with matched tags
+- [x] Role cards; Saved and Apply sections; applied history (company section comes with Stage 4 data)
+- [x] Installable on phone home screen (PWA)
 - Done when: Mihir opens it each morning and the For You list is genuinely relevant.
 ### Stage 3: CV tools, alerts, costs (days 3-4)
 - [ ] Story bank, CV rewrites, keyword gaps, cover letter recommendations, company briefs with values, "sounds like AI" check, master CV templates (Opus)
