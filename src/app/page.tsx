@@ -3,32 +3,13 @@ import { Suspense } from "react";
 import { RoleCard } from "@/components/RoleCard";
 import { SidePanel } from "@/components/SidePanel";
 import { currentUser } from "@/lib/auth";
-import { fetchRoles, PAGE_SIZE, parseFilters, type RoleFilters } from "@/lib/roles";
+import { FilterBar } from "@/components/FilterBar";
+import { withDefaults } from "@/lib/profile";
+import { fetchRoles, filtersToQuery, PAGE_SIZE, parseFilters } from "@/lib/roles";
 
-// Builds a link to this page with some filters changed (and back to page 1).
-function hrefWith(f: RoleFilters, changes: Partial<RoleFilters>): string {
-  const next = { ...f, page: 1, ...changes };
-  const params = new URLSearchParams();
-  if (next.q) params.set("q", next.q);
-  if (next.sponsor) params.set("sponsor", next.sponsor);
-  if (next.schemes) params.set("schemes", "1");
-  if (next.sort !== "newest") params.set("sort", next.sort);
-  if (next.page > 1) params.set("page", String(next.page));
-  const qs = params.toString();
-  return qs ? `/?${qs}` : "/";
-}
-
-function FilterChip({ href, active, children }: { href: string; active: boolean; children: React.ReactNode }) {
+function Chip({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <Link
-      href={href}
-      scroll={false}
-      className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm transition-colors ${
-        active
-          ? "border-foreground bg-foreground text-background"
-          : "border-border bg-surface text-foreground/80 hover:border-foreground/30"
-      }`}
-    >
+    <Link href={href} scroll={false} className="whitespace-nowrap rounded-full border border-accent/30 bg-accent-soft px-3 py-1 text-xs font-medium text-accent hover:opacity-80">
       {children}
     </Link>
   );
@@ -91,6 +72,18 @@ async function Roles({ searchParams }: { searchParams: PageProps<"/">["searchPar
   }
   const pages = result ? Math.ceil(result.total / PAGE_SIZE) : 0;
 
+  // Profile answers whose "Use in For you" switch is off become one-tap filters here.
+  const myChips: React.ReactNode[] = [];
+  if (user) {
+    const { data: profile } = await db.from("profiles").select("answers").maybeSingle();
+    const a = withDefaults(profile?.answers);
+    if (!a.fields.forYou && a.fields.value.length) myChips.push(<Chip key="f" href={filtersToQuery(f, { sectors: a.fields.value })}>My sectors</Chip>);
+    const places = [...a.locations.value, ...a.locations.other.split(",").map((x) => x.trim()).filter(Boolean)];
+    if (!a.locations.forYou && places.length) myChips.push(<Chip key="l" href={filtersToQuery(f, { locs: places })}>My locations</Chip>);
+    if (!a.salary.forYou && a.salary.value) myChips.push(<Chip key="s" href={filtersToQuery(f, { salary: a.salary.value })}>My salary</Chip>);
+    if (!a.sponsors.forYou && a.sponsors.value) myChips.push(<Chip key="sp" href={filtersToQuery(f, { sponsor: "likely" })}>Sponsors only</Chip>);
+  }
+
   return (
     <>
       <section>
@@ -101,9 +94,9 @@ async function Roles({ searchParams }: { searchParams: PageProps<"/">["searchPar
         </p>
 
         <form action="/" className="mt-6">
-          {f.sponsor && <input type="hidden" name="sponsor" value={f.sponsor} />}
-          {f.schemes && <input type="hidden" name="schemes" value="1" />}
-          {f.sort !== "newest" && <input type="hidden" name="sort" value={f.sort} />}
+          {[...new URLSearchParams(filtersToQuery(f, { q: "" }).slice(2))].map(([k, v]) => (
+            <input key={k} type="hidden" name={k} value={v} />
+          ))}
           <label className="flex items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.04)] focus-within:border-foreground/40">
             <svg aria-hidden viewBox="0 0 20 20" className="h-5 w-5 shrink-0 text-muted" fill="none" stroke="currentColor" strokeWidth="1.8">
               <circle cx="9" cy="9" r="6" />
@@ -121,15 +114,13 @@ async function Roles({ searchParams }: { searchParams: PageProps<"/">["searchPar
           </label>
         </form>
 
-        <div className="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
-          <FilterChip href={hrefWith(f, { sponsor: "" })} active={!f.sponsor}>All employers</FilterChip>
-          <FilterChip href={hrefWith(f, { sponsor: "likely" })} active={f.sponsor === "likely"}>Licensed sponsors</FilterChip>
-          <FilterChip href={hrefWith(f, { sponsor: "unclear" })} active={f.sponsor === "unclear"}>Sponsor unclear</FilterChip>
-          <FilterChip href={hrefWith(f, { schemes: !f.schemes })} active={f.schemes}>Graduate schemes</FilterChip>
-          <span className="mx-1 hidden w-px bg-border sm:block" />
-          <FilterChip href={hrefWith(f, { sort: "newest" })} active={f.sort === "newest"}>Newest</FilterChip>
-          <FilterChip href={hrefWith(f, { sort: "closing" })} active={f.sort === "closing"}>Closing soon</FilterChip>
-        </div>
+        <FilterBar filters={f} />
+        {myChips.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-xs text-muted">From your profile:</span>
+            {myChips}
+          </div>
+        )}
       </section>
 
       <section className="mt-8 space-y-3">
@@ -144,13 +135,13 @@ async function Roles({ searchParams }: { searchParams: PageProps<"/">["searchPar
       {pages > 1 && (
         <nav className="mt-8 flex items-center justify-between text-sm">
           {f.page > 1 ? (
-            <Link href={hrefWith(f, { page: f.page - 1 })} className="rounded-full border border-border bg-surface px-4 py-2 hover:border-foreground/30">
+            <Link href={filtersToQuery(f, { page: f.page - 1 })} className="rounded-full border border-border bg-surface px-4 py-2 hover:border-foreground/30">
               ← Previous
             </Link>
           ) : <span />}
           <span className="text-muted">Page {f.page} of {pages}</span>
           {f.page < pages ? (
-            <Link href={hrefWith(f, { page: f.page + 1 })} className="rounded-full border border-border bg-surface px-4 py-2 hover:border-foreground/30">
+            <Link href={filtersToQuery(f, { page: f.page + 1 })} className="rounded-full border border-border bg-surface px-4 py-2 hover:border-foreground/30">
               Next →
             </Link>
           ) : <span />}

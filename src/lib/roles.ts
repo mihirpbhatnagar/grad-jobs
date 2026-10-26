@@ -1,3 +1,4 @@
+import { FIELDS } from "./profile";
 import { publicClient } from "./supabase";
 
 export type RoleTags = {
@@ -36,20 +37,54 @@ export type RoleFilters = {
   schemes: boolean;
   sort: "newest" | "closing";
   page: number;
+  sectors: string[];
+  locs: string[];
+  salary: number;
+  start: "" | "summer" | "sept" | "later";
+  closingSoon: boolean;
+  source: "" | "reed" | "google_jobs";
 };
 
 export const PAGE_SIZE = 40;
 
 export function parseFilters(params: Record<string, string | string[] | undefined>): RoleFilters {
   const one = (k: string) => (Array.isArray(params[k]) ? params[k]![0] : params[k]) ?? "";
+  const list = (k: string) => one(k).split(",").map((v) => v.trim()).filter(Boolean).slice(0, 15);
   const sponsor = one("sponsor");
+  const start = one("start");
+  const source = one("source");
   return {
     q: one("q").trim().slice(0, 100),
     sponsor: sponsor === "likely" || sponsor === "unclear" || sponsor === "not_listed" ? sponsor : "",
     schemes: one("schemes") === "1",
     sort: one("sort") === "closing" ? "closing" : "newest",
     page: Math.max(1, Math.min(500, Number(one("page")) || 1)),
+    sectors: list("sector").filter((id) => FIELDS.some((f) => f.id === id)),
+    locs: list("loc").map((l) => l.replace(/[^\p{L} '-]/gu, "")).filter(Boolean),
+    salary: Math.max(0, Math.min(200000, Number(one("salary")) || 0)),
+    start: start === "summer" || start === "sept" || start === "later" ? start : "",
+    closingSoon: one("closing") === "1",
+    source: source === "reed" || source === "google_jobs" ? source : "",
   };
+}
+
+// Builds a query string for All roles with some filters changed (and back to page 1).
+export function filtersToQuery(f: RoleFilters, changes: Partial<RoleFilters> = {}): string {
+  const n = { ...f, page: 1, ...changes };
+  const p = new URLSearchParams();
+  if (n.q) p.set("q", n.q);
+  if (n.sponsor) p.set("sponsor", n.sponsor);
+  if (n.schemes) p.set("schemes", "1");
+  if (n.sort !== "newest") p.set("sort", n.sort);
+  if (n.sectors.length) p.set("sector", n.sectors.join(","));
+  if (n.locs.length) p.set("loc", n.locs.join(","));
+  if (n.salary) p.set("salary", String(n.salary));
+  if (n.start) p.set("start", n.start);
+  if (n.closingSoon) p.set("closing", "1");
+  if (n.source) p.set("source", n.source);
+  if (n.page > 1) p.set("page", String(n.page));
+  const qs = p.toString();
+  return qs ? `/?${qs}` : "/";
 }
 
 export async function fetchRoles(f: RoleFilters) {
@@ -73,6 +108,20 @@ export async function fetchRoles(f: RoleFilters) {
   if (f.q) query = query.textSearch("search", f.q, { type: "websearch", config: "english" });
   if (f.sponsor) query = query.eq("sponsor_status", f.sponsor);
   if (f.schemes) query = query.eq("tags->>graduateScheme", "true");
+  if (f.sectors.length) {
+    const words = FIELDS.filter((x) => f.sectors.includes(x.id)).flatMap((x) => x.keywords.map((k) => k.trim()));
+    query = query.or(words.map((w) => `title.ilike.%${w}%`).join(","));
+  }
+  if (f.locs.length) query = query.or(f.locs.map((l) => `location.ilike.%${l}%`).join(","));
+  if (f.salary) query = query.or(`salary_min.gte.${f.salary},salary_max.gte.${f.salary}`);
+  if (f.start === "summer") query = query.gte("tags->>startDate", "2027-06-01").lt("tags->>startDate", "2027-09-01");
+  if (f.start === "sept") query = query.gte("tags->>startDate", "2027-09-01").lt("tags->>startDate", "2027-10-01");
+  if (f.start === "later") query = query.gte("tags->>startDate", "2027-10-01");
+  if (f.closingSoon) {
+    const twoWeeks = new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10);
+    query = query.lte("expires_at", twoWeeks);
+  }
+  if (f.source) query = query.contains("sources", [f.source]);
   query =
     f.sort === "closing"
       ? query.order("expires_at", { ascending: true, nullsFirst: false })
