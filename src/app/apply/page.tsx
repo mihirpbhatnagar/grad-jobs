@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { StoryBankSection } from "@/components/StoryBankSection";
 import { Tracker } from "@/components/Tracker";
 
 // Phone tab: saved roles plus the application tracker and dashboard.
@@ -9,7 +10,10 @@ export default function ApplyPage() {
       <p className="mt-2 text-muted">Your saved roles and every application, in one place.</p>
       <div className="mt-6">
         <Suspense fallback={<div className="h-80 animate-pulse rounded-2xl bg-chip" />}>
-          <Tracker />
+          <div className="space-y-4">
+            <StoryBankSection />
+            <Tracker />
+          </div>
         </Suspense>
       </div>
     </main>

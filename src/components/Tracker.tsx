@@ -48,7 +48,7 @@ function Group({ title, rows }: { title: string; rows: Row[] }) {
               </Link>
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                 <span className={`text-xs ${!row.role!.is_open || urgent ? "text-rose" : "text-muted"}`}>
-                  {!row.role!.is_open ? "Listing may have closed" : row.stage === "saved" || row.stage === "applying" ? due ?? "No deadline stated" : stageLabel(row.stage)}
+                  {!row.role!.is_open ? "Listing may have closed" : row.stage === "saved" || row.stage === "applying" ? due ?? "No deadline stated" : `${stageLabel(row.stage)}${row.applied_at ? ` · applied ${new Date(row.applied_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}` : ""}`}
                 </span>
                 <StageControls roleId={row.role!.id} stage={row.stage} />
               </div>

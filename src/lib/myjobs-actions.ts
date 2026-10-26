@@ -35,6 +35,19 @@ export async function setStage(roleId: number, stage: string): Promise<void> {
   revalidatePath("/", "layout");
 }
 
+export async function saveStoryBank(text: string): Promise<void> {
+  const { db, user } = await currentUser();
+  if (!user) throw new Error("Sign in first");
+  const { error } = await db.from("profiles").upsert({
+    user_id: user.id,
+    story_bank: text.slice(0, 20000),
+    story_bank_updated_at: new Date().toISOString(),
+  });
+  if (error) throw error;
+  revalidatePath("/apply");
+  revalidatePath("/my-jobs");
+}
+
 export async function removeSaved(roleId: number): Promise<void> {
   const { db, user } = await currentUser();
   if (!user) throw new Error("Sign in first");

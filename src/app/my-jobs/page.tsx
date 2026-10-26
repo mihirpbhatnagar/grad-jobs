@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { ForYou } from "@/components/ForYou";
+import { StoryBankSection } from "@/components/StoryBankSection";
 import { Tracker } from "@/components/Tracker";
 
 // Desktop and iPad: For you alongside the application tracker. On phones the tracker
@@ -18,7 +19,10 @@ export default function MyJobsPage() {
       <aside className="hidden md:block lg:pt-[60px]">
         <div className="lg:sticky lg:top-20">
           <Suspense fallback={<div className="h-80 animate-pulse rounded-2xl bg-chip" />}>
-            <Tracker />
+            <div className="space-y-4">
+              <Tracker />
+              <StoryBankSection />
+            </div>
           </Suspense>
         </div>
       </aside>
