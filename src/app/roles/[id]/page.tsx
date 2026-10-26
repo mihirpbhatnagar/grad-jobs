@@ -5,6 +5,7 @@ import type { RoleTags } from "@/lib/roles";
 import { SaveButton } from "@/components/SaveButton";
 import { currentUser } from "@/lib/auth";
 import { publicClient } from "@/lib/supabase";
+import { visaFit, visaSettings } from "@/lib/visa";
 
 type FullRole = {
   id: number;
@@ -89,11 +90,13 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
   const closes = t.deadline ?? r.expires_at;
   const start = r.start_status === "confirmed" && t.startText ? t.startText : r.start_status === "likely" ? "2027 intake" : "Not stated";
 
+  const fit = visaFit(r, await visaSettings());
   const sponsorLine = {
-    likely: `On the Home Office sponsor register${r.sponsor_name ? ` as ${r.sponsor_name}` : ""}. If the scheme runs past your 18-month Graduate visa, they can sponsor a switch to a Skilled Worker visa.`,
-    unclear: `Possibly on the sponsor register${r.sponsor_name ? ` (closest match: ${r.sponsor_name})` : ""}. Worth asking early if the scheme is longer than 18 months.`,
-    not_listed: "Not found on the sponsor register. Fine for 18 months on the Graduate visa; ask early if the role runs longer.",
+    likely: `On the Home Office sponsor register${r.sponsor_name ? ` as ${r.sponsor_name}` : ""}.`,
+    unclear: `Possibly on the sponsor register${r.sponsor_name ? ` (closest match: ${r.sponsor_name})` : ""}.`,
+    not_listed: "Not found on the sponsor register.",
   }[r.sponsor_status ?? "not_listed"];
+  const fitStyle = { fits: "bg-accent-soft text-accent", switch: "bg-accent-soft text-accent", ask: "bg-amber-soft text-amber" }[fit.level];
 
   return (
     <>
@@ -143,7 +146,9 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
           )}
           </div>
           <Panel title="Visa">
-            <p>{sponsorLine}</p>
+            <p className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${fitStyle}`}>{fit.label}</p>
+            <p className="mt-2">{fit.detail}</p>
+            <p className="mt-2 text-muted">{sponsorLine} On the Graduate visa any employer can hire you without sponsorship.</p>
             {t.sponsorship === "not_offered" && <p className="mt-2 font-medium text-rose">The listing says it can&apos;t offer sponsorship.</p>}
           </Panel>
           <Panel title="Requirements">
