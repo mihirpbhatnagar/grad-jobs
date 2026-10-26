@@ -164,7 +164,13 @@ export function sponsorMatcher(sponsors: Sponsor[]): (employer: string, location
     const key = companyKey(employer);
     if (!key) return { status: "not_listed", name: null };
 
-    const hits = exact.get(key) ?? (ALIASES[key] ? exact.get(companyKey(ALIASES[key])) : undefined);
+    // Exact name, a known alias, or the company's own UK / group entity ("Thales" → "Thales UK").
+    const hits =
+      exact.get(key) ??
+      (ALIASES[key] ? exact.get(companyKey(ALIASES[key])) : undefined) ??
+      exact.get(`${key} uk`) ??
+      exact.get(`${key} group`) ??
+      exact.get(`${key} uk group`);
     if (hits) {
       const town = townKey(location);
       const best = hits.find((h) => town && townKey(h.town) === town) ?? hits[0];
