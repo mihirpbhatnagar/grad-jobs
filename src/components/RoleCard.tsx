@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SaveButton } from "@/components/SaveButton";
 import type { Role } from "@/lib/roles";
 
 const SPONSOR_BADGE = {
@@ -31,7 +32,17 @@ function Chip({ children, className = "bg-chip text-foreground/80" }: { children
   return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${className}`}>{children}</span>;
 }
 
-export function RoleCard({ role }: { role: Role }) {
+export function RoleCard({
+  role,
+  saved = false,
+  signedIn = false,
+  matchTags,
+}: {
+  role: Role;
+  saved?: boolean;
+  signedIn?: boolean;
+  matchTags?: string[];
+}) {
   const t = role.tags;
   const pay = salary(role.salary_min, role.salary_max);
   const closes = t.deadline ?? role.expires_at;
@@ -40,6 +51,9 @@ export function RoleCard({ role }: { role: Role }) {
 
   return (
     <article className="relative rounded-2xl border border-border bg-surface p-5 transition-colors hover:border-foreground/20">
+      {matchTags && matchTags.length > 0 && (
+        <p className="mb-2 text-xs font-medium text-accent">{matchTags.join(" · ")}</p>
+      )}
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h2 className="text-[15px] font-semibold leading-snug tracking-tight">
@@ -58,7 +72,10 @@ export function RoleCard({ role }: { role: Role }) {
             )}
           </p>
         </div>
-        {pay && <span className="shrink-0 text-sm font-medium tabular-nums">{pay}</span>}
+        <div className="flex shrink-0 items-center gap-3">
+          {pay && <span className="text-sm font-medium tabular-nums">{pay}</span>}
+          <SaveButton roleId={role.id} saved={saved} signedIn={signedIn} />
+        </div>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-1.5">

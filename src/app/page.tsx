@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { RoleCard } from "@/components/RoleCard";
 import { SidePanel } from "@/components/SidePanel";
+import { currentUser } from "@/lib/auth";
 import { fetchRoles, PAGE_SIZE, parseFilters, type RoleFilters } from "@/lib/roles";
 
 // Builds a link to this page with some filters changed (and back to page 1).
@@ -82,7 +83,12 @@ function RolesSkeleton() {
 
 async function Roles({ searchParams }: { searchParams: PageProps<"/">["searchParams"] }) {
   const f = parseFilters(await searchParams);
-  const result = await fetchRoles(f);
+  const [result, { db, user }] = await Promise.all([fetchRoles(f), currentUser()]);
+  const savedIds = new Set<number>();
+  if (user && result?.roles.length) {
+    const { data } = await db.from("saved_roles").select("role_id").in("role_id", result.roles.map((r) => r.id));
+    for (const row of data ?? []) savedIds.add(row.role_id);
+  }
   const pages = result ? Math.ceil(result.total / PAGE_SIZE) : 0;
 
   return (
@@ -127,7 +133,7 @@ async function Roles({ searchParams }: { searchParams: PageProps<"/">["searchPar
       </section>
 
       <section className="mt-8 space-y-3">
-        {result?.roles.map((role) => <RoleCard key={role.id} role={role} />)}
+        {result?.roles.map((role) => <RoleCard key={role.id} role={role} saved={savedIds.has(role.id)} signedIn={!!user} />)}
         {result && result.roles.length === 0 && (
           <div className="rounded-2xl border border-dashed border-border p-10 text-center text-muted">
             No roles match. Try fewer words or clear a filter.

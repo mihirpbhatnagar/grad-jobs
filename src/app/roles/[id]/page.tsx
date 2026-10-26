@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import type { RoleTags } from "@/lib/roles";
+import { SaveButton } from "@/components/SaveButton";
+import { currentUser } from "@/lib/auth";
 import { publicClient } from "@/lib/supabase";
 
 type FullRole = {
@@ -81,6 +83,8 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
     .maybeSingle();
   if (!data) notFound();
   const r = data as FullRole;
+  const { db: userDb, user } = await currentUser();
+  const saved = user ? !!(await userDb.from("saved_roles").select("role_id").eq("role_id", r.id).maybeSingle()).data : false;
   const t = r.tags;
   const closes = t.deadline ?? r.expires_at;
   const start = r.start_status === "confirmed" && t.startText ? t.startText : r.start_status === "likely" ? "2027 intake" : "Not stated";
@@ -125,16 +129,19 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
         </section>
 
         <div className="space-y-4">
+          <div className="flex gap-2">
+          <SaveButton roleId={r.id} saved={saved} signedIn={!!user} large />
           {r.apply_url && (
             <a
               href={r.apply_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex w-full items-center justify-center rounded-xl bg-foreground px-4 py-3 font-medium text-background hover:opacity-90"
+              className="flex flex-1 items-center justify-center rounded-xl bg-foreground px-4 py-3 font-medium text-background hover:opacity-90"
             >
               View and apply ↗
             </a>
           )}
+          </div>
           <Panel title="Visa">
             <p>{sponsorLine}</p>
             {t.sponsorship === "not_offered" && <p className="mt-2 font-medium text-rose">The listing says it can&apos;t offer sponsorship.</p>}
