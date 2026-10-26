@@ -1,5 +1,5 @@
 import { requireEnv } from "../lib/env.ts";
-import { htmlToText } from "../lib/normalise.ts";
+import { htmlToText, prettyLocation } from "../lib/normalise.ts";
 import type { Listing } from "./types.ts";
 
 // Reed jobseeker API (free key). Docs: https://www.reed.co.uk/developers/jobseeker
@@ -140,7 +140,7 @@ export function toListing(r: SearchResult, d: JobDetails | undefined): Listing {
     sourceUrl: r.jobUrl,
     title: r.jobTitle.trim(),
     employer: r.employerName.trim(),
-    location: r.locationName?.trim() || null,
+    location: prettyLocation(r.locationName),
     salaryMin: d?.yearlyMinimumSalary ?? r.minimumSalary ?? null,
     salaryMax: d?.yearlyMaximumSalary ?? r.maximumSalary ?? null,
     salaryText: d?.salary ?? null,

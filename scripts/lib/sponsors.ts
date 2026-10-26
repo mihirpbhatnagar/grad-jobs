@@ -41,8 +41,20 @@ function parseCsv(text: string): string[][] {
   return rows;
 }
 
+// GOV.UK downloads, retried through brief network drops.
+async function fetchWithRetry(url: string): Promise<Response> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await fetch(url);
+    } catch (err) {
+      if (attempt >= 4) throw err;
+      await new Promise((r) => setTimeout(r, 5000 * attempt));
+    }
+  }
+}
+
 async function latestRegisterUrl(): Promise<string> {
-  const res = await fetch(PUBLICATION_API);
+  const res = await fetchWithRetry(PUBLICATION_API);
   if (!res.ok) throw new Error(`GOV.UK content API returned ${res.status}`);
   const page = (await res.json()) as { details: { attachments?: { url: string; content_type: string }[] } };
   const csv = page.details.attachments?.find((a) => a.content_type === "text/csv" || a.url.endsWith(".csv"));
@@ -51,7 +63,7 @@ async function latestRegisterUrl(): Promise<string> {
 }
 
 async function downloadRegister(url: string): Promise<Sponsor[]> {
-  const res = await fetch(url);
+  const res = await fetchWithRetry(url);
   if (!res.ok) throw new Error(`Sponsor register download returned ${res.status}`);
   const [header, ...rows] = parseCsv(await res.text());
   if (header[0]?.trim() !== "Organisation Name") throw new Error(`Unexpected register columns: ${header.join(", ")}`);

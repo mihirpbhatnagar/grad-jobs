@@ -42,6 +42,25 @@ export function dedupeKey(employer: string, title: string, description: string):
   return `${companyKey(employer)}|${textKey(title)}|${fingerprint}`;
 }
 
+// Reed sometimes gives a bare postcode ("EC2V7AN") as the location. Map the postcode area
+// to its town so people can read it and the location filter can find it.
+const POSTCODE_AREAS: Record<string, string> = {
+  EC: "London", WC: "London", E: "London", N: "London", NW: "London", SE: "London", SW: "London", W: "London",
+  M: "Manchester", B: "Birmingham", EH: "Edinburgh", G: "Glasgow", LS: "Leeds", BS: "Bristol", L: "Liverpool",
+  NG: "Nottingham", S: "Sheffield", NE: "Newcastle upon Tyne", CF: "Cardiff", LE: "Leicester", CB: "Cambridge",
+  OX: "Oxford", RG: "Reading", MK: "Milton Keynes", BN: "Brighton", SO: "Southampton", AB: "Aberdeen",
+  BT: "Belfast", CV: "Coventry", DE: "Derby", LU: "Luton", SL: "Slough", GU: "Guildford", WA: "Warrington",
+  YO: "York", PO: "Portsmouth", EX: "Exeter", PL: "Plymouth", NR: "Norwich", HU: "Hull", ST: "Stoke-on-Trent",
+};
+
+export function prettyLocation(location: string | null | undefined): string | null {
+  if (!location) return null;
+  const m = location.trim().toUpperCase().match(/^([A-Z]{1,2})\d[A-Z\d]?\s*\d[A-Z]{2}$/);
+  if (!m) return location.trim();
+  const town = POSTCODE_AREAS[m[1]];
+  return town ? `${town} (${location.trim().toUpperCase().replace(/^(.+?)(\d[A-Z]{2})$/, "$1 $2").replace(/\s+/g, " ")})` : location.trim();
+}
+
 export function htmlToText(html: string | null | undefined): string {
   if (!html) return "";
   return html

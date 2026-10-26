@@ -5,7 +5,7 @@
 import { adminClient, chunks, must, selectAll } from "./lib/db.ts";
 import { loadEnv } from "./lib/env.ts";
 import { knownRoleIndex } from "./lib/match.ts";
-import { dedupeKey } from "./lib/normalise.ts";
+import { dedupeKey, prettyLocation } from "./lib/normalise.ts";
 import { refreshSponsors, sponsorMatcher, type SponsorMatch } from "./lib/sponsors.ts";
 import { isEarlyCareer, isSeniorTitle, roleKind, startStatus, tagListing } from "./lib/tags.ts";
 import { GOOGLE_JOBS_QUERIES, searchGoogleJobs } from "./sources/googleJobs.ts";
@@ -228,9 +228,9 @@ function sameJson(a: unknown, b: unknown): boolean {
 // Re-applies the early-career check, tagging and sponsor matching to open roles. Roles that
 // no longer pass the check are removed and remembered as excluded; only changed rows are written.
 async function retag(match: Matcher) {
-  type Row = { id: number; title: string; employer: string; location: string | null; description: string | null; tags: unknown; sponsor_status: string | null; sponsor_name: string | null; kind: string; start_status: string | null };
+  type Row = { id: number; title: string; employer: string; location: string | null; description: string | null; tags: unknown; sponsor_status: string | null; sponsor_name: string | null; kind: string; start_status: string | null; locations: string[] };
   const roles = await selectAll<Row>((from, to) =>
-    db.from("roles").select("id,title,employer,location,description,tags,sponsor_status,sponsor_name,kind,start_status").eq("is_open", true).order("id").range(from, to),
+    db.from("roles").select("id,title,employer,location,locations,description,tags,sponsor_status,sponsor_name,kind,start_status").eq("is_open", true).order("id").range(from, to),
   );
 
   const outOfScope = roles.filter((r) => (r.description ? !isEarlyCareer(r.title, r.description) : isSeniorTitle(r.title)));
@@ -249,8 +249,17 @@ async function retag(match: Matcher) {
     if (removed.has(r.id)) continue;
     const tags = tagListing(r.title, r.description ?? "");
     const m = match(r.employer, r.location);
-    const next = { tags, sponsor_status: m.status, sponsor_name: m.name, kind: roleKind(r.title), start_status: startStatus(tags, earliestStart) };
-    if (sameJson(next, { tags: r.tags, sponsor_status: r.sponsor_status, sponsor_name: r.sponsor_name, kind: r.kind, start_status: r.start_status })) continue;
+    const next = {
+      tags,
+      sponsor_status: m.status,
+      sponsor_name: m.name,
+      kind: roleKind(r.title),
+      start_status: startStatus(tags, earliestStart),
+      location: prettyLocation(r.location),
+      locations: [...new Set(r.locations.map((l) => prettyLocation(l) ?? l))],
+    };
+    const current = { tags: r.tags, sponsor_status: r.sponsor_status, sponsor_name: r.sponsor_name, kind: r.kind, start_status: r.start_status, location: r.location, locations: r.locations };
+    if (sameJson(next, current)) continue;
     await must(() => db.from("roles").update(next).eq("id", r.id));
     changed++;
   }
