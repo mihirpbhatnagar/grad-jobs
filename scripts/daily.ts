@@ -1,5 +1,6 @@
 // Daily data job. Run locally with `npm run daily`, and every morning by GitHub Actions.
-// Flags: --retag  re-run the scope check, tagging, start status and sponsor matching on every open role.
+// Flags: --retag-only  re-check stored roles without searching any source.
+//        --retag  re-run the scope check, tagging, start status and sponsor matching on every open role.
 
 import { adminClient, chunks, must, selectAll } from "./lib/db.ts";
 import { loadEnv } from "./lib/env.ts";
@@ -14,6 +15,8 @@ import type { Listing } from "./sources/types.ts";
 loadEnv();
 const db = adminClient();
 const retagAll = process.argv.includes("--retag");
+// Re-check stored roles only: no source searches (so no API calls or Google Jobs cost).
+const retagOnly = process.argv.includes("--retag-only");
 // A role not seen by any source for this long is treated as closed.
 const CLOSE_AFTER_DAYS = 2;
 // New Reed listings are fetched and saved this many at a time, so progress is never lost.
@@ -270,6 +273,13 @@ async function main() {
       db.from("roles").select("id,dedupe_key,sources,locations,first_seen").order("id").range(from, to),
     );
     const byKey = new Map(existing.map((r) => [r.dedupe_key, r]));
+
+    if (retagOnly) {
+      stats.retagged = await retag(match);
+      console.log("Done:", JSON.stringify(stats));
+      await db.from("ingest_runs").update({ finished_at: new Date().toISOString(), stats }).eq("id", run.id);
+      return;
+    }
 
     stats.reed = await pullReed(match, byKey);
 
