@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { CITIES, DONT_SHOW, FIELDS, SALARY_OPTIONS, type ProfileAnswers } from "@/lib/profile";
+import { embedInBrowser } from "@/lib/embed-browser";
 import { saveProfile } from "./actions";
 
 function Switch({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
@@ -68,7 +69,10 @@ export function ProfileForm({ initialName, initial, email, cvSlot }: { initialNa
 
   const save = () =>
     start(async () => {
-      const res = await saveProfile(name, a);
+      // What the user wants, in words: their chosen fields plus their own description.
+      const fieldNames = FIELDS.filter((f) => a.fields.value.includes(f.id)).map((f) => f.label);
+      const meaning = await embedInBrowser([...fieldNames, a.goals.value].filter(Boolean).join(". "));
+      const res = await saveProfile(name, a, meaning);
       setStatus(res.ok ? "saved" : "error");
     });
 

@@ -5,6 +5,7 @@
 import { adminClient, chunks, must, selectAll } from "./lib/db.ts";
 import { loadEnv } from "./lib/env.ts";
 import { knownRoleIndex } from "./lib/match.ts";
+import { embed, roleText } from "./lib/embed.ts";
 import { dedupeKey, prettyLocation } from "./lib/normalise.ts";
 import { refreshSponsors, sponsorMatcher, type SponsorMatch } from "./lib/sponsors.ts";
 import { isEarlyCareer, isSeniorTitle, roleKind, startStatus, tagListing } from "./lib/tags.ts";
@@ -203,6 +204,21 @@ async function saveCrossCheck(source: string, listings: Listing[], match: Matche
   return { found: listings.length, matchedExisting: links.length, newRoles: saved.newRoles, excluded: senior.length };
 }
 
+// Adds a meaning-embedding to main-list roles that don't have one yet (for For you).
+async function embedNewRoles(): Promise<number> {
+  const roles = await selectAll<{ id: number; title: string; description: string | null }>((from, to) =>
+    db.from("roles").select("id,title,description").eq("is_open", true).eq("kind", "job").eq("part_time", false)
+      .in("start_status", ["confirmed", "likely"]).is("embedding", null).order("id").range(from, to),
+  );
+  for (const batch of chunks(roles, 32)) {
+    const vectors = await embed(batch.map((r) => roleText(r.title, r.description)));
+    for (const [i, r] of batch.entries()) {
+      await must(() => db.from("roles").update({ embedding: `[${vectors[i].join(",")}]` }).eq("id", r.id));
+    }
+  }
+  return roles.length;
+}
+
 async function setting<T>(key: string, fallback: T): Promise<T> {
   const { data } = await db.from("settings").select("value").eq("key", key).maybeSingle();
   return (data?.value as T) ?? fallback;
@@ -285,6 +301,7 @@ async function main() {
 
     if (retagOnly) {
       stats.retagged = await retag(match);
+      stats.embedded = await embedNewRoles();
       console.log("Done:", JSON.stringify(stats));
       await db.from("ingest_runs").update({ finished_at: new Date().toISOString(), stats }).eq("id", run.id);
       return;
@@ -302,6 +319,7 @@ async function main() {
 
     stats.closed = await closeStaleRoles();
     if (retagAll || refreshed) stats.retagged = await retag(match);
+    stats.embedded = await embedNewRoles();
 
     const { count } = await db.from("roles").select("id", { count: "exact", head: true }).eq("is_open", true);
     stats.openRoles = count;

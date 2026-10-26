@@ -14,7 +14,13 @@ function inLocations(role: Role, wanted: string[]): string | null {
   return wanted.find((w) => places.includes(w.toLowerCase())) ?? null;
 }
 
-export function rankForYou(roles: (Role & { description?: string | null })[], a: ProfileAnswers): Match[] {
+// `similarity` (optional): how close each role is in meaning to the user's goals, 0–1, from
+// the free embedding model. It boosts close matches and can stand in for a keyword match.
+export function rankForYou(
+  roles: (Role & { description?: string | null })[],
+  a: ProfileAnswers,
+  similarity: Map<number, number> = new Map(),
+): Match[] {
   const fields = a.fields.forYou ? FIELDS.filter((f) => a.fields.value.includes(f.id)) : [];
   const goalWords = a.goals.forYou
     ? a.goals.value.toLowerCase().split(/[^a-z]+/).filter((w) => w.length > 4)
@@ -48,7 +54,12 @@ export function rankForYou(roles: (Role & { description?: string | null })[], a:
         tags.push(f.label.split(" ")[0]);
       }
     }
-    if (fields.length && score === 0) continue; // must match at least one chosen field
+    const sim = similarity.get(role.id) ?? 0;
+    if (fields.length && score === 0) {
+      if (sim < 0.4) continue; // must match a chosen field, by keyword or by meaning
+      tags.push("Close match");
+    }
+    score += Math.max(0, sim - 0.2) * 40;
 
     const goalHits = goalWords.filter((w) => title.includes(w) || body.includes(w)).length;
     if (goalHits) score += Math.min(goalHits, 3) * 2;

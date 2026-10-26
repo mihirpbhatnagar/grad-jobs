@@ -5,13 +5,18 @@ import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
 import { withDefaults, type ProfileAnswers } from "@/lib/profile";
 
-export async function saveProfile(displayName: string, answers: ProfileAnswers): Promise<{ ok: boolean; error?: string }> {
+export async function saveProfile(
+  displayName: string,
+  answers: ProfileAnswers,
+  goalEmbedding: number[] | null,
+): Promise<{ ok: boolean; error?: string }> {
   const { db, user } = await currentUser();
   if (!user) return { ok: false, error: "Sign in first" };
   const { error } = await db.from("profiles").upsert({
     user_id: user.id,
     display_name: displayName.trim().slice(0, 80) || null,
     answers: withDefaults(answers),
+    ...(goalEmbedding?.length === 384 ? { goal_embedding: `[${goalEmbedding.map(Number).join(",")}]` } : {}),
     updated_at: new Date().toISOString(),
   });
   if (error) return { ok: false, error: error.message };

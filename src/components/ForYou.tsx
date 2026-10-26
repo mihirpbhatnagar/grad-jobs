@@ -26,7 +26,7 @@ export async function ForYou() {
   if (!user) {
     return <Prompt title="Roles picked for you" body="Sign in and tell us what you're looking for. We'll rank every 2027 role for you." href="/sign-in?next=/my-jobs" cta="Sign in" />;
   }
-  const { data: profile } = await db.from("profiles").select("answers").maybeSingle();
+  const { data: profile } = await db.from("profiles").select("answers,goal_embedding").maybeSingle();
   const answers = withDefaults(profile?.answers);
   if (answers.fields.value.length === 0) {
     return <Prompt title="Tell us what you're looking for" body="Pick the kinds of roles you want on your profile and For you will fill up with matches." href="/profile" cta="Set up your profile" />;
@@ -41,7 +41,12 @@ export async function ForYou() {
     .eq("part_time", false)
     .in("start_status", ["confirmed", "likely"])
     .limit(1000);
-  const matches = rankForYou((data ?? []) as (Role & { description: string | null })[], answers);
+  const similarity = new Map<number, number>();
+  if (profile?.goal_embedding) {
+    const { data: close } = await pub.rpc("match_roles", { query: profile.goal_embedding, max_results: 1000 });
+    for (const c of (close ?? []) as { id: number; similarity: number }[]) similarity.set(c.id, c.similarity);
+  }
+  const matches = rankForYou((data ?? []) as (Role & { description: string | null })[], answers, similarity);
 
   const { data: saved } = await db.from("saved_roles").select("role_id");
   const savedIds = new Set((saved ?? []).map((s) => s.role_id));
