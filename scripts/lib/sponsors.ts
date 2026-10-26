@@ -105,6 +105,33 @@ export async function refreshSponsors(db: SupabaseClient): Promise<{ sponsors: S
   return { sponsors, refreshed: true, url };
 }
 
+// Big graduate employers whose everyday name differs from their register entry
+// (checked against the register on 26 October 2026). Keys are cleaned names.
+const ALIASES: Record<string, string> = {
+  ey: "Ernst & Young",
+  "ernst and young": "Ernst & Young",
+  pwc: "PricewaterhouseCoopers LLP",
+  jlr: "Jaguar Land Rover Limited",
+  "m and s": "Marks and Spencer Group Plc",
+  "marks and spencer": "Marks and Spencer Group Plc",
+  sky: "Sky UK Limited",
+  barclays: "Barclays Bank UK PLC",
+  lloyds: "Lloyds Bank plc",
+  "lloyds banking group": "Lloyds Bank plc",
+  unilever: "Unilever UK Limited",
+  capgemini: "Capgemini UK PLC",
+  atkinsrealis: "AtkinsRealis UK Limited",
+  aon: "Aon UK  Limited",
+  natwest: "NatWest Group PLC",
+  "natwest group": "NatWest Group PLC",
+  mazars: "Forvis Mazars LLP",
+  wsp: "WSP Group Limited",
+  bt: "BT Group",
+  hsbc: "HSBC Holdings plc",
+  "hsbc uk": "HSBC Holdings plc",
+  ibm: "IBM UK Ltd",
+};
+
 // Exact cleaned-name match = Likely (a licence covers every site, so town only picks the
 // best entry). A name that only matches as a prefix (e.g. "Barclays" vs "Barclays Bank UK")
 // = Unclear. Otherwise Not listed.
@@ -125,7 +152,7 @@ export function sponsorMatcher(sponsors: Sponsor[]): (employer: string, location
     const key = companyKey(employer);
     if (!key) return { status: "not_listed", name: null };
 
-    const hits = exact.get(key);
+    const hits = exact.get(key) ?? (ALIASES[key] ? exact.get(companyKey(ALIASES[key])) : undefined);
     if (hits) {
       const town = townKey(location);
       const best = hits.find((h) => town && townKey(h.town) === town) ?? hits[0];
