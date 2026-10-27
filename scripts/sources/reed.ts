@@ -105,9 +105,17 @@ export async function searchReed(): Promise<{ results: Map<number, SearchResult>
   const results = new Map<number, SearchResult>();
   let calls = 0;
   for (const search of SEARCHES) {
-    for (let skip = 0; ; skip += PAGE_SIZE) {
+    // Broad words ("work experience") match tens of thousands of jobs and Reed fails deep into
+    // them, so each search stops after 2,000 results; a failed page ends that search only.
+    for (let skip = 0; skip < 2000; skip += PAGE_SIZE) {
       const params = new URLSearchParams({ ...search, resultsToTake: String(PAGE_SIZE), resultsToSkip: String(skip) });
-      const page = await reedGet<{ results: SearchResult[]; totalResults: number }>(`/search?${params}`);
+      let page: { results: SearchResult[]; totalResults: number };
+      try {
+        page = await reedGet<{ results: SearchResult[]; totalResults: number }>(`/search?${params}`);
+      } catch (err) {
+        console.warn(`Reed search ${JSON.stringify(search)} stopped at ${skip}: ${String(err).slice(0, 120)}`);
+        break;
+      }
       calls++;
       for (const r of page.results) results.set(r.jobId, r);
       if (page.results.length < PAGE_SIZE || skip + PAGE_SIZE >= page.totalResults) break;
