@@ -9,6 +9,7 @@ import { knownRoleIndex } from "./lib/match.ts";
 import { embed, roleText } from "./lib/embed.ts";
 import { GRAD_EMPLOYERS } from "./data/gradEmployers.ts";
 import { lookupCompanies } from "./lib/companies.ts";
+import { healthCheck } from "./lib/health.ts";
 import { isEmployerPage, readJobPage, USER_AGENT } from "./lib/employerPages.ts";
 import { discoverFromWebsite, feedFromUrl, probe, readFeed } from "./sources/feeds.ts";
 import { companyKey, dedupeKey, prettyLocation } from "./lib/normalise.ts";
@@ -566,7 +567,11 @@ async function recordCoverage() {
     coveragePct: atWatched.length ? Math.round((viaFeed / atWatched.length) * 1000) / 10 : null,
     googleOnlyPct: roles.length ? Math.round((googleOnly / roles.length) * 1000) / 10 : null,
     bySource: Object.fromEntries(["reed", "google_jobs", "employer"].map((s) => [s, roles.filter((r) => r.sources.includes(s)).length])),
+    health: await healthCheck(db),
   };
+  const h = stats.health;
+  console.log(`Health check: ${h.passed}/${h.total} passed`);
+  for (const c of h.checks.filter((x) => !x.ok)) console.log(`  FAILED ${c.name}: ${c.detail}`);
   await must(() => db.from("coverage_daily").upsert({ day: new Date().toISOString().slice(0, 10), stats }, { onConflict: "day" }));
   return stats;
 }

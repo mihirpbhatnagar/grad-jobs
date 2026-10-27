@@ -2,29 +2,32 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { CompanyLogo } from "@/components/CompanyLogo";
 import { companiesFor, type Company } from "@/lib/companies";
-import { placeName } from "@/lib/format";
+import { daysUntil, placeName } from "@/lib/format";
 import { upcomingEvents } from "@/lib/loughborough";
 import { internshipRules } from "@/lib/roles";
 import { publicClient } from "@/lib/supabase";
 
-type Item = { id: number; title: string; employer: string; location: string | null; company_key: string | null };
-const COLS = "id,title,employer,location,company_key";
+type Item = { id: number; title: string; employer: string; location: string | null; company_key: string | null; expires_at: string | null };
+const COLS = "id,title,employer,location,company_key,expires_at";
 
 async function fetchSide() {
   // Live data on every request (also lets us read the current time below).
   await connection();
   const db = publicClient();
   if (!db) return null;
-  const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
-  const [internships, newSchemes, partTime] = await Promise.all([
+  const today = new Date().toISOString().slice(0, 10);
+  const twoWeeks = new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10);
+  const [internships, closing, partTime] = await Promise.all([
     internshipRules(db.from("roles").select(COLS).eq("is_open", true)).order("first_seen", { ascending: false }).limit(4),
+    // Closing soon: main-list roles with the nearest deadlines.
     db.from("roles").select(COLS).eq("is_open", true).eq("kind", "job").eq("part_time", false)
-      .in("start_status", ["confirmed", "likely"]).gte("first_seen", weekAgo).order("quality", { ascending: false }).limit(4),
+      .in("start_status", ["confirmed", "likely"]).gte("expires_at", today).lte("expires_at", twoWeeks)
+      .or(`tags->>deadline.is.null,tags->>deadline.gte.${today}`).order("expires_at", { ascending: true }).limit(5),
     db.from("roles").select("id", { count: "exact", head: true }).eq("is_open", true).eq("part_time", true).neq("start_status", "before"),
   ]);
-  const all = [...(internships.data ?? []), ...(newSchemes.data ?? [])] as Item[];
+  const all = [...(internships.data ?? []), ...(closing.data ?? [])] as Item[];
   const companies = await companiesFor(all.map((r) => r.company_key));
-  return { internships: (internships.data ?? []) as Item[], newSchemes: (newSchemes.data ?? []) as Item[], partTime: partTime.count ?? 0, companies, events: upcomingEvents().slice(0, 3) };
+  return { internships: (internships.data ?? []) as Item[], closing: (closing.data ?? []) as Item[], partTime: partTime.count ?? 0, companies, events: upcomingEvents().slice(0, 3) };
 }
 
 function Block({ title, icon, href, children }: { title: string; icon: string; href: string; children: React.ReactNode }) {
@@ -48,7 +51,7 @@ function Block({ title, icon, href, children }: { title: string; icon: string; h
   );
 }
 
-function RoleItems({ items, companies, empty }: { items: Item[]; companies: Map<string, Company>; empty: string }) {
+function RoleItems({ items, companies, empty, countdown = false }: { items: Item[]; companies: Map<string, Company>; empty: string; countdown?: boolean }) {
   if (items.length === 0) return <p className="py-2 text-sm text-muted">{empty}</p>;
   return (
     <ul className="divide-y divide-border">
@@ -58,13 +61,14 @@ function RoleItems({ items, companies, empty }: { items: Item[]; companies: Map<
           <li key={r.id}>
             <Link href={`/roles/${r.id}`} className="flex items-center gap-3 py-2.5 hover:opacity-80">
               <CompanyLogo name={r.employer} logoUrl={c?.logo_url} domain={c?.domain} size={34} />
-              <span className="min-w-0">
+              <span className="min-w-0 flex-1">
                 <span className="line-clamp-1 text-sm font-medium leading-snug">{r.title}</span>
                 <span className="block truncate text-xs text-muted">
                   {r.employer}
                   {r.location ? ` · ${placeName(r.location)}` : ""}
                 </span>
               </span>
+              {countdown && r.expires_at && <DaysLeft iso={r.expires_at} />}
             </Link>
           </li>
         );
@@ -73,15 +77,21 @@ function RoleItems({ items, companies, empty }: { items: Item[]; companies: Map<
   );
 }
 
-// Right-hand column on All roles (and the Careers tab on phones): new roles, internships,
+function DaysLeft({ iso }: { iso: string }) {
+  const d = daysUntil(iso);
+  const tone = d <= 3 ? "bg-rose-soft text-rose" : d <= 7 ? "bg-amber-soft text-amber" : "bg-chip text-foreground/80";
+  return <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold tabular-nums ${tone}`}>{d === 0 ? "Today" : `${d}d`}</span>;
+}
+
+// Right-hand column on All roles (and the Careers tab on phones): closing soon, internships,
 // opening soon, events and part-time roles, each linking to its own page.
 export async function SidePanel() {
   const side = await fetchSide();
   if (!side) return null;
   return (
     <div className="space-y-4 lg:sticky lg:top-20">
-      <Block title="New this week" href="/?sort=newest" icon="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z">
-        <RoleItems items={side.newSchemes} companies={side.companies} empty="New 2027 roles will appear here." />
+      <Block title="Closing soon" href="/?closing=1&sort=closing" icon="M12 7v5l3 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z">
+        <RoleItems items={side.closing} companies={side.companies} empty="Nothing closes in the next two weeks." countdown />
       </Block>
       <Block title="Internships and work experience" href="/internships" icon="M4 8h16v11H4zM9 8V5h6v3">
         <RoleItems items={side.internships} companies={side.companies} empty="None nearby right now. Remote and events internships show here too." />

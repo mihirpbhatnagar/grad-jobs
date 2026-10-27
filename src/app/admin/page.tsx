@@ -11,6 +11,7 @@ type Coverage = {
   coveragePct: number | null;
   googleOnlyPct: number | null;
   bySource: Record<string, number>;
+  health?: { checks: { name: string; ok: boolean; detail: string }[]; employers: { name: string; roles: number; reason: string }[]; passed: number; total: number };
 };
 
 function Big({ label, value, sub }: { label: string; value: string; sub?: string }) {
@@ -44,6 +45,33 @@ async function CoverageView() {
         <Big label="Found only by Google Jobs" value={today.googleOnlyPct === null ? "–" : `${today.googleOnlyPct}%`} sub="Roles no other source had" />
         <Big label="Main list" value={today.mainList.toLocaleString("en-GB")} sub="Full-time, starting June 2027+" />
       </div>
+      {today.health && (
+        <section className="rounded-2xl border border-border bg-surface p-5">
+          <h2 className="font-semibold tracking-tight">
+            Health check · {today.health.passed}/{today.health.total} passed
+          </h2>
+          <ul className="mt-3 space-y-2 text-sm">
+            {today.health.checks.map((c) => (
+              <li key={c.name} className="flex gap-3">
+                <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${c.ok ? "bg-success-soft text-success" : "bg-rose-soft text-rose"}`}>{c.ok ? "✓" : "!"}</span>
+                <span>
+                  <span className="font-medium">{c.name}</span>
+                  {!c.ok && <span className="block text-muted">{c.detail}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <h3 className="mt-6 text-sm font-semibold">Big graduate employers</h3>
+          <div className="mt-2 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+            {today.health.employers.map((e) => (
+              <div key={e.name} className="flex justify-between gap-3 border-b border-border py-1.5">
+                <span className={e.roles ? "" : "text-muted"}>{e.name}</span>
+                <span className={`text-right ${e.roles ? "font-semibold tabular-nums" : "text-xs text-muted"}`}>{e.roles || e.reason}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
       <section className="rounded-2xl border border-border bg-surface p-5">
         <h2 className="font-semibold tracking-tight">Where main-list roles were found</h2>
         <div className="mt-4 space-y-3">
