@@ -13,7 +13,8 @@ concurrency:
 jobs:
   daily:
     runs-on: ubuntu-latest
-    timeout-minutes: 150
+    # Public repository: unlimited free minutes, so the full watch list can run every morning.
+    timeout-minutes: 330
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
