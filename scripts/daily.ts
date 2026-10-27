@@ -267,7 +267,9 @@ async function closeStaleRoles(): Promise<number> {
   const today = new Date().toISOString().slice(0, 10);
   const stale = await must(() => db.from("roles").update({ is_open: false }).eq("is_open", true).lt("last_seen", cutoff).select("id"));
   const expired = await must(() => db.from("roles").update({ is_open: false }).eq("is_open", true).lt("expires_at", today).select("id"));
-  return stale.length + expired.length;
+  // The listing's own stated closing date counts too (boards sometimes keep roles up longer).
+  const pastDeadline = await must(() => db.from("roles").update({ is_open: false }).eq("is_open", true).lt("tags->>deadline", today).select("id"));
+  return stale.length + expired.length + pastDeadline.length;
 }
 
 // The database stores JSON with its keys reordered, so compare with keys sorted.

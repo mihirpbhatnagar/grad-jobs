@@ -35,11 +35,76 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
   );
 }
 
+// Type-to-search field picker: "audit" finds Finance and accounting, "sport" finds Sports business.
+function FieldPicker({ value, onChange, myFields }: { value: string[]; onChange: (v: string[]) => void; myFields: string[] }) {
+  const [text, setText] = useState("");
+  const t = text.trim().toLowerCase();
+  const matches = t
+    ? FIELDS.filter((f) => !value.includes(f.id) && (f.label.toLowerCase().includes(t) || f.keywords.some((k) => k.trim().startsWith(t) || t.startsWith(k.trim()))))
+    : [];
+  const mineOn = myFields.length > 0 && myFields.every((id) => value.includes(id));
+  return (
+    <div>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative w-full sm:w-80">
+          <input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && matches[0]) {
+                e.preventDefault();
+                onChange([...value, matches[0].id]);
+                setText("");
+              }
+            }}
+            placeholder="Type a field, e.g. marketing, audit, sport"
+            className="w-full rounded-xl border border-border bg-background px-3.5 py-2 text-sm outline-none focus:border-accent"
+          />
+          {matches.length > 0 && (
+            <ul className="absolute z-10 mt-1 w-full overflow-hidden rounded-xl border border-border bg-surface shadow-xl">
+              {matches.slice(0, 6).map((f) => (
+                <li key={f.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onChange([...value, f.id]);
+                      setText("");
+                    }}
+                    className="block w-full px-3.5 py-2 text-left text-sm hover:bg-accent-soft"
+                  >
+                    {f.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {t && matches.length === 0 && <p className="mt-1 text-xs text-muted">No field matches. Try the search bar for any word.</p>}
+        </div>
+        {myFields.length > 0 && (
+          <Pill on={mineOn} onClick={() => onChange(mineOn ? value.filter((id) => !myFields.includes(id)) : [...new Set([...value, ...myFields])])}>
+            ✦ My fields
+          </Pill>
+        )}
+      </div>
+      {value.length > 0 && (
+        <div className="mt-2.5 flex flex-wrap gap-2">
+          {value.map((id) => (
+            <button key={id} type="button" onClick={() => onChange(value.filter((x) => x !== id))} className="inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 text-sm text-white">
+              {FIELDS.find((f) => f.id === id)?.label ?? id}
+              <span aria-hidden>×</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const toggle = (list: string[], v: string) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
 
 // Search box with a Filters button (all filters in one panel) and the sort menu.
 // Filters are chosen in the panel and applied together; the address keeps them shareable.
-export function FilterBar({ filters, path = "/", showStart = true }: { filters: RoleFilters; path?: string; showStart?: boolean }) {
+export function FilterBar({ filters, path = "/", showStart = true, myFields = [] }: { filters: RoleFilters; path?: string; showStart?: boolean; myFields?: string[] }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [open, setOpen] = useState(false);
@@ -56,9 +121,6 @@ export function FilterBar({ filters, path = "/", showStart = true }: { filters: 
     ...filters.locs.map((l) => ({ label: l, remove: { locs: filters.locs.filter((x) => x !== l) } })),
     ...(filters.salary ? [{ label: SALARY_OPTIONS.find((o) => o.value === filters.salary)?.label ?? `£${filters.salary}+`, remove: { salary: 0 } }] : []),
     ...(filters.start ? [{ label: START_OPTIONS.find((o) => o.value === filters.start)!.label, remove: { start: "" as const } }] : []),
-    ...(filters.sponsor ? [{ label: "Licensed sponsors", remove: { sponsor: "" as const } }] : []),
-    ...(filters.schemes ? [{ label: "Graduate schemes", remove: { schemes: false } }] : []),
-    ...(filters.closingSoon ? [{ label: "Closing in 2 weeks", remove: { closingSoon: false } }] : []),
     ...(filters.source ? [{ label: filters.source === "reed" ? "From Reed" : "From Google Jobs", remove: { source: "" as const } }] : []),
   ];
 
@@ -125,13 +187,10 @@ export function FilterBar({ filters, path = "/", showStart = true }: { filters: 
         <div className="mt-3 rounded-2xl border border-border bg-surface p-5 text-foreground shadow-xl shadow-black/10">
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="lg:col-span-2">
-              <Group title="Field">
-                {FIELDS.map((f) => (
-                  <Pill key={f.id} on={draft.sectors.includes(f.id)} onClick={() => set({ sectors: toggle(draft.sectors, f.id) })}>
-                    {f.label}
-                  </Pill>
-                ))}
-              </Group>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">Field</h3>
+              <div className="mt-2.5">
+                <FieldPicker value={draft.sectors} onChange={(sectors) => set({ sectors })} myFields={myFields} />
+              </div>
             </div>
             <Group title="Location">
               {[...CITIES, "Leeds", "Bristol", "Glasgow", "Nottingham", "Remote"].map((c) => (
@@ -156,9 +215,12 @@ export function FilterBar({ filters, path = "/", showStart = true }: { filters: 
                 ))}
               </Group>
             )}
+            <Group title="Visa sponsorship">
+              <Pill on={draft.sponsor === ""} onClick={() => set({ sponsor: "" })}>Any employer</Pill>
+              <Pill on={draft.sponsor === "likely"} onClick={() => set({ sponsor: "likely" })}>✓ Licensed sponsors only</Pill>
+            </Group>
             <Group title="Role type">
               <Pill on={draft.schemes} onClick={() => set({ schemes: !draft.schemes })}>Graduate schemes</Pill>
-              <Pill on={draft.sponsor === "likely"} onClick={() => set({ sponsor: draft.sponsor === "likely" ? "" : "likely" })}>Licensed sponsors</Pill>
               <Pill on={draft.closingSoon} onClick={() => set({ closingSoon: !draft.closingSoon })}>Closing in 2 weeks</Pill>
             </Group>
             <Group title="Found by">
@@ -185,8 +247,33 @@ export function FilterBar({ filters, path = "/", showStart = true }: { filters: 
         </div>
       )}
 
-      {applied.length > 0 && !open && (
+      {!open && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
+          {(
+            [
+              ["✓ Licensed sponsors only", filters.sponsor === "likely", { sponsor: filters.sponsor === "likely" ? "" : "likely" }],
+              ["Graduate schemes", filters.schemes, { schemes: !filters.schemes }],
+              ["Closing in 2 weeks", filters.closingSoon, { closingSoon: !filters.closingSoon }],
+              ...(myFields.length
+                ? [["✦ My fields", myFields.every((id) => filters.sectors.includes(id)), { sectors: myFields.every((id) => filters.sectors.includes(id)) ? filters.sectors.filter((id) => !myFields.includes(id)) : [...new Set([...filters.sectors, ...myFields])] }]]
+                : []),
+            ] as [string, boolean, Partial<RoleFilters>][]
+          ).map(([label, on, change]) => (
+            <button
+              key={label}
+              type="button"
+              aria-pressed={on}
+              onClick={() => go({ ...filters, ...change })}
+              className={`rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${on ? "bg-white text-accent shadow" : "bg-white/10 text-white ring-1 ring-white/30 hover:bg-white/20"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {applied.length > 0 && !open && (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
           {applied.map((a) => (
             <button
               key={a.label}

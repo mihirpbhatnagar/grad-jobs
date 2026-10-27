@@ -23,7 +23,7 @@ async function mainStats() {
   const today = new Date().toISOString().slice(0, 10);
   const base = () =>
     db.from("roles").select("id", { count: "exact", head: true }).eq("is_open", true).eq("kind", "job").eq("part_time", false)
-      .in("start_status", ["confirmed", "likely"]).or(`expires_at.is.null,expires_at.gte.${today}`);
+      .in("start_status", ["confirmed", "likely"]).or(`expires_at.is.null,expires_at.gte.${today}`).or(`tags->>deadline.is.null,tags->>deadline.gte.${today}`);
   const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
   const twoWeeks = new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10);
   const [fresh, closing, sponsors, schemes] = await Promise.all([
@@ -70,11 +70,13 @@ export async function RoleListing({
   const pages = result ? Math.ceil(result.total / PAGE_SIZE) : 0;
 
   // Profile answers whose "Use in For you" switch is off become one-tap filters here.
+  // (Fields always get a "My fields" button in the filters instead.)
   const myChips: { label: string; href: string }[] = [];
-  if (user && scope === "main") {
+  let myFields: string[] = [];
+  if (user) {
     const { data: profile } = await db.from("profiles").select("answers").maybeSingle();
     const a = withDefaults(profile?.answers);
-    if (!a.fields.forYou && a.fields.value.length) myChips.push({ label: "My fields", href: filtersToQuery(f, { sectors: a.fields.value }, path) });
+    myFields = a.fields.value;
     const places = [...a.locations.value, ...a.locations.other.split(",").map((x) => x.trim()).filter(Boolean)];
     if (!a.locations.forYou && places.length) myChips.push({ label: "My locations", href: filtersToQuery(f, { locs: places }, path) });
     if (!a.salary.forYou && a.salary.value) myChips.push({ label: "My salary", href: filtersToQuery(f, { salary: a.salary.value }, path) });
@@ -98,7 +100,7 @@ export async function RoleListing({
           </div>
         )}
         <div className="mt-6">
-          <FilterBar filters={f} path={path} showStart={scope === "main"} />
+          <FilterBar filters={f} path={path} showStart={scope === "main"} myFields={myFields} />
         </div>
         {myChips.length > 0 && (
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">

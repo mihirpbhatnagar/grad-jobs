@@ -112,7 +112,7 @@ export async function fetchRoles(f: RoleFilters, scope: RoleScope = "main") {
 
   // Open roles whose closing date hasn't passed (the daily job also closes them each morning).
   const today = new Date().toISOString().slice(0, 10);
-  let query = db.from("roles").select(ROLE_COLUMNS, { count: "exact" }).eq("is_open", true).or(`expires_at.is.null,expires_at.gte.${today}`);
+  let query = db.from("roles").select(ROLE_COLUMNS, { count: "exact" }).eq("is_open", true).or(`expires_at.is.null,expires_at.gte.${today}`).or(`tags->>deadline.is.null,tags->>deadline.gte.${today}`);
   // Main list: full-time jobs starting on or after the earliest start (June 2027), stated
   // or clearly aimed at 2027 starters. Part-time roles and internships have their own pages.
   if (scope === "main") {
