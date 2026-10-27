@@ -52,6 +52,35 @@ export async function recordCv(path: string, name: string): Promise<void> {
   revalidatePath("/profile");
 }
 
+export async function saveAlerts(alerts: { emailDigest: boolean; telegram: boolean }): Promise<void> {
+  const { db, user } = await currentUser();
+  if (!user) return;
+  await db.from("profiles").upsert({ user_id: user.id, alerts: { emailDigest: !!alerts.emailDigest, telegram: !!alerts.telegram } });
+}
+
+// Links the user's Telegram chat: finds their "/start <code>" message to the bot.
+export async function checkTelegram(): Promise<boolean> {
+  const { db, user } = await currentUser();
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!user || !token) return false;
+  const { data: profile } = await db.from("profiles").select("telegram_link_code").maybeSingle();
+  if (!profile?.telegram_link_code) return false;
+  const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates?allowed_updates=["message"]`, { cache: "no-store" });
+  if (!res.ok) return false;
+  const { result } = (await res.json()) as { result: { message?: { text?: string; chat: { id: number } } }[] };
+  const hit = result.find((u) => u.message?.text?.trim() === `/start ${profile.telegram_link_code}`);
+  if (!hit?.message) return false;
+  const chatId = hit.message.chat.id;
+  await db.from("profiles").update({ telegram_chat_id: chatId }).eq("user_id", user.id);
+  await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: chatId, text: "Connected to Grad Jobs. Deadline reminders and new matches will arrive here each morning." }),
+  });
+  revalidatePath("/profile");
+  return true;
+}
+
 // UK GDPR: removes the user's CV files, then the account (which cascades to all their rows).
 export async function deleteAccount(): Promise<void> {
   const { db, user } = await currentUser();

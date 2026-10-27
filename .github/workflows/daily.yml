@@ -35,3 +35,12 @@ jobs:
           REED_MAX_HOURLY_WAITS: "2"
           DATAFORSEO_LOGIN: ${{ secrets.DATAFORSEO_LOGIN }}
           DATAFORSEO_PASSWORD: ${{ secrets.DATAFORSEO_PASSWORD }}
+      # Morning alerts (Telegram and email digest); switched off until their keys are added.
+      - run: |
+          if [ -z "$SUPABASE_SECRET_KEY" ]; then exit 0; fi
+          npm run alerts
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}

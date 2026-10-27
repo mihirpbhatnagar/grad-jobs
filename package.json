@@ -9,7 +9,8 @@
     "lint": "eslint",
     "daily": "node scripts/daily.ts",
     "db": "supabase",
-    "adzuna-test": "node scripts/adzuna-overlap.ts"
+    "adzuna-test": "node scripts/adzuna-overlap.ts",
+    "alerts": "node scripts/alerts.ts"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.1",

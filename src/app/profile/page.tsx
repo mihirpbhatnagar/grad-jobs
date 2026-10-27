@@ -1,14 +1,16 @@
+import Link from "next/link";
 import { Suspense } from "react";
 import { requireUser } from "@/lib/auth";
 import { withDefaults } from "@/lib/profile";
 import { signOut } from "../sign-in/actions";
+import { Alerts } from "./Alerts";
 import { CvUpload } from "./CvUpload";
 import { DeleteAccount } from "./DeleteAccount";
 import { ProfileForm } from "./ProfileForm";
 
 async function Profile() {
   const { db, user } = await requireUser("/profile");
-  const { data } = await db.from("profiles").select("display_name,answers,cv_name,cv_uploaded_at,cv_suggested_fields").maybeSingle();
+  const { data } = await db.from("profiles").select("display_name,answers,cv_name,cv_uploaded_at,cv_suggested_fields,telegram_link_code,telegram_chat_id,alerts").maybeSingle();
   const cv = (
     <CvUpload
       url={process.env.SUPABASE_URL!}
@@ -20,6 +22,21 @@ async function Profile() {
   return (
     <div className="space-y-4">
       <ProfileForm initialName={data?.display_name ?? ""} initial={withDefaults(data?.answers)} email={user.email ?? ""} cvSlot={cv} cvSuggestions={data?.cv_suggested_fields ?? []} />
+      {data?.telegram_link_code && (
+        <Alerts
+          initial={{ emailDigest: data.alerts?.emailDigest !== false, telegram: data.alerts?.telegram !== false }}
+          connected={!!data.telegram_chat_id}
+          botUsername={process.env.TELEGRAM_BOT_USERNAME ?? null}
+          linkCode={data.telegram_link_code}
+        />
+      )}
+      <Link href="/admin" className="card-lift flex items-center justify-between rounded-2xl border border-border bg-surface p-5">
+        <span>
+          <span className="font-semibold tracking-tight">Data coverage</span>
+          <span className="block text-sm text-muted">How many UK graduate roles the app is catching, checked every morning</span>
+        </span>
+        <span aria-hidden className="text-muted">→</span>
+      </Link>
       <DeleteAccount />
     </div>
   );

@@ -1,5 +1,5 @@
-import { FIELDS, type ProfileAnswers } from "@/lib/profile";
-import type { Role } from "@/lib/roles";
+import { FIELDS, type ProfileAnswers } from "./profile.ts";
+import type { Role } from "./roles.ts";
 
 // For you ranking (free rules, no AI): roles matching the user's chosen fields first, then
 // the other switched-on answers (sponsors, locations, salary), then a small boost for July

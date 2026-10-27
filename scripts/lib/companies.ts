@@ -87,7 +87,7 @@ function latestEmployees(e: Entity): number | null {
     const when = String((c.qualifiers?.P585?.[0]?.datavalue?.value as { time?: string })?.time ?? "");
     if (Number.isFinite(n) && (!best || when > best.when)) best = { n, when };
   }
-  return best?.n ?? null;
+  return best ? Math.round(best.n) : null;
 }
 
 const domainOf = (url: string | null) => {
