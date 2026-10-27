@@ -2,8 +2,8 @@ import { cacheLife } from "next/cache";
 import { FIELDS } from "./profile";
 import { publicClient } from "./supabase";
 
-// Salary context from the roles in the app itself (free): the typical salary for similar
-// 2027 graduate roles, used as an estimate when a listing doesn't state one.
+// Salary context from the roles in the app itself (free): the typical stated salary for
+// similar 2027 graduate roles, shown beside a role's own salary.
 
 export type SalaryContext = { overall: number | null; byField: Record<string, { median: number; count: number }> };
 
@@ -48,10 +48,3 @@ export async function salaryContext(): Promise<SalaryContext> {
   return { overall: median(pays.map((p) => p.pay)), byField };
 }
 
-// Estimated salary for a role without one: the median for its field, else for all roles.
-export function estimateFor(title: string, ctx: SalaryContext): { amount: number; basis: string } | null {
-  const f = fieldOf(title);
-  const hit = f ? ctx.byField[f.id] : undefined;
-  if (hit) return { amount: hit.median, basis: `typical for ${f!.label.toLowerCase()} roles here` };
-  return ctx.overall ? { amount: ctx.overall, basis: "typical for 2027 graduate roles here" } : null;
-}

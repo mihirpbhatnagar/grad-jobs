@@ -1,4 +1,4 @@
-import { ukToday } from "./format";
+import { ukToday, weekAhead } from "./format";
 import { companiesFor, type Company } from "./companies";
 import { FIELDS } from "./profile";
 import { publicClient } from "./supabase";
@@ -13,6 +13,7 @@ export type RoleTags = {
   lengthMonths: number | null;
   graduateScheme: boolean;
   programmeTitle?: boolean;
+  salaryCompetitive?: boolean;
   aimedAt2027: boolean;
   startDate?: string | null;
 };
@@ -25,6 +26,7 @@ export type Role = {
   locations: string[];
   salary_min: number | null;
   salary_max: number | null;
+  salary_text?: string | null;
   apply_url: string | null;
   posted_at: string | null;
   expires_at: string | null;
@@ -38,7 +40,7 @@ export type Role = {
 };
 
 export const ROLE_COLUMNS =
-  "id,title,employer,location,locations,salary_min,salary_max,apply_url,posted_at,expires_at,tags,sponsor_status,sponsor_name,sources,start_status,company_key";
+  "id,title,employer,location,locations,salary_min,salary_max,salary_text,apply_url,posted_at,expires_at,tags,sponsor_status,sponsor_name,sources,start_status,company_key";
 
 export type RoleFilters = {
   q: string;
@@ -162,8 +164,9 @@ export async function fetchRoles(f: RoleFilters, scope: RoleScope = "main") {
   if (f.start === "sept") query = query.gte("tags->>startDate", "2027-09-01").lt("tags->>startDate", "2027-10-01");
   if (f.start === "later") query = query.gte("tags->>startDate", "2027-10-01");
   if (f.closingSoon) {
-    const twoWeeks = new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10);
-    query = query.lte("expires_at", twoWeeks);
+    // Closing this week: the listing's own deadline or the board's expiry within 7 days.
+    const week = weekAhead();
+    query = query.or(`expires_at.lte.${week},tags->>deadline.lte.${week}`);
   }
   if (f.source) query = query.contains("sources", [f.source]);
   if (f.sort === "closing") query = query.order("expires_at", { ascending: true, nullsFirst: false });

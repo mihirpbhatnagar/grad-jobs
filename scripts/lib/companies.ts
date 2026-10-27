@@ -67,6 +67,9 @@ const entityId = (v: unknown) => (v as { id?: string } | undefined)?.id ?? null;
 
 // An organisation, not a person, place or piece of software that happens to share the name.
 const isOrganisation = (e: Entity) => ["P452", "P1128", "P159", "P414"].some((p) => values(e, p).length > 0);
+// A same-named thing that isn't an employer of graduates: a club, a place, a work of art.
+export const NOT_EMPLOYER = /(football club|association football|rugby (union |league )?club|cricket club|village|town in|city in|county|civil parish|river|album|film|band|song|novel|television|politician|footballer|given name|surname|family name|asteroid|genus|species)/i;
+
 // Several matches (e.g. a group and a thin UK registration entry): prefer the best-described.
 const richness = (e: Entity) =>
   (e.sitelinks?.enwiki ? 3 : 0) + ["P452", "P1128", "P159", "P154", "P856", "P571"].filter((p) => values(e, p).length > 0).length;
@@ -110,10 +113,10 @@ export async function lookupCompanies(names: Map<string, string>): Promise<Compa
     );
     const ids = (res?.search ?? []).map((s) => s.id);
     if (!ids.length) continue;
-    const cands = await entities(ids, "labels|aliases|claims|sitelinks");
+    const cands = await entities(ids, "labels|aliases|descriptions|claims|sitelinks");
     const hit = ids
       .map((id) => cands[id])
-      .filter((e) => e && nameMatches(e, key) && isOrganisation(e))
+      .filter((e) => e && nameMatches(e, key) && isOrganisation(e) && !(NOT_EMPLOYER.test(e.descriptions?.en?.value ?? "") && !/(fc|club|united|city)/i.test(key)))
       .sort((a, b) => richness(b) - richness(a))[0];
     if (hit) found.set(key, hit.id);
   }

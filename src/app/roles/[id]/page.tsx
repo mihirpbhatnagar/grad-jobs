@@ -8,9 +8,9 @@ import { Chip, SponsorTick } from "@/components/RoleCard";
 import { SaveButton } from "@/components/SaveButton";
 import { currentUser } from "@/lib/auth";
 import { companyFor, sizeLabel, type Company } from "@/lib/companies";
-import { dateLong, daysUntil, decodeEntities, employerLabel, isBoardName, money, placeName, startLabel } from "@/lib/format";
+import { dateLong, daysUntil, decodeEntities, employerLabel, isBoardName, isCompetitive, money, placeName, startLabel } from "@/lib/format";
 import type { RoleTags } from "@/lib/roles";
-import { estimateFor, fieldOf, salaryContext } from "@/lib/salary";
+import { fieldOf, salaryContext } from "@/lib/salary";
 import { publicClient } from "@/lib/supabase";
 import { visaFit, visaSettings } from "@/lib/visa";
 
@@ -240,8 +240,7 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
   const blocks = r.description ? toBlocks(r.description) : [];
   const reqs = requirementsFrom(blocks);
   const field = fieldOf(r.title);
-  const estimate = r.salary_min || r.salary_max ? null : estimateFor(r.title, ctx);
-  const pay = r.salary_max && r.salary_min ? Math.round((r.salary_min + r.salary_max) / 2) : (r.salary_min ?? r.salary_max ?? estimate?.amount ?? null);
+  const pay = r.salary_max && r.salary_min ? Math.round((r.salary_min + r.salary_max) / 2) : (r.salary_min ?? r.salary_max ?? null);
   const fit = visaFit(r, visa);
   const fitStyle = { fits: "bg-success-soft text-success", switch: "bg-success-soft text-success", ask: "bg-amber-soft text-amber" }[fit.level];
   const standard = Number(settings?.value ?? 41700);
@@ -251,13 +250,13 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
       ? `${money(r.salary_min)} – ${money(r.salary_max)}`
       : r.salary_min || r.salary_max
         ? money((r.salary_min ?? r.salary_max)!)
-        : estimate
-          ? `≈ ${money(estimate.amount)}`
+        : isCompetitive(r.salary_text, t)
+          ? "Competitive"
           : "Not stated";
   const contract = r.contract_type ? cap(r.contract_type) : t.graduateScheme || t.programmeTitle ? "Graduate scheme" : "Not stated";
 
   const salaryRows = [
-    ...(pay ? [{ label: estimate ? "This role (estimate)" : "This role", amount: pay, highlight: true }] : []),
+    ...(pay ? [{ label: "This role", amount: pay, highlight: true }] : []),
     ...(field && ctx.byField[field.id] ? [{ label: `Typical ${field.label.split(" ")[0].toLowerCase()} role here`, amount: ctx.byField[field.id].median }] : []),
     ...(ctx.overall ? [{ label: "Typical 2027 graduate role here", amount: ctx.overall }] : []),
     { label: "Visa new-entrant floor", amount: visa.newEntrantSalary },
@@ -309,7 +308,7 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
       </section>
 
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-        <Fact label="Salary" value={salaryValue} sub={estimate ? "Estimate: not stated" : undefined} />
+        <Fact label="Salary" value={salaryValue} />
         <Fact label="Location" value={placeName(r.location) ?? "Not stated"} sub={r.locations.length > 1 ? `+ ${r.locations.length - 1} more` : undefined} />
         <Fact label="Starts" value={r.start_status === "confirmed" && t.startText ? t.startText : r.start_status === "likely" ? "2027 intake" : "Not stated"} sub={r.start_status === "likely" ? "Exact month not stated" : undefined} />
         <Fact

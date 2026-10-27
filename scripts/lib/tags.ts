@@ -16,6 +16,7 @@ export type RoleTags = {
   lengthMonths: number | null;
   graduateScheme: boolean;
   programmeTitle: boolean;
+  salaryCompetitive: boolean;
   immediateStart: boolean;
   aimedAt2027: boolean;
 };
@@ -75,6 +76,28 @@ function findStart(text: string): { startText: string | null; startDate: string 
     return { startText: `${label} ${m[2]}`, startDate: parseMonthYear(m[1], m[2]) };
   }
   return { startText: null, startDate: null };
+}
+
+// "Salary: £34,000 per annum + £2,000 welcome bonus" -> 34,000. Yearly amounts only, from a
+// line that talks about salary or pay (bonuses, allowances and hourly rates are ignored).
+export function findSalary(text: string): { min: number; max: number } | null {
+  const toNumber = (amount: string, k: string | undefined) => {
+    const n = Number(amount.replace(/,/g, ""));
+    return k ? n * 1000 : n;
+  };
+  for (const raw of text.split(/\n|(?<=\.)\s+/)) {
+    const line = raw.replace(/\s+/g, " ");
+    if (!/£/.test(line) || /\b(per hour|an hour|p\/h|hourly|per day|a day|daily rate)\b/i.test(line)) continue;
+    if (!/\b(salary|salaries|pay|per annum|p\.?a\.?|a year|per year|annual|starting|package|£\d{2}k)\b/i.test(line)) continue;
+    const amounts: number[] = [];
+    for (const m of line.matchAll(/£\s?(\d{1,3}(?:,\d{3})+|\d{2,3}(?:\.\d)?)\s?(k|K)?\b(?![^.]{0,25}\b(bonus|allowance|relocation|sign[- ]?on|golden hello|signing)\b)/g)) {
+      if (/\b(bonus|allowance|relocation|sign[- ]?on|golden hello|signing)\b[^£]{0,8}$/i.test(line.slice(0, m.index))) continue;
+      const n = toNumber(m[1], m[2]);
+      if (n >= 16000 && n <= 120000) amounts.push(n);
+    }
+    if (amounts.length) return { min: Math.min(...amounts.slice(0, 2)), max: Math.max(...amounts.slice(0, 2)) };
+  }
+  return null;
 }
 
 function findDeadline(text: string): string | null {
@@ -191,6 +214,7 @@ export function tagListing(title: string, description: string): RoleTags {
     deadline: findDeadline(text),
     lengthMonths: findLengthMonths(text),
     programmeTitle: /\b(graduate|grad)\b.{0,30}\b(scheme|programme|program|intake|cohort|academy|rotation)\b|\b(scheme|programme|program)\b.{0,30}\bgraduates?\b|\bgraduate development\b/i.test(title),
+    salaryCompetitive: /\b(competitive (salary|pay|package|remuneration|starting salary|base)|salary:?\s*(is\s*)?competitive|salary\s*-\s*competitive)\b/i.test(text),
     graduateScheme: /\bgraduate\s+(scheme|programme|program|trainee|development programme|training scheme)\b/i.test(text),
     immediateStart: /\b(immediate(ly)? start|start(ing)? (asap|immediately|straight away)|asap start|available to start immediately|start date:?\s*(asap|immediate))/i.test(text),
     aimedAt2027: /\b(graduate|programme|program|scheme|intake|rotation|cohort)\b[^\n.]{0,40}\b2027\b|\b2027\b[^\n.]{0,25}\b(graduate|programme|program|scheme|intake|cohort)\b|\b(class of 2027|2027 (graduates?|intake|cohort|start|entry)|graduating (in |summer )?2027|final[- ]year (students?|undergraduates?)|penultimate[- ]year|(due to )?graduate in 2027|for 2027 start)\b/i.test(text),

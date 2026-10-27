@@ -14,7 +14,7 @@ import { isEmployerPage, readJobPage, USER_AGENT } from "./lib/employerPages.ts"
 import { discoverFromWebsite, feedFromUrl, probe, readFeed } from "./sources/feeds.ts";
 import { companyKey, dedupeKey, prettyLocation } from "./lib/normalise.ts";
 import { refreshSponsors, sponsorMatcher, type SponsorMatch } from "./lib/sponsors.ts";
-import { employerFromTitle, isBoardName, isEarlyCareer, isOutsideUk, isSeniorTitle, roleKind, startStatus, tagListing, type RoleTags } from "./lib/tags.ts";
+import { employerFromTitle, findSalary, isBoardName, isEarlyCareer, isOutsideUk, isSeniorTitle, roleKind, startStatus, tagListing, type RoleTags } from "./lib/tags.ts";
 import { GOOGLE_JOBS_QUERIES, searchGoogleJobs } from "./sources/googleJobs.ts";
 import { reedDetails, searchReed, toListing } from "./sources/reed.ts";
 import type { Listing } from "./sources/types.ts";
@@ -56,16 +56,20 @@ function roleRow(l: Listing, match: SponsorMatch, existing: ExistingRole | undef
   const tags = tagListing(l.title, l.description);
   const locations = [...new Set([...(existing?.locations ?? []), ...(l.location ? [l.location] : [])])];
   const start_status = startStatus(tags, earliestStart);
+  // The source's salary fields, else a salary written in the description ("£35,000 per annum").
+  const written = l.salaryMin || l.salaryMax ? null : findSalary(l.description);
+  const salary_min = l.salaryMin ?? written?.min ?? null;
+  const salary_max = l.salaryMax ?? written?.max ?? null;
   return {
     company_key: companyKey(l.employer),
-    quality: roleQuality({ tags, start_status, salary_min: l.salaryMin, salary_max: l.salaryMax, sponsor_status: match.status, description: l.description, expires_at: l.expiresAt }),
+    quality: roleQuality({ tags, start_status, salary_min, salary_max, sponsor_status: match.status, description: l.description, expires_at: l.expiresAt }),
     dedupe_key: keyOf(l),
     title: l.title,
     employer: l.employer,
     location: locations[0] ?? null,
     locations,
-    salary_min: l.salaryMin,
-    salary_max: l.salaryMax,
+    salary_min,
+    salary_max,
     salary_text: l.salaryText,
     contract_type: l.contractType,
     full_time: l.fullTime,
@@ -316,8 +320,13 @@ async function retag(match: Matcher) {
     const employer = isBoardName(r.employer) ? (employerFromTitle(r.title) ?? r.employer) : r.employer;
     const m = match(employer, r.location);
     const start_status = startStatus(tags, earliestStart);
+    const written = r.salary_min || r.salary_max ? null : findSalary(r.description ?? "");
+    const salary_min = r.salary_min ?? written?.min ?? null;
+    const salary_max = r.salary_max ?? written?.max ?? null;
     const next = {
       tags,
+      salary_min,
+      salary_max,
       sponsor_status: m.status,
       sponsor_name: m.name,
       kind: roleKind(r.title),
@@ -326,9 +335,9 @@ async function retag(match: Matcher) {
       locations: [...new Set(r.locations.map((l) => prettyLocation(l) ?? l))],
       company_key: companyKey(employer),
       employer,
-      quality: roleQuality({ ...r, tags, start_status, sponsor_status: m.status }),
+      quality: roleQuality({ ...r, tags, start_status, salary_min, salary_max, sponsor_status: m.status }),
     };
-    const current = { employer: r.employer, tags: r.tags, sponsor_status: r.sponsor_status, sponsor_name: r.sponsor_name, kind: r.kind, start_status: r.start_status, location: r.location, locations: r.locations, company_key: r.company_key, quality: r.quality };
+    const current = { salary_min: r.salary_min, salary_max: r.salary_max, employer: r.employer, tags: r.tags, sponsor_status: r.sponsor_status, sponsor_name: r.sponsor_name, kind: r.kind, start_status: r.start_status, location: r.location, locations: r.locations, company_key: r.company_key, quality: r.quality };
     if (sameJson(next, current)) continue;
     await must(() => db.from("roles").update(next).eq("id", r.id));
     changed++;
@@ -343,8 +352,9 @@ type Details = { description: string; salaryMin: number | null; salaryMax: numbe
 async function applyDescription(r: DescribeRow, d: Details) {
   const tags = tagListing(r.title, d.description);
   const start_status = startStatus(tags, earliestStart);
-  const salary_min = r.salary_min ?? d.salaryMin;
-  const salary_max = r.salary_max ?? d.salaryMax;
+  const written = findSalary(d.description);
+  const salary_min = r.salary_min ?? d.salaryMin ?? written?.min ?? null;
+  const salary_max = r.salary_max ?? d.salaryMax ?? written?.max ?? null;
   const expires_at = r.expires_at ?? d.deadline ?? tags.deadline;
   await must(() =>
     db.from("roles").update({

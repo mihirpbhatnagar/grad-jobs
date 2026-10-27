@@ -5,7 +5,6 @@ import { companiesFor } from "@/lib/companies";
 import { rankForYou } from "@/lib/matching";
 import { withDefaults } from "@/lib/profile";
 import { ROLE_COLUMNS, type Role } from "@/lib/roles";
-import { estimateFor, salaryContext } from "@/lib/salary";
 import { publicClient } from "@/lib/supabase";
 
 const SHOW = 30;
@@ -51,7 +50,7 @@ export async function ForYou() {
   const matches = rankForYou((data ?? []) as (Role & { description: string | null })[], answers, similarity);
 
   const shown = matches.slice(0, SHOW);
-  const [companies, ctx] = await Promise.all([companiesFor(shown.map((m) => m.role.company_key)), salaryContext()]);
+  const companies = await companiesFor(shown.map((m) => m.role.company_key));
   const { data: saved } = await db.from("saved_roles").select("role_id");
   const savedIds = new Set((saved ?? []).map((s) => s.role_id));
 
@@ -69,7 +68,6 @@ export async function ForYou() {
           key={m.role.id}
           role={m.role}
           company={m.role.company_key ? companies.get(m.role.company_key) : null}
-          estimate={m.role.salary_min || m.role.salary_max ? null : estimateFor(m.role.title, ctx)?.amount}
           saved={savedIds.has(m.role.id)}
           signedIn
           matchTags={m.tags}

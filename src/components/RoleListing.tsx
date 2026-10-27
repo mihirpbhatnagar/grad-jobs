@@ -1,12 +1,11 @@
-import { ukToday } from "@/lib/format";
+import { ukToday, weekAhead } from "@/lib/format";
 import Link from "next/link";
 import { connection } from "next/server";
 import { FilterBar } from "@/components/FilterBar";
 import { RoleCard } from "@/components/RoleCard";
 import { currentUser } from "@/lib/auth";
 import { withDefaults } from "@/lib/profile";
-import { fetchRoles, filtersToQuery, PAGE_SIZE, parseFilters, type RoleFilters, type RoleScope } from "@/lib/roles";
-import { estimateFor, salaryContext } from "@/lib/salary";
+import { activeFilterCount, fetchRoles, filtersToQuery, PAGE_SIZE, parseFilters, type RoleFilters, type RoleScope } from "@/lib/roles";
 import { publicClient } from "@/lib/supabase";
 
 function updatedLabel(iso: string | undefined): string {
@@ -25,15 +24,14 @@ async function mainStats() {
   const base = () =>
     db.from("roles").select("id", { count: "exact", head: true }).eq("is_open", true).eq("kind", "job").eq("part_time", false)
       .in("start_status", ["confirmed", "likely"]).or(`expires_at.is.null,expires_at.gte.${today}`).or(`tags->>deadline.is.null,tags->>deadline.gte.${today}`);
-  const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
-  const twoWeeks = new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10);
-  const [fresh, closing, sponsors, schemes] = await Promise.all([
-    base().gte("first_seen", weekAgo),
-    base().lte("expires_at", twoWeeks),
+  const week = weekAhead();
+  const [sept, closing, sponsors, schemes] = await Promise.all([
+    base().gte("tags->>startDate", "2027-09-01").lt("tags->>startDate", "2027-10-01"),
+    base().or(`expires_at.lte.${week},tags->>deadline.lte.${week}`),
     base().eq("sponsor_status", "likely"),
     base().eq("tags->>graduateScheme", "true"),
   ]);
-  return { fresh: fresh.count ?? 0, closing: closing.count ?? 0, sponsors: sponsors.count ?? 0, schemes: schemes.count ?? 0 };
+  return { sept: sept.count ?? 0, closing: closing.count ?? 0, sponsors: sponsors.count ?? 0, schemes: schemes.count ?? 0 };
 }
 
 function Stat({ value, label, href }: { value: number; label: string; href: string }) {
@@ -73,7 +71,7 @@ export async function RoleListing({
       fieldsDefault = true;
     }
   }
-  const [result, stats, ctx] = await Promise.all([fetchRoles(f, scope), scope === "main" ? mainStats() : null, salaryContext()]);
+  const [result, stats] = await Promise.all([fetchRoles(f, scope), scope === "main" ? mainStats() : null]);
   const savedIds = new Set<number>();
   if (user && result?.roles.length) {
     const { data } = await db.from("saved_roles").select("role_id").in("role_id", result.roles.map((r) => r.id));
@@ -106,8 +104,8 @@ export async function RoleListing({
         </p>
         {stats && (
           <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Stat value={stats.fresh} label="New this week" href={filtersToQuery(f, { sort: "newest" }, path)} />
-            <Stat value={stats.closing} label="Closing in 2 weeks" href={filtersToQuery(f, { closingSoon: true, sort: "closing" }, path)} />
+            <Stat value={stats.closing} label="Closing this week" href={filtersToQuery(f, { closingSoon: true, sort: "closing" }, path)} />
+            <Stat value={stats.sept} label="Starting September 2027" href={filtersToQuery(f, { start: "sept" }, path)} />
             <Stat value={stats.schemes} label="Graduate schemes" href={filtersToQuery(f, { schemes: true }, path)} />
             <Stat value={stats.sponsors} label="Licensed sponsors" href={filtersToQuery(f, { sponsor: "likely" }, path)} />
           </div>
@@ -127,13 +125,23 @@ export async function RoleListing({
         )}
       </section>
 
-      <section className="mt-6 space-y-3">
+      {result && (f.q || activeFilterCount(f) > 0) && (
+        <p className="mt-6 text-sm text-muted">
+          Found <span className="font-semibold text-foreground">{result.total.toLocaleString("en-GB")}</span> result{result.total === 1 ? "" : "s"}
+          {f.q && (
+            <>
+              {" "}for <span className="font-semibold text-foreground">&ldquo;{f.q}&rdquo;</span>
+            </>
+          )}
+          {activeFilterCount(f) > 0 && ` with ${activeFilterCount(f)} filter${activeFilterCount(f) === 1 ? "" : "s"}`}
+        </p>
+      )}
+      <section className={`space-y-3 ${result && (f.q || activeFilterCount(f) > 0) ? "mt-3" : "mt-6"}`}>
         {result?.roles.map((role) => (
           <RoleCard
             key={role.id}
             role={role}
             company={role.company_key ? result.companies.get(role.company_key) : null}
-            estimate={role.salary_min || role.salary_max ? null : estimateFor(role.title, ctx)?.amount}
             saved={savedIds.has(role.id)}
             signedIn={!!user}
           />

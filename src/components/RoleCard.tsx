@@ -3,7 +3,7 @@ import { CompanyLogo } from "@/components/CompanyLogo";
 import { SaveButton } from "@/components/SaveButton";
 import type { Company } from "@/lib/companies";
 import type { Role } from "@/lib/roles";
-import { dateShort, daysUntil, employerLabel, isBoardName, placeName, postedAgo, salaryShort, startLabel } from "@/lib/format";
+import { dateShort, daysUntil, employerLabel, isBoardName, isCompetitive, placeName, postedAgo, salaryShort, startLabel } from "@/lib/format";
 
 export function Chip({ children, tone = "plain", title }: { children: React.ReactNode; tone?: "plain" | "accent" | "success" | "amber" | "rose"; title?: string }) {
   const tones = {
@@ -31,14 +31,12 @@ export function SponsorTick() {
 export function RoleCard({
   role,
   company: companyInfo,
-  estimate,
   saved = false,
   signedIn = false,
   matchTags,
 }: {
   role: Role;
   company?: Company | null;
-  estimate?: number | null;
   saved?: boolean;
   signedIn?: boolean;
   matchTags?: string[];
@@ -92,12 +90,18 @@ export function RoleCard({
               <span className="block text-lg font-bold leading-none tracking-tight text-foreground tabular-nums">{pay}</span>
               <span className="text-[11px] font-medium text-muted">a year</span>
             </span>
-          ) : estimate ? (
-            <span className="text-right" title="Not stated in the listing. Estimate from similar roles in the app.">
-              <span className="block text-lg font-bold leading-none tracking-tight text-foreground/70 tabular-nums">≈{salaryShort(estimate, null)}</span>
-              <span className="text-[11px] font-medium text-muted">estimate</span>
+          ) : isCompetitive(role.salary_text, t) ? (
+            <span className="text-right">
+              <span className="block text-base font-bold leading-none tracking-tight text-foreground">Competitive</span>
+              <span className="text-[11px] font-medium text-muted">salary</span>
             </span>
-          ) : null}
+          ) : (
+            <span className="text-right text-[11px] font-medium leading-tight text-muted">
+              Salary
+              <br />
+              not stated
+            </span>
+          )}
         </div>
       </div>
 

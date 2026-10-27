@@ -8,6 +8,10 @@ export function salaryShort(min: number | null, max: number | null): string | nu
   return gbpShort((min ?? max)!);
 }
 
+// A listing that gives no figure but says "competitive salary".
+export const isCompetitive = (salaryText: string | null | undefined, tags: { salaryCompetitive?: boolean }) =>
+  !!tags.salaryCompetitive || /competitive/i.test(salaryText ?? "");
+
 export const money = (n: number) => `£${n.toLocaleString("en-GB", { maximumFractionDigits: 0 })}`;
 
 export const dateLong = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
@@ -20,8 +24,9 @@ export function daysUntil(iso: string): number {
   return Math.round((Date.parse(iso.slice(0, 10)) - Date.parse(today)) / 86_400_000);
 }
 
-// Today's date in the UK, for database filters ("2026-10-28").
+// Today's date in the UK, for database filters ("2026-10-28"), and the date a week ahead.
 export const ukToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" });
+export const weekAhead = () => new Date(Date.parse(ukToday()) + 7 * 86_400_000).toISOString().slice(0, 10);
 
 export function postedAgo(iso: string): string {
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);

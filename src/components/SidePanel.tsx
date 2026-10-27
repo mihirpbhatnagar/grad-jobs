@@ -2,7 +2,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { CompanyLogo } from "@/components/CompanyLogo";
 import { companiesFor, type Company } from "@/lib/companies";
-import { daysUntil, placeName, ukToday } from "@/lib/format";
+import { daysUntil, placeName, ukToday, weekAhead } from "@/lib/format";
 import { upcomingEvents } from "@/lib/loughborough";
 import { internshipRules } from "@/lib/roles";
 import { publicClient } from "@/lib/supabase";
@@ -16,12 +16,12 @@ async function fetchSide() {
   const db = publicClient();
   if (!db) return null;
   const today = ukToday();
-  const twoWeeks = new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10);
+  const week = weekAhead();
   const [internships, closing, partTime] = await Promise.all([
     internshipRules(db.from("roles").select(COLS).eq("is_open", true)).order("first_seen", { ascending: false }).limit(4),
     // Closing soon: main-list roles with the nearest deadlines.
     db.from("roles").select(COLS).eq("is_open", true).eq("kind", "job").eq("part_time", false)
-      .in("start_status", ["confirmed", "likely"]).gte("expires_at", today).lte("expires_at", twoWeeks)
+      .in("start_status", ["confirmed", "likely"]).gte("expires_at", today).lte("expires_at", week)
       .or(`tags->>deadline.is.null,tags->>deadline.gte.${today}`).order("expires_at", { ascending: true }).limit(5),
     db.from("roles").select("id", { count: "exact", head: true }).eq("is_open", true).eq("part_time", true).neq("start_status", "before"),
   ]);
@@ -91,7 +91,7 @@ export async function SidePanel() {
   return (
     <div className="space-y-4 lg:sticky lg:top-20">
       <Block title="Closing soon" href="/?closing=1&sort=closing" icon="M12 7v5l3 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z">
-        <RoleItems items={side.closing} companies={side.companies} empty="Nothing closes in the next two weeks." countdown />
+        <RoleItems items={side.closing} companies={side.companies} empty="Nothing closes in the next 7 days." countdown />
       </Block>
       <Block title="Internships and work experience" href="/internships" icon="M4 8h16v11H4zM9 8V5h6v3">
         <RoleItems items={side.internships} companies={side.companies} empty="None nearby right now. Remote and events internships show here too." />

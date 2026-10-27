@@ -221,7 +221,7 @@ export function FilterBar({ filters, path = "/", showStart = true, myFields = []
             </Group>
             <Group title="Role type">
               <Pill on={draft.schemes} onClick={() => set({ schemes: !draft.schemes })}>Graduate schemes</Pill>
-              <Pill on={draft.closingSoon} onClick={() => set({ closingSoon: !draft.closingSoon })}>Closing in 2 weeks</Pill>
+              <Pill on={draft.closingSoon} onClick={() => set({ closingSoon: !draft.closingSoon })}>Closing this week</Pill>
             </Group>
             <Group title="Found by">
               <Pill on={draft.source === ""} onClick={() => set({ source: "" })}>All sources</Pill>
@@ -253,7 +253,7 @@ export function FilterBar({ filters, path = "/", showStart = true, myFields = []
             [
               ["✓ Licensed sponsors only", filters.sponsor === "likely", { sponsor: filters.sponsor === "likely" ? "" : "likely" }],
               ...(showStart ? [["Graduate schemes", filters.schemes, { schemes: !filters.schemes }]] : []),
-              ["Closing in 2 weeks", filters.closingSoon, { closingSoon: !filters.closingSoon }],
+              ["Closing this week", filters.closingSoon, { closingSoon: !filters.closingSoon, sort: filters.closingSoon ? filters.sort : "closing" }],
               ...(myFields.length
                 ? [["✦ My fields", myFields.every((id) => filters.sectors.includes(id)), { sectors: myFields.every((id) => filters.sectors.includes(id)) ? filters.sectors.filter((id) => !myFields.includes(id)) : [...new Set([...filters.sectors, ...myFields])] }]]
                 : []),
