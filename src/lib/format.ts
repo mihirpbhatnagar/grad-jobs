@@ -13,9 +13,15 @@ export const money = (n: number) => `£${n.toLocaleString("en-GB", { maximumFrac
 export const dateLong = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 export const dateShort = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
+// Whole days from today to a date, both as UK calendar dates (0 = today), so the countdown
+// agrees with the database's date filters at any time of night.
 export function daysUntil(iso: string): number {
-  return Math.ceil((new Date(`${iso.slice(0, 10)}T23:59:59`).getTime() - Date.now()) / 86_400_000) - 1;
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" });
+  return Math.round((Date.parse(iso.slice(0, 10)) - Date.parse(today)) / 86_400_000);
 }
+
+// Today's date in the UK, for database filters ("2026-10-28").
+export const ukToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" });
 
 export function postedAgo(iso: string): string {
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);

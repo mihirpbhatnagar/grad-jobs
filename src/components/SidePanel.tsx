@@ -2,7 +2,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { CompanyLogo } from "@/components/CompanyLogo";
 import { companiesFor, type Company } from "@/lib/companies";
-import { daysUntil, placeName } from "@/lib/format";
+import { daysUntil, placeName, ukToday } from "@/lib/format";
 import { upcomingEvents } from "@/lib/loughborough";
 import { internshipRules } from "@/lib/roles";
 import { publicClient } from "@/lib/supabase";
@@ -15,7 +15,7 @@ async function fetchSide() {
   await connection();
   const db = publicClient();
   if (!db) return null;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = ukToday();
   const twoWeeks = new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10);
   const [internships, closing, partTime] = await Promise.all([
     internshipRules(db.from("roles").select(COLS).eq("is_open", true)).order("first_seen", { ascending: false }).limit(4),

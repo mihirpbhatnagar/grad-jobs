@@ -1,3 +1,4 @@
+import { ukToday } from "@/lib/format";
 import Link from "next/link";
 import { connection } from "next/server";
 import { FilterBar } from "@/components/FilterBar";
@@ -20,7 +21,7 @@ function updatedLabel(iso: string | undefined): string {
 async function mainStats() {
   const db = publicClient();
   if (!db) return null;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = ukToday();
   const base = () =>
     db.from("roles").select("id", { count: "exact", head: true }).eq("is_open", true).eq("kind", "job").eq("part_time", false)
       .in("start_status", ["confirmed", "likely"]).or(`expires_at.is.null,expires_at.gte.${today}`).or(`tags->>deadline.is.null,tags->>deadline.gte.${today}`);
