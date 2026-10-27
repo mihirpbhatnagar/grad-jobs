@@ -1,7 +1,7 @@
 // Daily data job. Run locally with `npm run daily`, and every morning by GitHub Actions.
 // Flags: --retag-only  re-check stored roles without searching any source.
 //        --feeds-only  read the employer watch list only (no Reed or Google Jobs searches).
-//        --retag  re-run the scope check, tagging, start status and sponsor matching on every open role.
+//        (every run re-applies the scope check, tagging, start status and sponsor matching)
 
 import { adminClient, chunks, must, selectAll } from "./lib/db.ts";
 import { loadEnv } from "./lib/env.ts";
@@ -15,17 +15,18 @@ import { discoverFromWebsite, feedFromUrl, probe, readFeed } from "./sources/fee
 import { companyKey, dedupeKey, prettyLocation } from "./lib/normalise.ts";
 import { refreshSponsors, sponsorMatcher, type SponsorMatch } from "./lib/sponsors.ts";
 import { employerFromTitle, findSalary, isBoardName, isEarlyCareer, isOutsideUk, isSeniorTitle, roleKind, startStatus, tagListing, type RoleTags } from "./lib/tags.ts";
-import { GOOGLE_JOBS_QUERIES, searchGoogleJobs } from "./sources/googleJobs.ts";
+import { GOOGLE_JOBS_QUERIES, searchGoogleJobs, SWEEP_QUERIES } from "./sources/googleJobs.ts";
 import { reedDetails, searchReed, toListing } from "./sources/reed.ts";
 import type { Listing } from "./sources/types.ts";
 
 loadEnv();
 const db = adminClient();
-const retagAll = process.argv.includes("--retag");
 // Re-check stored roles only: no source searches (so no API calls or Google Jobs cost).
 const retagOnly = process.argv.includes("--retag-only");
 // Employer feeds only (no Reed or Google Jobs searches): for testing the watch list.
 const feedsOnly = process.argv.includes("--feeds-only");
+// One-off deep Google Jobs sweep using the remaining prepaid credit, then Google is paused.
+const googleSweep = process.argv.includes("--google-sweep");
 // A role not seen by any source for this long is treated as closed.
 const CLOSE_AFTER_DAYS = 2;
 // New Reed listings are fetched and saved this many at a time, so progress is never lost.
@@ -588,12 +589,43 @@ async function recordCoverage() {
     googleOnlyPct: roles.length ? Math.round((googleOnly / roles.length) * 1000) / 10 : null,
     bySource: Object.fromEntries(["reed", "google_jobs", "employer"].map((s) => [s, roles.filter((r) => r.sources.includes(s)).length])),
     health: await healthCheck(db),
+    ...(linkedIn ? { linkedIn: { ...linkedIn, pct: linkedIn.seen ? Math.round((linkedIn.alreadyHad / linkedIn.seen) * 1000) / 10 : null } } : {}),
   };
   const h = stats.health;
   console.log(`Health check: ${h.passed}/${h.total} passed`);
   for (const c of h.checks.filter((x) => !x.ok)) console.log(`  FAILED ${c.name}: ${c.detail}`);
   await must(() => db.from("coverage_daily").upsert({ day: new Date().toISOString().slice(0, 10), stats }, { onConflict: "day" }));
   return stats;
+}
+
+// Google Jobs cross-check. Also measures LinkedIn coverage: of the roles Google shows "via
+// LinkedIn", how many the app already had from other sources. A failure (e.g. no credit left)
+// is logged and the run carries on.
+let linkedIn: { seen: number; alreadyHad: number; added: number } | null = null;
+async function googleJobs(stats: Record<string, unknown>, match: Matcher, byKey: Map<string, ExistingRole>, queries: string[], opts?: { depth: number; maxCost: number }) {
+  if (!process.env.DATAFORSEO_LOGIN) return;
+  try {
+    const depth = opts?.depth ?? (await setting("google_jobs.depth", 50));
+    const maxCost = opts?.maxCost ?? (await setting("google_jobs.max_cost_usd_per_run", 0.1));
+    if (maxCost <= 0) {
+      console.log("Google Jobs: paused (spend cap is 0)");
+      return;
+    }
+    const google = await searchGoogleJobs(queries, depth, maxCost);
+    console.log(`Google Jobs: ${google.listings.length} listings from ${google.tasks} searches ($${google.costUsd.toFixed(4)})`);
+    const known = await selectAll<{ id: number; employer: string; title: string }>((from, to) =>
+      db.from("roles").select("id,employer,title").eq("is_open", true).order("id").range(from, to),
+    );
+    const findRole = knownRoleIndex(known);
+    const viaLinkedIn = google.listings.filter((l) => /linkedin/i.test(l.via ?? ""));
+    const had = viaLinkedIn.filter((l) => findRole(l.employer, l.title)).length;
+    stats.googleJobs = { ...(await saveCrossCheck("google_jobs", google.listings, match, byKey)), costUsd: google.costUsd };
+    linkedIn = { seen: viaLinkedIn.length, alreadyHad: had, added: viaLinkedIn.length - had };
+    console.log(`LinkedIn (via Google Jobs): ${linkedIn.seen} seen, ${linkedIn.alreadyHad} already in the app, ${linkedIn.added} added`);
+  } catch (err) {
+    console.error("Google Jobs failed (run continues):", err);
+    stats.googleJobsError = String(err);
+  }
 }
 
 // The watch list is newer than the rest of the run: a failure here is logged and the morning
@@ -634,6 +666,19 @@ async function main() {
     );
     const byKey = new Map(existing.map((r) => [r.dedupe_key, r]));
 
+    if (googleSweep) {
+      await googleJobs(stats, match, byKey, SWEEP_QUERIES, { depth: 100, maxCost: Number(process.env.SWEEP_MAX_USD ?? 0.78) });
+      // Paused until the top-up is approved: the morning run skips Google Jobs at a zero cap.
+      await must(() => db.from("settings").update({ value: 0 }).eq("key", "google_jobs.max_cost_usd_per_run"));
+      stats.retagged = await retag(match);
+      await enrich(stats);
+      stats.coverage = await recordCoverage();
+      stats.embedded = await embedNewRoles();
+      console.log("Done:", JSON.stringify(stats));
+      await db.from("ingest_runs").update({ finished_at: new Date().toISOString(), stats }).eq("id", run.id);
+      return;
+    }
+
     if (retagOnly || feedsOnly) {
       if (feedsOnly) {
         await watchList(stats, match, byKey);
@@ -648,13 +693,7 @@ async function main() {
 
     stats.reed = await pullReed(match, byKey);
 
-    if (process.env.DATAFORSEO_LOGIN) {
-      const depth = await setting("google_jobs.depth", 50);
-      const maxCost = await setting("google_jobs.max_cost_usd_per_run", 0.1);
-      const google = await searchGoogleJobs(GOOGLE_JOBS_QUERIES, depth, maxCost);
-      console.log(`Google Jobs: ${google.listings.length} listings from ${google.tasks} searches ($${google.costUsd.toFixed(4)})`);
-      stats.googleJobs = { ...(await saveCrossCheck("google_jobs", google.listings, match, byKey)), costUsd: google.costUsd };
-    }
+    await googleJobs(stats, match, byKey, GOOGLE_JOBS_QUERIES);
 
     await watchList(stats, match, byKey);
 

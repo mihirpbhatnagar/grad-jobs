@@ -11,6 +11,7 @@ type Coverage = {
   coveragePct: number | null;
   googleOnlyPct: number | null;
   bySource: Record<string, number>;
+  linkedIn?: { seen: number; alreadyHad: number; added: number; pct: number | null };
   health?: { checks: { name: string; ok: boolean; detail: string }[]; employers: { name: string; roles: number; reason: string }[]; passed: number; total: number };
 };
 
@@ -45,6 +46,17 @@ async function CoverageView() {
         <Big label="Found only by Google Jobs" value={today.googleOnlyPct === null ? "–" : `${today.googleOnlyPct}%`} sub="Roles no other source had" />
         <Big label="Main list" value={today.mainList.toLocaleString("en-GB")} sub="Full-time, starting June 2027+" />
       </div>
+      {today.linkedIn && (
+        <section className="rounded-2xl border border-border bg-surface p-5">
+          <h2 className="font-semibold tracking-tight">LinkedIn check</h2>
+          <p className="mt-1 text-sm text-muted">Graduate roles Google Jobs shows &ldquo;via LinkedIn&rdquo;, checked against what the app already had.</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <Big label="Already in the app" value={today.linkedIn.pct === null ? "–" : `${today.linkedIn.pct}%`} sub={`${today.linkedIn.alreadyHad} of ${today.linkedIn.seen} LinkedIn roles`} />
+            <Big label="LinkedIn roles seen" value={String(today.linkedIn.seen)} sub="In today's Google Jobs searches" />
+            <Big label="Added from LinkedIn" value={String(today.linkedIn.added)} sub="Missing before; now in the app" />
+          </div>
+        </section>
+      )}
       {today.health && (
         <section className="rounded-2xl border border-border bg-surface p-5">
           <h2 className="font-semibold tracking-tight">

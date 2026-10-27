@@ -35,6 +35,17 @@ export const GOOGLE_JOBS_QUERIES = [
   "internship",
 ];
 
+// One-off deep sweep (run by hand with --google-sweep): every field, internships and the main
+// cities, to measure and fill coverage, including roles Google shows "via LinkedIn".
+const FIELD_WORDS = ["marketing", "sales", "consulting", "finance", "accounting", "audit", "tax", "banking", "investment", "operations", "supply chain", "procurement", "project management", "HR", "data", "analyst", "software", "technology", "cyber security", "engineering", "civil engineering", "mechanical engineering", "communications", "PR", "media", "events", "hospitality", "retail", "buying", "FMCG", "policy", "public sector", "sports", "law", "property", "insurance", "actuarial", "logistics", "business development", "management trainee"];
+const CITIES = ["London", "Manchester", "Birmingham", "Leeds", "Bristol", "Edinburgh", "Glasgow", "Nottingham", "Leicester", "Sheffield", "Newcastle", "Cardiff", "Reading", "Cambridge"];
+export const SWEEP_QUERIES = [
+  ...FIELD_WORDS.map((w) => `graduate ${w} 2027`),
+  ...FIELD_WORDS.map((w) => `${w} graduate scheme`),
+  ...CITIES.map((c) => `graduate scheme ${c}`),
+  ...["internship", "summer internship 2027", "events internship", "work experience", "graduate programme 2027", "2027 graduate intake", "september 2027 graduate", "graduate trainee", "entry level graduate", "graduate rotational programme"],
+];
+
 type Task = { id: string; status_code: number; status_message: string; cost: number };
 type JobItem = {
   type: string;
@@ -138,6 +149,7 @@ export async function searchGoogleJobs(
       applyUrl: i.source_url,
       postedAt: i.timestamp?.slice(0, 10) ?? null,
       expiresAt: null,
+      via: i.source_name,
     });
   }
   return { listings: [...byId.values()], costUsd, tasks: ids.length };

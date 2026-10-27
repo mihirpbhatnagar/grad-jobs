@@ -16,4 +16,6 @@ export type Listing = {
   applyUrl: string | null;
   postedAt: string | null;
   expiresAt: string | null;
+  // The site a cross-check source saw it on (Google Jobs: "LinkedIn", "Indeed", the employer...).
+  via?: string | null;
 };
