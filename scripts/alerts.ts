@@ -13,7 +13,7 @@ import type { Role } from "../src/lib/roles.ts";
 
 loadEnv();
 const db = adminClient();
-const APP = process.env.APP_URL ?? "https://grad-jobs-six.vercel.app";
+const APP = process.env.APP_URL ?? "https://gradjobsuk.vercel.app";
 const TELEGRAM = process.env.TELEGRAM_BOT_TOKEN;
 const RESEND = process.env.RESEND_API_KEY;
 const FROM = process.env.RESEND_FROM ?? "Grad Jobs <onboarding@resend.dev>";
