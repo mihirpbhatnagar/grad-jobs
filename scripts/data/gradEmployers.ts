@@ -50,3 +50,11 @@ export const GRAD_EMPLOYERS: string[] = [
   "British Airways", "easyJet", "Jet2", "Virgin Atlantic", "TUI", "Heathrow", "Manchester Airports Group", "IHG", "Hilton", "Marriott",
   "Compass Group", "Sodexo", "DHL", "Royal Mail", "DPD", "Maersk", "Kuehne+Nagel", "Wincanton", "GXO", "Unipart",
 ];
+
+// Hiring systems checked by hand for big employers that automatic discovery misses (each one
+// tested against the live feed before being added).
+export const KNOWN_FEEDS: { name: string; ats: string; ats_id: string }[] = [
+  { name: "Shell", ats: "workday", ats_id: "shell.wd3.myworkdayjobs.com/shell/ShellCareers" },
+  { name: "J.P. Morgan", ats: "oracle", ats_id: "jpmc.fa.oraclecloud.com/CX_1001" },
+  { name: "Amazon", ats: "amazon", ats_id: "amazon" },
+];

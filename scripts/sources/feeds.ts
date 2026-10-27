@@ -1,5 +1,6 @@
 import { USER_AGENT, readJobPage } from "../lib/employerPages.ts";
 import { htmlToText, prettyLocation } from "../lib/normalise.ts";
+import { isOutsideUk } from "../lib/tags.ts";
 import type { Listing } from "./types.ts";
 
 // Employers' own hiring systems, read through their public job-board feeds (the same data
@@ -13,7 +14,8 @@ const SENIOR = /\b(senior|snr|sr\.?|principal|head of|director|vp|vice president
 const UK = /\b(uk|u\.k\.|united kingdom|great britain|england|scotland|wales|northern ireland|london|manchester|birmingham|leeds|glasgow|edinburgh|bristol|cardiff|belfast|liverpool|newcastle|sheffield|nottingham|leicester|cambridge|oxford|reading|milton keynes|southampton|aberdeen|coventry|derby|warrington|york|brighton|guildford|farnborough|bath|exeter|plymouth|norwich|ipswich|swindon|slough|stevenage|crawley|chester|preston|lancaster|loughborough|cheltenham|gloucester|barrow|warton|portsmouth|basingstoke|bracknell|uxbridge|watford|hatfield|luton|peterborough|northampton|telford|wolverhampton|hull|dundee|inverness|swansea|newport|remote - uk|gb)\b/i;
 
 export const wantedTitle = (title: string) => EARLY.test(title) && !(SENIOR.test(title) && !/\b(graduate|grad|intern|trainee|placement)\b/i.test(title));
-export const inUk = (location: string | null | undefined) => !!location && UK.test(location);
+// "New York" contains "York": anything that reads as abroad is not the UK.
+export const inUk = (location: string | null | undefined) => !!location && UK.test(location) && !isOutsideUk("", location);
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -253,6 +255,33 @@ async function eightfold(feed: Feed): Promise<Listing[] | null> {
   return out;
 }
 
+// Amazon's own careers search (amazon.jobs), filtered to the UK. ats_id is unused ("amazon").
+async function amazon(feed: Feed): Promise<Listing[] | null> {
+  type J = { id_icims: string; title: string; country_code: string; city?: string; location?: string; job_path: string; description?: string; basic_qualifications?: string; preferred_qualifications?: string; posted_date?: string; job_schedule_type?: string };
+  const found = new Map<string, J>();
+  let reachable = false;
+  for (const q of ["graduate", "intern", "placement", "early careers", "2027"]) {
+    for (let offset = 0; offset < 200; offset += 100) {
+      const res = await json<{ hits: number; jobs: J[] }>(`https://www.amazon.jobs/en/search.json?base_query=${encodeURIComponent(q)}&country=GBR&result_limit=100&offset=${offset}`);
+      if (!res) break;
+      reachable = true;
+      for (const j of res.jobs ?? []) if (j.country_code === "GBR" && wantedTitle(j.title)) found.set(j.id_icims, j);
+      if ((res.jobs ?? []).length < 100) break;
+    }
+  }
+  if (!reachable) return null;
+  return [...found.values()].map((j) =>
+    listing(feed, j.id_icims, {
+      title: j.title,
+      url: `https://www.amazon.jobs${j.job_path}`,
+      location: j.city ?? j.location ?? "United Kingdom",
+      contractType: j.job_schedule_type ?? null,
+      description: htmlToText([j.description, j.basic_qualifications && `Basic qualifications<br>${j.basic_qualifications}`, j.preferred_qualifications && `Preferred qualifications<br>${j.preferred_qualifications}`].filter(Boolean).join("<br><br>")),
+      postedAt: j.posted_date ? new Date(j.posted_date).toISOString() : null,
+    }),
+  );
+}
+
 // A careers site without one of the systems above: its sitemap lists every job page, and each
 // page carries structured job data. Only pages whose address looks early-career are read.
 async function sitemap(feed: Feed, known: Set<string>): Promise<Listing[] | null> {
@@ -301,6 +330,7 @@ export async function readFeed(feed: Feed, known: Set<string>): Promise<Listing[
     case "workday": return workday(feed);
     case "oracle": return oracle(feed);
     case "eightfold": return eightfold(feed);
+    case "amazon": return amazon(feed);
     case "sitemap": return sitemap(feed, known);
     default: return null;
   }

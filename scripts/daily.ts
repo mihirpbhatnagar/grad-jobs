@@ -7,7 +7,7 @@ import { adminClient, chunks, must, selectAll } from "./lib/db.ts";
 import { loadEnv } from "./lib/env.ts";
 import { knownRoleIndex } from "./lib/match.ts";
 import { embed, roleText } from "./lib/embed.ts";
-import { GRAD_EMPLOYERS } from "./data/gradEmployers.ts";
+import { GRAD_EMPLOYERS, KNOWN_FEEDS } from "./data/gradEmployers.ts";
 import { lookupCompanies } from "./lib/companies.ts";
 import { healthCheck } from "./lib/health.ts";
 import { isEmployerPage, readJobPage, USER_AGENT } from "./lib/employerPages.ts";
@@ -445,6 +445,9 @@ async function discoverFeeds(probeLimit = 120, sitemapLimit = 40) {
     watched.add(row.company_key);
     added.push({ ...row, priority: seedKeys.has(row.company_key) ? 1 : 2 });
   };
+
+  // 0. Hiring systems checked by hand for big employers.
+  for (const k of KNOWN_FEEDS) add({ company_key: companyKey(k.name), name: k.name, ats: k.ats, ats_id: k.ats_id, added_by: "seed" });
 
   // 1. Apply links on roles we already have.
   const roles = await selectAll<{ id: number; employer: string; company_key: string | null }>((from, to) =>
