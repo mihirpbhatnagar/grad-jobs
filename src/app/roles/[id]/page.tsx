@@ -7,7 +7,7 @@ import { Chip, SponsorTick } from "@/components/RoleCard";
 import { SaveButton } from "@/components/SaveButton";
 import { currentUser } from "@/lib/auth";
 import { companyFor, sizeLabel, type Company } from "@/lib/companies";
-import { dateLong, daysUntil, decodeEntities, money, startLabel } from "@/lib/format";
+import { dateLong, daysUntil, decodeEntities, money, placeName, startLabel } from "@/lib/format";
 import type { RoleTags } from "@/lib/roles";
 import { estimateFor, fieldOf, salaryContext } from "@/lib/salary";
 import { publicClient } from "@/lib/supabase";
@@ -283,7 +283,7 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
           <h1 className="mt-4 text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">{r.title}</h1>
           <p className="mt-1.5 text-muted">
             <span className="font-medium text-foreground">{company?.name ?? r.employer}</span>
-            {r.location && ` · ${r.location}`}
+            {r.location && ` · ${placeName(r.location)}`}
             {r.locations.length > 1 && ` + ${r.locations.length - 1} more`}
           </p>
           <div className="mt-4 flex flex-wrap gap-1.5">
@@ -303,7 +303,7 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
 
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         <Fact label="Salary" value={salaryValue} sub={estimate ? "Estimate: not stated" : undefined} />
-        <Fact label="Location" value={r.location ?? "Not stated"} sub={r.locations.length > 1 ? `+ ${r.locations.length - 1} more` : undefined} />
+        <Fact label="Location" value={placeName(r.location) ?? "Not stated"} sub={r.locations.length > 1 ? `+ ${r.locations.length - 1} more` : undefined} />
         <Fact label="Starts" value={r.start_status === "confirmed" && t.startText ? t.startText : r.start_status === "likely" ? "2027 intake" : "Not stated"} sub={r.start_status === "likely" ? "Exact month not stated" : undefined} />
         <Fact
           label="Deadline"

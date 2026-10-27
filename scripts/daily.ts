@@ -1,13 +1,16 @@
 // Daily data job. Run locally with `npm run daily`, and every morning by GitHub Actions.
 // Flags: --retag-only  re-check stored roles without searching any source.
+//        --feeds-only  read the employer watch list only (no Reed or Google Jobs searches).
 //        --retag  re-run the scope check, tagging, start status and sponsor matching on every open role.
 
 import { adminClient, chunks, must, selectAll } from "./lib/db.ts";
 import { loadEnv } from "./lib/env.ts";
 import { knownRoleIndex } from "./lib/match.ts";
 import { embed, roleText } from "./lib/embed.ts";
+import { GRAD_EMPLOYERS } from "./data/gradEmployers.ts";
 import { lookupCompanies } from "./lib/companies.ts";
-import { isEmployerPage, readJobPage } from "./lib/employerPages.ts";
+import { isEmployerPage, readJobPage, USER_AGENT } from "./lib/employerPages.ts";
+import { feedFromUrl, probe, readFeed } from "./sources/feeds.ts";
 import { companyKey, dedupeKey, prettyLocation } from "./lib/normalise.ts";
 import { refreshSponsors, sponsorMatcher, type SponsorMatch } from "./lib/sponsors.ts";
 import { isEarlyCareer, isSeniorTitle, roleKind, startStatus, tagListing, type RoleTags } from "./lib/tags.ts";
@@ -20,6 +23,8 @@ const db = adminClient();
 const retagAll = process.argv.includes("--retag");
 // Re-check stored roles only: no source searches (so no API calls or Google Jobs cost).
 const retagOnly = process.argv.includes("--retag-only");
+// Employer feeds only (no Reed or Google Jobs searches): for testing the watch list.
+const feedsOnly = process.argv.includes("--feeds-only");
 // A role not seen by any source for this long is treated as closed.
 const CLOSE_AFTER_DAYS = 2;
 // New Reed listings are fetched and saved this many at a time, so progress is never lost.
@@ -195,11 +200,26 @@ async function saveCrossCheck(source: string, listings: Listing[], match: Matche
   const links: { source: string; source_id: string; role_id: number; url: string | null; last_seen: string }[] = [];
   const unmatched: Listing[] = [];
   const senior: Listing[] = [];
+  const withText = new Map<number, Listing>();
   for (const l of listings) {
     const roleId = findRole(l.employer, l.title);
-    if (roleId) links.push({ source: l.source, source_id: l.sourceId, role_id: roleId, url: l.sourceUrl, last_seen: now });
-    else if (isSeniorTitle(l.title)) senior.push(l);
+    if (roleId) {
+      links.push({ source: l.source, source_id: l.sourceId, role_id: roleId, url: l.sourceUrl, last_seen: now });
+      if (l.description.length > 150) withText.set(roleId, l);
+    } else if (isSeniorTitle(l.title)) senior.push(l);
     else unmatched.push(l);
+  }
+  // A known role that has no description yet takes this source's full text.
+  let described = 0;
+  for (const ids of chunks([...withText.keys()], 200)) {
+    const empty = (await must(() =>
+      db.from("roles").select("id,title,salary_min,salary_max,expires_at,contract_type,sponsor_status").in("id", ids).or("description.is.null,description.eq."),
+    )) as DescribeRow[];
+    for (const r of empty) {
+      const l = withText.get(r.id)!;
+      await applyDescription(r, { description: l.description, salaryMin: l.salaryMin, salaryMax: l.salaryMax, deadline: l.expiresAt, employmentType: l.contractType });
+      described++;
+    }
   }
 
   for (const batch of chunks(links, 500)) {
@@ -219,7 +239,7 @@ async function saveCrossCheck(source: string, listings: Listing[], match: Matche
 
   await saveExcluded(senior, "senior title");
   const saved = await saveListings(unmatched, match, byKey);
-  return { found: listings.length, matchedExisting: links.length, newRoles: saved.newRoles, excluded: senior.length };
+  return { found: listings.length, matchedExisting: links.length, described, newRoles: saved.newRoles, excluded: senior.length };
 }
 
 // Adds a meaning-embedding to main-list roles that don't have one yet (for For you).
@@ -303,11 +323,31 @@ async function retag(match: Matcher) {
   return { removedOutOfScope: removeIds.length, updated: changed };
 }
 
+type DescribeRow = { id: number; title: string; salary_min: number | null; salary_max: number | null; expires_at: string | null; contract_type: string | null; sponsor_status: string | null };
+type Details = { description: string; salaryMin: number | null; salaryMax: number | null; deadline: string | null; employmentType: string | null };
+
+// Gives a role its full description (from an employer page or feed) and re-tags it.
+async function applyDescription(r: DescribeRow, d: Details) {
+  const tags = tagListing(r.title, d.description);
+  const start_status = startStatus(tags, earliestStart);
+  const salary_min = r.salary_min ?? d.salaryMin;
+  const salary_max = r.salary_max ?? d.salaryMax;
+  const expires_at = r.expires_at ?? d.deadline ?? tags.deadline;
+  await must(() =>
+    db.from("roles").update({
+      description: d.description, tags, start_status, salary_min, salary_max, expires_at,
+      contract_type: r.contract_type ?? d.employmentType?.toLowerCase().replace(/_/g, " ") ?? null,
+      quality: roleQuality({ tags, start_status, salary_min, salary_max, sponsor_status: r.sponsor_status, description: d.description, expires_at }),
+      details_checked_at: new Date().toISOString(),
+    }).eq("id", r.id),
+  );
+}
+
 // Listings without a description (mostly from Google Jobs): read the employer's own job page
 // for the full text, then re-tag it (start date, deadline, degree...). Retried weekly.
 const pageLogos = new Map<string, string>();
 async function fillMissingDetails(limit = 400) {
-  type Row = { id: number; title: string; employer: string; apply_url: string | null; salary_min: number | null; salary_max: number | null; expires_at: string | null; contract_type: string | null; sponsor_status: string | null };
+  type Row = DescribeRow & { employer: string; apply_url: string | null };
   const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
   const roles = (await must(() =>
     db.from("roles").select("id,title,employer,apply_url,salary_min,salary_max,expires_at,contract_type,sponsor_status")
@@ -324,22 +364,13 @@ async function fillMissingDetails(limit = 400) {
       page = await readJobPage(url);
       if (page) break;
     }
-    const update: Record<string, unknown> = { details_checked_at: new Date().toISOString() };
     if (page) {
-      const tags = tagListing(r.title, page.description);
-      const start_status = startStatus(tags, earliestStart);
-      const salary_min = r.salary_min ?? page.salaryMin;
-      const salary_max = r.salary_max ?? page.salaryMax;
-      const expires_at = r.expires_at ?? page.deadline ?? tags.deadline;
-      Object.assign(update, {
-        description: page.description, tags, start_status, salary_min, salary_max, expires_at,
-        contract_type: r.contract_type ?? page.employmentType?.toLowerCase().replace(/_/g, " ") ?? null,
-        quality: roleQuality({ tags, start_status, salary_min, salary_max, sponsor_status: r.sponsor_status, description: page.description, expires_at }),
-      });
+      await applyDescription(r, page);
       if (page.logo) pageLogos.set(companyKey(r.employer), page.logo);
       filled++;
+    } else {
+      await must(() => db.from("roles").update({ details_checked_at: new Date().toISOString() }).eq("id", r.id));
     }
-    await must(() => db.from("roles").update(update).eq("id", r.id));
   }
   return { checked: roles.length, filled };
 }
@@ -388,6 +419,133 @@ async function refreshCompanies(limit = 1500) {
   return { lookedUp: names.length, found };
 }
 
+// ---------- employer watch list ----------
+
+type FeedRow = { id: number; company_key: string; name: string; ats: string; ats_id: string; priority: number; last_checked: string | null };
+const seedKeys = new Set(GRAD_EMPLOYERS.map(companyKey));
+
+// Grows the watch list for free: hiring systems seen in apply links (the coverage loop),
+// careers-site sitemaps of employers' own job pages, and standard board addresses for the
+// seed list of big graduate employers.
+async function discoverFeeds(probeLimit = 80, sitemapLimit = 40) {
+  const feeds = await selectAll<FeedRow>((from, to) => db.from("employer_feeds").select("*").order("id").range(from, to));
+  const have = new Set(feeds.map((f) => `${f.ats}|${f.ats_id}`));
+  const watched = new Set(feeds.map((f) => f.company_key));
+  const added: Record<string, unknown>[] = [];
+  const add = (row: { company_key: string; name: string; ats: string; ats_id: string; added_by: string }) => {
+    const k = `${row.ats}|${row.ats_id}`;
+    if (have.has(k)) return;
+    have.add(k);
+    watched.add(row.company_key);
+    added.push({ ...row, priority: seedKeys.has(row.company_key) ? 1 : 2 });
+  };
+
+  // 1. Apply links on roles we already have.
+  const roles = await selectAll<{ id: number; employer: string; company_key: string | null }>((from, to) =>
+    db.from("roles").select("id,employer,company_key").eq("is_open", true).order("id").range(from, to),
+  );
+  const byId = new Map(roles.map((r) => [r.id, r]));
+  const links = await selectAll<{ role_id: number; url: string | null }>((from, to) =>
+    db.from("role_sources").select("role_id,url").neq("source", "employer").order("role_id").range(from, to),
+  );
+  const ownSites = new Map<string, { origin: string; role: { employer: string; company_key: string | null } }>();
+  for (const l of links) {
+    const role = byId.get(l.role_id);
+    if (!role || !l.url) continue;
+    const key = role.company_key ?? companyKey(role.employer);
+    const feed = feedFromUrl(l.url);
+    if (feed) add({ company_key: key, name: role.employer, ...feed, added_by: "apply_link" });
+    else if (isEmployerPage(l.url, role.employer) && !watched.has(key)) ownSites.set(key, { origin: new URL(l.url).origin, role });
+  }
+
+  // 2. Employers' own careers sites: the sitemap listed in robots.txt.
+  let sitemaps = 0;
+  for (const [key, { origin, role }] of [...ownSites].slice(0, sitemapLimit)) {
+    if (watched.has(key)) continue;
+    try {
+      const res = await fetch(`${origin}/robots.txt`, { headers: { "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(15_000) });
+      const text = res.ok ? await res.text() : "";
+      const maps = [...text.matchAll(/^\s*sitemap:\s*(\S+)/gim)].map((m) => m[1]);
+      const pick = maps.find((m) => /job|vacanc|career/i.test(m)) ?? maps[0];
+      if (pick) {
+        add({ company_key: key, name: role.employer, ats: "sitemap", ats_id: pick, added_by: "apply_link" });
+        sitemaps++;
+      }
+    } catch {
+      // unreachable site: tried again another day
+    }
+  }
+
+  // 3. Seed employers not yet checked: try the standard board addresses.
+  let probed = 0;
+  for (const name of GRAD_EMPLOYERS) {
+    const key = companyKey(name);
+    if (watched.has(key) || probed >= probeLimit) continue;
+    probed++;
+    const hits = await probe(name);
+    if (hits.length === 0) add({ company_key: key, name, ats: "none", ats_id: key, added_by: "probe" });
+    for (const h of hits) add({ company_key: key, name, ...h, added_by: "probe" });
+  }
+
+  for (const batch of chunks(added, 200)) await must(() => db.from("employer_feeds").upsert(batch, { onConflict: "ats,ats_id", ignoreDuplicates: true }));
+  return { added: added.filter((a) => a.ats !== "none").length, sitemaps, probed };
+}
+
+// Reads every feed on the watch list (daily, so roles that disappear are closed on time).
+async function pullEmployerFeeds(match: Matcher, byKey: Map<string, ExistingRole>) {
+  const feeds = await selectAll<FeedRow>((from, to) =>
+    db.from("employer_feeds").select("*").neq("ats", "none").order("priority").order("id").range(from, to),
+  );
+  const known = new Set(
+    (await selectAll<{ source_id: string }>((from, to) => db.from("role_sources").select("source_id").eq("source", "employer").order("source_id").range(from, to))).map((r) => r.source_id),
+  );
+  const listings: Listing[] = [];
+  let ok = 0;
+  let failed = 0;
+  for (const f of feeds) {
+    const found = await readFeed(f, known);
+    await must(() =>
+      db.from("employer_feeds").update({ last_checked: new Date().toISOString(), last_status: found ? "ok" : "unreachable", last_found: found?.length ?? 0 }).eq("id", f.id),
+    );
+    if (!found) {
+      failed++;
+      continue;
+    }
+    ok++;
+    listings.push(...found.filter((l) => !isSeniorTitle(l.title)));
+  }
+  // Sitemap feeds only return pages not seen before; keep the ones already linked open too.
+  const sitemapIds = [...known].filter((id) => id.startsWith("sitemap:"));
+  await markSeen("employer", sitemapIds);
+  const saved = await saveCrossCheck("employer", listings, match, byKey);
+  console.log(`Employer feeds: ${ok} read, ${failed} unreachable, ${listings.length} early-career UK listings`);
+  return { feeds: feeds.length, ok, failed, ...saved };
+}
+
+// Daily coverage score: of open main-list roles at employers we watch, the share that the
+// employer feeds also found; plus the share found only by Google Jobs.
+async function recordCoverage() {
+  const feeds = await selectAll<{ company_key: string; ats: string }>((from, to) => db.from("employer_feeds").select("company_key,ats").order("id").range(from, to));
+  const watched = new Set(feeds.filter((f) => f.ats !== "none").map((f) => f.company_key));
+  const roles = await selectAll<{ company_key: string | null; sources: string[] }>((from, to) =>
+    db.from("roles").select("company_key,sources").eq("is_open", true).eq("kind", "job").eq("part_time", false).in("start_status", ["confirmed", "likely"]).order("id").range(from, to),
+  );
+  const atWatched = roles.filter((r) => r.company_key && watched.has(r.company_key));
+  const viaFeed = atWatched.filter((r) => r.sources.includes("employer")).length;
+  const googleOnly = roles.filter((r) => r.sources.length === 1 && r.sources[0] === "google_jobs").length;
+  const stats = {
+    mainList: roles.length,
+    employersWatched: watched.size,
+    rolesAtWatchedEmployers: atWatched.length,
+    foundByEmployerFeeds: viaFeed,
+    coveragePct: atWatched.length ? Math.round((viaFeed / atWatched.length) * 1000) / 10 : null,
+    googleOnlyPct: roles.length ? Math.round((googleOnly / roles.length) * 1000) / 10 : null,
+    bySource: Object.fromEntries(["reed", "google_jobs", "employer"].map((s) => [s, roles.filter((r) => r.sources.includes(s)).length])),
+  };
+  await must(() => db.from("coverage_daily").upsert({ day: new Date().toISOString().slice(0, 10), stats }, { onConflict: "day" }));
+  return stats;
+}
+
 async function enrich(stats: Record<string, unknown>) {
   stats.details = await fillMissingDetails();
   console.log("Employer pages:", JSON.stringify(stats.details));
@@ -413,9 +571,13 @@ async function main() {
     );
     const byKey = new Map(existing.map((r) => [r.dedupe_key, r]));
 
-    if (retagOnly) {
-      stats.retagged = await retag(match);
+    if (retagOnly || feedsOnly) {
+      if (feedsOnly) {
+        stats.discovered = await discoverFeeds();
+        stats.employerFeeds = await pullEmployerFeeds(match, byKey);
+      } else stats.retagged = await retag(match);
       await enrich(stats);
+      stats.coverage = await recordCoverage();
       stats.embedded = await embedNewRoles();
       console.log("Done:", JSON.stringify(stats));
       await db.from("ingest_runs").update({ finished_at: new Date().toISOString(), stats }).eq("id", run.id);
@@ -432,9 +594,13 @@ async function main() {
       stats.googleJobs = { ...(await saveCrossCheck("google_jobs", google.listings, match, byKey)), costUsd: google.costUsd };
     }
 
+    stats.discovered = await discoverFeeds();
+    stats.employerFeeds = await pullEmployerFeeds(match, byKey);
+
     stats.closed = await closeStaleRoles();
     if (retagAll || refreshed) stats.retagged = await retag(match);
     await enrich(stats);
+    stats.coverage = await recordCoverage();
     stats.embedded = await embedNewRoles();
 
     const { count } = await db.from("roles").select("id", { count: "exact", head: true }).eq("is_open", true);

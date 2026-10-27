@@ -38,3 +38,7 @@ export const decodeEntities = (text: string) =>
     .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
     .replace(/&pound;/g, "£")
     .replace(/&amp;/g, "&");
+
+// "Glasgow (G84 8HL)" -> "Glasgow": postcodes in brackets add nothing on a card.
+export const placeName = (location: string | null | undefined) =>
+  location ? location.replace(/\s*\(?\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b\)?/g, "").replace(/\s*,\s*$/, "").trim() || location : null;

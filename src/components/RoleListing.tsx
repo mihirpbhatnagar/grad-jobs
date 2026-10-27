@@ -20,7 +20,10 @@ function updatedLabel(iso: string | undefined): string {
 async function mainStats() {
   const db = publicClient();
   if (!db) return null;
-  const base = () => db.from("roles").select("id", { count: "exact", head: true }).eq("is_open", true).eq("kind", "job").eq("part_time", false).in("start_status", ["confirmed", "likely"]);
+  const today = new Date().toISOString().slice(0, 10);
+  const base = () =>
+    db.from("roles").select("id", { count: "exact", head: true }).eq("is_open", true).eq("kind", "job").eq("part_time", false)
+      .in("start_status", ["confirmed", "likely"]).or(`expires_at.is.null,expires_at.gte.${today}`);
   const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
   const twoWeeks = new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10);
   const [fresh, closing, sponsors, schemes] = await Promise.all([

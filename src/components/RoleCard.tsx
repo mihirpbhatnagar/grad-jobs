@@ -3,7 +3,7 @@ import { CompanyLogo } from "@/components/CompanyLogo";
 import { SaveButton } from "@/components/SaveButton";
 import type { Company } from "@/lib/companies";
 import type { Role } from "@/lib/roles";
-import { dateShort, daysUntil, postedAgo, salaryShort, startLabel } from "@/lib/format";
+import { dateShort, daysUntil, placeName, postedAgo, salaryShort, startLabel } from "@/lib/format";
 
 export function Chip({ children, tone = "plain", title }: { children: React.ReactNode; tone?: "plain" | "accent" | "success" | "amber" | "rose"; title?: string }) {
   const tones = {
@@ -77,7 +77,7 @@ export function RoleCard({
                   <path d="M10 18s6-5.3 6-10a6 6 0 1 0-12 0c0 4.7 6 10 6 10z" />
                   <circle cx="10" cy="8" r="2" />
                 </svg>
-                {role.location}
+                {placeName(role.location)}
                 {extraLocations > 0 && ` +${extraLocations}`}
               </span>
             )}

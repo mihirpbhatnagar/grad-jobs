@@ -2,6 +2,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { CompanyLogo } from "@/components/CompanyLogo";
 import { companiesFor, type Company } from "@/lib/companies";
+import { placeName } from "@/lib/format";
 import { upcomingEvents } from "@/lib/loughborough";
 import { publicClient } from "@/lib/supabase";
 
@@ -60,7 +61,7 @@ function RoleItems({ items, companies, empty }: { items: Item[]; companies: Map<
                 <span className="line-clamp-1 text-sm font-medium leading-snug">{r.title}</span>
                 <span className="block truncate text-xs text-muted">
                   {r.employer}
-                  {r.location ? ` · ${r.location}` : ""}
+                  {r.location ? ` · ${placeName(r.location)}` : ""}
                 </span>
               </span>
             </Link>
