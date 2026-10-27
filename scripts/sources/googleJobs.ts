@@ -46,6 +46,14 @@ export const SWEEP_QUERIES = [
   ...["internship", "summer internship 2027", "events internship", "work experience", "graduate programme 2027", "2027 graduate intake", "september 2027 graduate", "graduate trainee", "entry level graduate", "graduate rotational programme"],
 ];
 
+// A second, different sweep: fields by city and internships by field.
+export const SWEEP_QUERIES_2 = [
+  ...["marketing", "finance", "consulting", "data", "engineering", "sales", "HR", "operations", "technology", "project management"].flatMap((w) =>
+    ["London", "Manchester", "Birmingham", "Leeds", "Bristol", "Nottingham"].map((c) => `graduate ${w} ${c}`),
+  ),
+  ...["marketing", "finance", "events", "sports", "data", "HR", "sales", "media"].map((w) => `${w} internship`),
+];
+
 type Task = { id: string; status_code: number; status_message: string; cost: number };
 type JobItem = {
   type: string;

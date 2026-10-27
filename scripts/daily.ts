@@ -15,7 +15,7 @@ import { discoverFromWebsite, feedFromUrl, probe, readFeed } from "./sources/fee
 import { companyKey, dedupeKey, prettyLocation } from "./lib/normalise.ts";
 import { refreshSponsors, sponsorMatcher, type SponsorMatch } from "./lib/sponsors.ts";
 import { countryOf, employerFromTitle, findSalary, isBoardName, isEarlyCareer, isSeniorTitle, roleKind, startStatus, tagListing, type RoleTags } from "./lib/tags.ts";
-import { GOOGLE_JOBS_QUERIES, searchGoogleJobs, SWEEP_QUERIES } from "./sources/googleJobs.ts";
+import { GOOGLE_JOBS_QUERIES, searchGoogleJobs, SWEEP_QUERIES, SWEEP_QUERIES_2 } from "./sources/googleJobs.ts";
 import { reedDetails, searchReed, toListing } from "./sources/reed.ts";
 import type { Listing } from "./sources/types.ts";
 
@@ -668,7 +668,7 @@ async function main() {
     const byKey = new Map(existing.map((r) => [r.dedupe_key, r]));
 
     if (googleSweep) {
-      await googleJobs(stats, match, byKey, SWEEP_QUERIES, { depth: 100, maxCost: Number(process.env.SWEEP_MAX_USD ?? 0.78) });
+      await googleJobs(stats, match, byKey, process.env.SWEEP_SET === "2" ? SWEEP_QUERIES_2 : SWEEP_QUERIES, { depth: 100, maxCost: Number(process.env.SWEEP_MAX_USD ?? 0.78) });
       // Paused until the top-up is approved: the morning run skips Google Jobs at a zero cap.
       await must(() => db.from("settings").update({ value: 0 }).eq("key", "google_jobs.max_cost_usd_per_run"));
       stats.retagged = await retag(match);
