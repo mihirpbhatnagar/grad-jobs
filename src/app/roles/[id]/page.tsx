@@ -42,7 +42,18 @@ const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 
 // ---------- description formatting ----------
 
-type Block = { kind: "h" | "p" | "ul"; lines: string[] };
+type Block = { kind: "h" | "p" | "ul" | "kv"; lines: string[] };
+
+// Reed puts a facts block at the top with each label at the end of the previous line
+// ("Technology Graduate Programme Location\nAsda House Employment Type\n..."). Put each label
+// in front of its value instead: "Location: Asda House".
+const FACT_LABELS = "Job Title|Location|Employment Type|Contract Type|Hours per Week|Salary|Category|Closing Date|Start Date|Reference|Department|Working Pattern|Job Type|Duration";
+function untangleFacts(text: string): string {
+  return text
+    .replace(new RegExp(`^\\s*(${FACT_LABELS})\\s*\\n`, "i"), "$1: ")
+    .replace(new RegExp(`[ \\t]+(${FACT_LABELS})[ \\t]*\\n[ \\t]*`, "g"), "\n$1: ");
+}
+const FACT = new RegExp(`^(${FACT_LABELS}):\\s+(.{1,90})$`);
 
 const HEADING = /^[A-Z0-9][^.!?]{2,70}[:?]?$/;
 const BULLET = /^\s*(?:[•●▪◦*\-–]|\d+[.)])\s+/;
@@ -50,11 +61,16 @@ const BULLET = /^\s*(?:[•●▪◦*\-–]|\d+[.)])\s+/;
 // Turns plain description text into headings, paragraphs and bullet lists.
 function toBlocks(text: string): Block[] {
   const blocks: Block[] = [];
-  const lines = decodeEntities(text).replace(/\r/g, "").split("\n").map((l) => l.replace(/\s+/g, " ").trim());
+  const lines = untangleFacts(decodeEntities(text).replace(/\r/g, "")).split("\n").map((l) => l.replace(/\s+/g, " ").trim());
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (!line) continue;
     const last = blocks[blocks.length - 1];
+    if (FACT.test(line)) {
+      if (last?.kind === "kv") last.lines.push(line);
+      else blocks.push({ kind: "kv", lines: [line] });
+      continue;
+    }
     if (BULLET.test(line)) {
       const item = line.replace(BULLET, "");
       if (last?.kind === "ul") last.lines.push(item);
@@ -87,7 +103,19 @@ function Description({ blocks }: { blocks: Block[] }) {
   return (
     <div className="mt-4 space-y-4 text-[15px] leading-7 text-foreground/85">
       {blocks.map((b, i) =>
-        b.kind === "h" ? (
+        b.kind === "kv" ? (
+          <dl key={i} className="grid gap-x-6 gap-y-2 rounded-xl bg-chip px-4 py-3 text-sm sm:grid-cols-2">
+            {b.lines.map((l, j) => {
+              const [, k, v] = l.match(FACT)!;
+              return (
+                <div key={j}>
+                  <dt className="text-xs text-muted">{k}</dt>
+                  <dd className="font-medium text-foreground">{v}</dd>
+                </div>
+              );
+            })}
+          </dl>
+        ) : b.kind === "h" ? (
           <h3 key={i} className="pt-2 text-base font-semibold text-foreground">{b.lines[0]}</h3>
         ) : b.kind === "ul" ? (
           <ul key={i} className="space-y-1.5">
@@ -254,7 +282,9 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
         : isCompetitive(r.salary_text, t)
           ? "Competitive"
           : "Not stated";
-  const contract = r.contract_type ? cap(r.contract_type) : t.graduateScheme || t.programmeTitle ? "Graduate scheme" : "Not stated";
+  // The listing's own "Contract Type" line beats the source's one-word field ("contract").
+  const statedContract = blocks.flatMap((b) => (b.kind === "kv" ? b.lines : [])).map((l) => l.match(FACT)!).find((m) => /contract type|job type/i.test(m[1]))?.[2];
+  const contract = statedContract ?? (r.contract_type ? cap(r.contract_type) : t.graduateScheme || t.programmeTitle ? "Graduate scheme" : "Not stated");
 
   const salaryRows = [
     ...(pay ? [{ label: "This role", amount: pay, highlight: true }] : []),
