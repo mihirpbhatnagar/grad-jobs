@@ -61,7 +61,18 @@ export async function RoleListing({
 }) {
   await connection();
   const f = parseFilters(await searchParams);
-  const [result, { db, user }, stats, ctx] = await Promise.all([fetchRoles(f, scope), currentUser(), scope === "main" ? mainStats() : null, salaryContext()]);
+  const { db, user } = await currentUser();
+  // Internships default to the user's own fields (plus events, which are always relevant).
+  let fieldsDefault = false;
+  if (scope === "internships" && user && f.sectors.length === 0) {
+    const { data: profile } = await db.from("profiles").select("answers").maybeSingle();
+    const fields = withDefaults(profile?.answers).fields.value;
+    if (fields.length) {
+      f.sectors = [...new Set([...fields, "events"])];
+      fieldsDefault = true;
+    }
+  }
+  const [result, stats, ctx] = await Promise.all([fetchRoles(f, scope), scope === "main" ? mainStats() : null, salaryContext()]);
   const savedIds = new Set<number>();
   if (user && result?.roles.length) {
     const { data } = await db.from("saved_roles").select("role_id").in("role_id", result.roles.map((r) => r.id));
@@ -89,6 +100,7 @@ export async function RoleListing({
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h1>
         <p className="mt-2 max-w-2xl text-white/80">
           {result ? lead(result.total, f) : "Connecting to the role database…"}
+          {fieldsDefault && <span className="text-white/80"> · in your fields</span>}
           {result?.updatedAt && <span className="text-white/60"> · {updatedLabel(result.updatedAt)}</span>}
         </p>
         {stats && (

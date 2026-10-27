@@ -30,6 +30,8 @@ export const GOOGLE_JOBS_QUERIES = [
   "graduate communications",
   "graduate events",
   "graduate sports",
+  "events internship",
+  "internship",
 ];
 
 type Task = { id: string; status_code: number; status_message: string; cost: number };

@@ -99,7 +99,7 @@ function findLengthMonths(text: string): number | null {
 const SENIOR_TITLE = /\b(senior|snr|sr|principal|head of|director|vp|chief|partner)\b|\b(team|tech|technical|project|engineering|design|mechanical|electrical|site|shift)\s+lead\b/i;
 const EARLY_TITLE = /\b(graduate|grad|trainee|junior|entry[- ]level|early careers?|apprentice|intern|internship|placement|assistant|associate|analyst|coordinator|executive|administrator|advisor|adviser)\b/i;
 const EARLY_TEXT = /\b(graduates?|grad (scheme|programme)|entry[- ]level|trainee|recent(ly)? graduated?|final[- ]year (students?|undergraduates?)|no (prior |previous )?experience (is )?(required|needed|necessary)|full training (is )?(given|provided)|early careers?|first (step|role) in your career|class of 2027|2027 (start|intake|cohort|graduates?))\b/i;
-const GRAD_IN_TITLE = /\b(graduate|grad|trainee|junior|entry[- ]level|early careers?)\b/i;
+const GRAD_IN_TITLE = /\b(graduate|grad|trainee|junior|entry[- ]level|early careers?|intern|internship|work experience)\b/i;
 
 export function isSeniorTitle(title: string): boolean {
   return SENIOR_TITLE.test(title) && !GRAD_IN_TITLE.test(title);
@@ -113,7 +113,7 @@ export function isEarlyCareer(title: string, description: string): boolean {
 
 // Internships, placements and apprenticeships are stored but kept out of the main list.
 export function roleKind(title: string): "job" | "internship" | "apprenticeship" {
-  if (/\b(intern|internship|placement|insight (day|week|programme)|spring week|summer analyst)\b/i.test(title)) return "internship";
+  if (/\b(intern|interns|internship|internships|placement|work experience|work placement|vacation scheme|insight (day|week|programme)|spring week|summer analyst)\b/i.test(title)) return "internship";
   if (/\bapprentice(ship)?\b/i.test(title)) return "apprenticeship";
   return "job";
 }

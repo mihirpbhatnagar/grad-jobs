@@ -4,7 +4,7 @@ import { PageBand } from "@/components/SectionIntro";
 import { SidePanel } from "@/components/SidePanel";
 
 const LINKS = [
-  { href: "/internships", title: "Internships", body: "Placements, insight days, spring weeks" },
+  { href: "/internships", title: "Internships", body: "Work experience nearby, remote or events" },
   { href: "/opening-soon", title: "Opening soon", body: "Schemes about to open" },
   { href: "/events", title: "Events", body: "Workshops, fairs, networking" },
   { href: "/part-time", title: "Part-time", body: "Kept out of the main list" },

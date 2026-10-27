@@ -103,6 +103,27 @@ export function filtersToQuery(f: RoleFilters, changes: Partial<RoleFilters> = {
   return qs ? `${path}?${qs}` : path;
 }
 
+// Internships section (our users' rule): internships and work experience, no placements
+// (already done); on-site only around Loughborough, Leicester, Nottingham and Derby; remote
+// from anywhere; and events internships or ones with accommodation provided from anywhere.
+export const NEARBY = ["Loughborough", "Leicester", "Nottingham", "Derby"];
+// Works on any roles query (typed loosely: Supabase's query types are too deep to pass around).
+export function internshipRules<Q>(query: Q): Q {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let q = (query as any).eq("kind", "internship");
+  for (const word of ["placement", "year in industry", "sandwich", "industrial"]) q = q.not("title", "ilike", `%${word}%`);
+  const where = [
+    ...NEARBY.map((t) => `location.ilike.%${t}%`),
+    "location.ilike.%remote%",
+    "title.ilike.%remote%",
+    "title.ilike.%event%",
+    "description.ilike.%accommodation provided%",
+    "description.ilike.%accommodation is provided%",
+    "description.ilike.%accommodation included%",
+  ];
+  return q.or(where.join(","));
+}
+
 // Which list: the main list, or the separate internships / part-time sections.
 export type RoleScope = "main" | "internships" | "part_time";
 
@@ -118,7 +139,7 @@ export async function fetchRoles(f: RoleFilters, scope: RoleScope = "main") {
   if (scope === "main") {
     query = query.eq("kind", "job").eq("part_time", false).in("start_status", f.start === "unstated" ? ["unknown"] : ["confirmed", "likely"]);
   } else if (scope === "internships") {
-    query = query.eq("kind", "internship").neq("start_status", "before");
+    query = internshipRules(query);
   } else {
     query = query.eq("part_time", true).neq("start_status", "before");
   }

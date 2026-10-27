@@ -252,7 +252,7 @@ export function FilterBar({ filters, path = "/", showStart = true, myFields = []
           {(
             [
               ["✓ Licensed sponsors only", filters.sponsor === "likely", { sponsor: filters.sponsor === "likely" ? "" : "likely" }],
-              ["Graduate schemes", filters.schemes, { schemes: !filters.schemes }],
+              ...(showStart ? [["Graduate schemes", filters.schemes, { schemes: !filters.schemes }]] : []),
               ["Closing in 2 weeks", filters.closingSoon, { closingSoon: !filters.closingSoon }],
               ...(myFields.length
                 ? [["✦ My fields", myFields.every((id) => filters.sectors.includes(id)), { sectors: myFields.every((id) => filters.sectors.includes(id)) ? filters.sectors.filter((id) => !myFields.includes(id)) : [...new Set([...filters.sectors, ...myFields])] }]]

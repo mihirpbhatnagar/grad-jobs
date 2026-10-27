@@ -9,8 +9,8 @@ export default function InternshipsPage(props: PageProps<"/internships">) {
           searchParams={props.searchParams}
           scope="internships"
           path="/internships"
-          title="Internships and placements"
-          lead={(total) => `${total.toLocaleString("en-GB")} open internships, placements, insight days and spring weeks`}
+          title="Internships and work experience"
+          lead={(total) => `${total.toLocaleString("en-GB")} open: on-site around Loughborough, Leicester, Nottingham and Derby, remote from anywhere, plus events internships`}
         />
       </Suspense>
     </main>

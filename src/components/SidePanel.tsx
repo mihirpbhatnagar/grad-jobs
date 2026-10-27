@@ -4,6 +4,7 @@ import { CompanyLogo } from "@/components/CompanyLogo";
 import { companiesFor, type Company } from "@/lib/companies";
 import { placeName } from "@/lib/format";
 import { upcomingEvents } from "@/lib/loughborough";
+import { internshipRules } from "@/lib/roles";
 import { publicClient } from "@/lib/supabase";
 
 type Item = { id: number; title: string; employer: string; location: string | null; company_key: string | null };
@@ -16,7 +17,7 @@ async function fetchSide() {
   if (!db) return null;
   const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
   const [internships, newSchemes, partTime] = await Promise.all([
-    db.from("roles").select(COLS).eq("is_open", true).eq("kind", "internship").neq("start_status", "before").order("quality", { ascending: false }).limit(4),
+    internshipRules(db.from("roles").select(COLS).eq("is_open", true)).order("first_seen", { ascending: false }).limit(4),
     db.from("roles").select(COLS).eq("is_open", true).eq("kind", "job").eq("part_time", false)
       .in("start_status", ["confirmed", "likely"]).gte("first_seen", weekAgo).order("quality", { ascending: false }).limit(4),
     db.from("roles").select("id", { count: "exact", head: true }).eq("is_open", true).eq("part_time", true).neq("start_status", "before"),
@@ -82,8 +83,8 @@ export async function SidePanel() {
       <Block title="New this week" href="/?sort=newest" icon="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z">
         <RoleItems items={side.newSchemes} companies={side.companies} empty="New 2027 roles will appear here." />
       </Block>
-      <Block title="Internships and placements" href="/internships" icon="M4 8h16v11H4zM9 8V5h6v3">
-        <RoleItems items={side.internships} companies={side.companies} empty="No open internships right now." />
+      <Block title="Internships and work experience" href="/internships" icon="M4 8h16v11H4zM9 8V5h6v3">
+        <RoleItems items={side.internships} companies={side.companies} empty="None nearby right now. Remote and events internships show here too." />
       </Block>
       <Block title="Opening soon" href="/opening-soon" icon="M12 7v5l3 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z">
         <p className="py-2 text-sm text-muted">Big graduate schemes that haven&apos;t opened yet, with register-interest links. Being set up.</p>
