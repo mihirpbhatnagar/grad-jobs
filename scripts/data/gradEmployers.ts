@@ -57,4 +57,10 @@ export const KNOWN_FEEDS: { name: string; ats: string; ats_id: string }[] = [
   { name: "Shell", ats: "workday", ats_id: "shell.wd3.myworkdayjobs.com/shell/ShellCareers" },
   { name: "J.P. Morgan", ats: "oracle", ats_id: "jpmc.fa.oraclecloud.com/CX_1001" },
   { name: "Amazon", ats: "amazon", ats_id: "amazon" },
+  { name: "BP", ats: "workday", ats_id: "bpinternational.wd3.myworkdayjobs.com/bpinternational/bpCareers" },
+  { name: "Airbus", ats: "workday", ats_id: "ag.wd3.myworkdayjobs.com/ag/Airbus" },
+  { name: "Santander", ats: "workday", ats_id: "santander.wd3.myworkdayjobs.com/santander/SantanderCareers" },
+  { name: "Mars", ats: "workday", ats_id: "mars.wd3.myworkdayjobs.com/mars/External" },
+  { name: "NatWest Group", ats: "workday", ats_id: "rbs.wd3.myworkdayjobs.com/rbs/RBS" },
+  { name: "Procter & Gamble", ats: "workday", ats_id: "pg.wd5.myworkdayjobs.com/pg/1000" },
 ];
