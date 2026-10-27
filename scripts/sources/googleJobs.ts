@@ -129,7 +129,8 @@ export async function recoverGoogleJobs(fromIso: string, toIso: string): Promise
   const res = await fetch("https://api.dataforseo.com/v3/serp/id_list", {
     method: "POST",
     headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json" },
-    body: JSON.stringify([{ datetime_from: fromIso, datetime_to: toIso, limit: 1000 }]),
+    // The end must be in the past: cap it at a minute ago.
+    body: JSON.stringify([{ datetime_from: fromIso, datetime_to: new Date(Math.min(Date.parse(toIso), Date.now() - 60_000)).toISOString().replace("T", " ").slice(0, 19) + " +00:00", limit: 1000 }]),
   });
   const json = (await res.json()) as { tasks?: { result?: { id: string; url?: string }[] }[] };
   const ids = (json.tasks?.[0]?.result ?? []).filter((r) => !r.url || r.url.includes("/jobs/")).map((r) => r.id);
