@@ -15,7 +15,14 @@ function hash(text: string): number {
 }
 
 export function CompanyLogo({ name, logoUrl, domain, size = 48 }: { name: string; logoUrl?: string | null; domain?: string | null; size?: number }) {
-  const sources = [logoUrl, domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=128` : null].filter((s): s is string => !!s);
+  // The stored logo, then the high-resolution icon most sites publish for phones, then the
+  // site's ordinary icon (via Google), then initials.
+  const sources = [
+    logoUrl,
+    domain ? `https://${domain}/apple-touch-icon.png` : null,
+    domain ? `https://www.${domain.replace(/^www\./, "")}/apple-touch-icon.png` : null,
+    domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=128` : null,
+  ].filter((s): s is string => !!s);
   const [index, setIndex] = useState(0);
   const src = sources[index];
   const box = { width: size, height: size };
@@ -37,7 +44,17 @@ export function CompanyLogo({ name, logoUrl, domain, size = 48 }: { name: string
   return (
     <span style={box} className={`flex shrink-0 items-center justify-center overflow-hidden border border-border bg-white p-1.5 ${radius}`}>
       {/* eslint-disable-next-line @next/next/no-img-element -- remote logos from many hosts */}
-      <img src={src} alt="" loading="lazy" className="h-full w-full object-contain" onError={() => setIndex((i) => i + 1)} />
+      <img
+        src={src}
+        alt=""
+        loading="lazy"
+        className="h-full w-full object-contain"
+        onError={() => setIndex((i) => i + 1)}
+        // Google answers unknown sites with a tiny blank globe: treat that as no logo.
+        onLoad={(e) => {
+          if (e.currentTarget.naturalWidth > 0 && e.currentTarget.naturalWidth < 24) setIndex((i) => i + 1);
+        }}
+      />
     </span>
   );
 }

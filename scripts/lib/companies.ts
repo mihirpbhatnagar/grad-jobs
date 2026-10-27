@@ -102,6 +102,20 @@ const domainOf = (url: string | null) => {
   }
 };
 
+// A company's website from its name (Clearbit's free name search, no account), for firms
+// that aren't on Wikidata. Only an exact name match is taken; UK sites win a tie.
+export async function domainFor(name: string): Promise<string | null> {
+  const key = companyKey(name);
+  if (key.length < 3) return null;
+  const res = await getJson<{ name: string; domain: string }[]>(`https://autocomplete.clearbit.com/v1/companies/suggest?query=${encodeURIComponent(key)}`);
+  const same = (res ?? []).filter((c) => {
+    const k = companyKey(c.name);
+    return k === key || k === `${key} uk` || `${k} uk` === key || k === `${key} group` || `${k} group` === key;
+  });
+  const pick = same.find((c) => /\.(co\.)?uk$/.test(c.domain)) ?? same[0];
+  return pick?.domain ?? null;
+}
+
 // Looks up each employer (by name) and returns a row for every one, found or not.
 export async function lookupCompanies(names: Map<string, string>): Promise<Company[]> {
   const now = new Date().toISOString();
@@ -137,7 +151,9 @@ export async function lookupCompanies(names: Map<string, string>): Promise<Compa
   for (const [key, name] of names) {
     const e = found.has(key) ? full[found.get(key)!] : undefined;
     if (!e) {
-      rows.push({ key, name, wikidata_id: null, description: null, summary: null, wikipedia_url: null, industry: null, hq: null, founded: null, employees: null, website: null, domain: null, logo_url: null, checked_at: now });
+      await sleep(100);
+      const domain = await domainFor(name);
+      rows.push({ key, name, wikidata_id: null, description: null, summary: null, wikipedia_url: null, industry: null, hq: null, founded: null, employees: null, website: domain ? `https://${domain}` : null, domain, logo_url: null, checked_at: now });
       continue;
     }
     const website = (firstValue(e, "P856") as string | undefined) ?? null;

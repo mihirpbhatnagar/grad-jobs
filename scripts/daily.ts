@@ -659,7 +659,8 @@ async function main() {
     await watchList(stats, match, byKey);
 
     stats.closed = await closeStaleRoles();
-    if (retagAll || refreshed) stats.retagged = await retag(match);
+    // Re-applied every morning so rule fixes reach every stored role (only changed rows are written).
+    stats.retagged = await retag(match);
     await enrich(stats);
     stats.coverage = await recordCoverage();
     stats.embedded = await embedNewRoles();
