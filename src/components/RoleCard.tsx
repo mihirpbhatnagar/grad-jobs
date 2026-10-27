@@ -3,7 +3,7 @@ import { CompanyLogo } from "@/components/CompanyLogo";
 import { SaveButton } from "@/components/SaveButton";
 import type { Company } from "@/lib/companies";
 import type { Role } from "@/lib/roles";
-import { daysUntil, postedAgo, salaryShort, startLabel } from "@/lib/format";
+import { dateShort, daysUntil, postedAgo, salaryShort, startLabel } from "@/lib/format";
 
 export function Chip({ children, tone = "plain", title }: { children: React.ReactNode; tone?: "plain" | "accent" | "success" | "amber" | "rose"; title?: string }) {
   const tones = {
@@ -81,14 +81,22 @@ export function RoleCard({
                 {extraLocations > 0 && ` +${extraLocations}`}
               </span>
             )}
-            {pay ? (
-              <span className="font-semibold text-foreground">{pay}</span>
-            ) : estimate ? (
-              <span title="Not stated in the listing. Estimate from similar roles in the app.">≈ {salaryShort(estimate, null)} <span className="text-xs">est.</span></span>
-            ) : null}
           </p>
         </div>
-        <SaveButton roleId={role.id} saved={saved} signedIn={signedIn} />
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <SaveButton roleId={role.id} saved={saved} signedIn={signedIn} />
+          {pay ? (
+            <span className="text-right">
+              <span className="block text-lg font-bold leading-none tracking-tight text-foreground tabular-nums">{pay}</span>
+              <span className="text-[11px] font-medium text-muted">a year</span>
+            </span>
+          ) : estimate ? (
+            <span className="text-right" title="Not stated in the listing. Estimate from similar roles in the app.">
+              <span className="block text-lg font-bold leading-none tracking-tight text-foreground/70 tabular-nums">≈{salaryShort(estimate, null)}</span>
+              <span className="text-[11px] font-medium text-muted">estimate</span>
+            </span>
+          ) : null}
+        </div>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-1.5 sm:pl-[68px]">
@@ -104,13 +112,27 @@ export function RoleCard({
         {t.lengthMonths && <Chip>{t.lengthMonths} months</Chip>}
         {t.drivingLicence && <Chip>Driving licence</Chip>}
         {t.sponsorship === "not_offered" && <Chip tone="rose">Says no sponsorship</Chip>}
-        <span className="ml-auto flex items-center gap-3 text-xs text-muted">
-          {days !== null && days >= 0 && (
-            <span className={days <= 7 ? "font-semibold text-rose" : days <= 14 ? "font-semibold text-amber" : ""}>
-              {days === 0 ? "Closes today" : `Closes in ${days} day${days === 1 ? "" : "s"}`}
-            </span>
-          )}
-          {role.posted_at && <span>{postedAgo(role.posted_at)}</span>}
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border pt-3 text-sm font-semibold sm:ml-[68px]">
+        <span className="inline-flex items-center gap-1.5 text-foreground">
+          <svg viewBox="0 0 20 20" className="h-4 w-4 text-muted" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+            <circle cx="10" cy="10" r="7" />
+            <path d="M10 6v4l2.5 2" strokeLinecap="round" />
+          </svg>
+          {role.posted_at ? postedAgo(role.posted_at) : "Posting date not stated"}
+        </span>
+        <span
+          className={`inline-flex items-center gap-1.5 ${days === null ? "text-muted" : days < 0 ? "text-muted" : days <= 7 ? "text-rose" : days <= 14 ? "text-amber" : "text-foreground"}`}
+        >
+          <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+            <path d="M4 5h12v12H4zM4 9h12M8 3v4M12 3v4" strokeLinejoin="round" />
+          </svg>
+          {days === null
+            ? "No closing date: apply early"
+            : days < 0
+              ? "May have closed"
+              : `Closes ${dateShort(closes!)} · ${days === 0 ? "today" : `${days} day${days === 1 ? "" : "s"} left`}`}
         </span>
       </div>
     </article>

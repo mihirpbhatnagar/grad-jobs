@@ -103,7 +103,7 @@ const domainOf = (url: string | null) => {
 export async function lookupCompanies(names: Map<string, string>): Promise<Company[]> {
   const now = new Date().toISOString();
   const found = new Map<string, string>(); // employer key -> Wikidata id
-  for (const [key, name] of names) {
+  for (const key of names.keys()) {
     await sleep(150);
     const res = await getJson<{ search: { id: string }[] }>(
       `${WIKIDATA}?action=wbsearchentities&search=${encodeURIComponent(key)}&language=en&uselang=en&type=item&limit=5&format=json`,
