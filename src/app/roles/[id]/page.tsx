@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { CompanyLogo } from "@/components/CompanyLogo";
+import { FollowButton } from "@/components/FollowButton";
 import { Chip, SponsorTick } from "@/components/RoleCard";
 import { SaveButton } from "@/components/SaveButton";
 import { currentUser } from "@/lib/auth";
@@ -132,7 +133,7 @@ function Fact({ label, value, sub, tone }: { label: string; value: string; sub?:
   );
 }
 
-function CompanyPanel({ company, employer }: { company: Company | null; employer: string }) {
+function CompanyPanel({ company, employer, follow }: { company: Company | null; employer: string; follow: React.ReactNode }) {
   const facts = company
     ? [
         ["Industry", company.industry && cap(company.industry)],
@@ -145,10 +146,11 @@ function CompanyPanel({ company, employer }: { company: Company | null; employer
     <Panel title="The company" icon="M4 21V5l8-3 8 3v16M9 21v-4h6v4M8 8h1M8 12h1M15 8h1M15 12h1">
       <div className="flex items-center gap-3">
         <CompanyLogo name={employer} logoUrl={company?.logo_url} domain={company?.domain} size={44} />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="font-semibold text-foreground">{company?.name ?? employer}</p>
           {company?.description && <p className="text-xs text-muted">{cap(company.description)}</p>}
         </div>
+        {follow}
       </div>
       {company?.summary ? (
         <p className="mt-3">{company.summary}</p>
@@ -226,7 +228,12 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
     visaSettings(),
     db.from("settings").select("value").eq("key", "visa.standard_salary_gbp").maybeSingle(),
   ]);
-  const saved = user ? !!(await userDb.from("saved_roles").select("role_id").eq("role_id", r.id).maybeSingle()).data : false;
+  const [saved, followed] = user
+    ? await Promise.all([
+        userDb.from("saved_roles").select("role_id").eq("role_id", r.id).maybeSingle().then((x) => !!x.data),
+        r.company_key ? userDb.from("follows").select("company_key").eq("company_key", r.company_key).maybeSingle().then((x) => !!x.data) : false,
+      ])
+    : [false, false];
   const t = r.tags;
   const closes = t.deadline ?? r.expires_at;
   const days = closes ? daysUntil(closes) : null;
@@ -362,7 +369,11 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
         </div>
 
         <div className="space-y-4">
-          <CompanyPanel company={company} employer={r.employer} />
+          <CompanyPanel
+            company={company}
+            employer={r.employer}
+            follow={r.company_key && <FollowButton companyKey={r.company_key} name={company?.name ?? r.employer} followed={followed} signedIn={!!user} />}
+          />
 
           <Panel title="Visa" icon="M4 7h16v12H4zM8 7V5h8v2M9 12h6">
             <p className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${fitStyle}`}>{fit.label}</p>

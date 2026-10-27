@@ -1,6 +1,7 @@
 // Alerts, run straight after the daily data job (GitHub Actions) or with `npm run alerts`.
 // For each user: new For you matches, deadline countdowns (7, 3, 1 days and closing day) for
-// saved roles, closed-role warnings, and a nudge 14 days after saving a role with no deadline.
+// saved roles, closed-role warnings, a nudge 14 days after saving a role with no deadline, and
+// new roles from followed companies.
 // Sent as one Telegram message (if connected) and one email digest (if switched on).
 // Needs TELEGRAM_BOT_TOKEN and/or RESEND_API_KEY; without them it reports and does nothing.
 
@@ -66,6 +67,7 @@ async function main() {
   const saved = await selectAll<Saved>((from, to) => db.from("saved_roles").select("user_id,role_id,stage,saved_at").order("user_id").range(from, to));
   const sent = await selectAll<{ user_id: string; role_id: number; kind: string }>((from, to) => db.from("alerts_sent").select("user_id,role_id,kind").order("user_id").range(from, to));
   const already = new Set(sent.map((s) => `${s.user_id}|${s.role_id}|${s.kind}`));
+  const follows = await selectAll<{ user_id: string; company_key: string }>((from, to) => db.from("follows").select("user_id,company_key").order("user_id").range(from, to));
 
   // Main-list roles (for new matches) and every saved role (open or not).
   const today = new Date().toISOString().slice(0, 10);
@@ -113,9 +115,20 @@ async function main() {
     const fresh = answers.fields.value.length ? rankForYou(open.filter((r) => r.first_seen > since), answers, similarity).slice(0, 8) : [];
     const matches: Item[] = fresh.map((m) => ({ roleId: m.role.id, kind: "new_match", text: m.tags.join(" · ") }));
 
+    // New roles (any kind, including internships) from companies the user follows.
+    const followed = new Set(follows.filter((f) => f.user_id === p.user_id).map((f) => f.company_key));
+    const fromFollowed: Item[] = followed.size
+      ? ((await must(() =>
+          db.from("roles").select(COLS).eq("is_open", true).in("company_key", [...followed]).gt("first_seen", since).limit(30),
+        )) as RoleRow[]).map((r) => {
+          roles.set(r.id, r);
+          return { roleId: r.id, kind: "followed_company", text: "New from a company you follow" };
+        })
+      : [];
+
     const notYet = (i: Item) => !already.has(`${p.user_id}|${i.roleId}|${i.kind}`);
-    const parts = { deadlines: deadlines.filter(notYet), closed: closed.filter(notYet), nudges: nudges.filter(notYet), matches: matches.filter(notYet) };
-    const all = [...parts.deadlines, ...parts.closed, ...parts.nudges, ...parts.matches];
+    const parts = { deadlines: deadlines.filter(notYet), closed: closed.filter(notYet), nudges: nudges.filter(notYet), followed: fromFollowed.filter(notYet), matches: matches.filter((m) => notYet(m) && !fromFollowed.some((f) => f.roleId === m.roleId)) };
+    const all = [...parts.deadlines, ...parts.closed, ...parts.nudges, ...parts.followed, ...parts.matches];
     if (!all.length) continue;
 
     const name = p.display_name?.split(" ")[0];
@@ -124,6 +137,7 @@ async function main() {
         section("⏰ Deadlines", parts.deadlines, roles, html),
         section("⚠️ May have closed", parts.closed, roles, html),
         section("👉 Apply soon", parts.nudges, roles, html),
+        section("🏢 Companies you follow", parts.followed, roles, html),
         section("✦ New for you", parts.matches, roles, html),
       ].filter(Boolean);
 

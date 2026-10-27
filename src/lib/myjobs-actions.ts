@@ -54,3 +54,17 @@ export async function removeSaved(roleId: number): Promise<void> {
   await db.from("saved_roles").delete().eq("role_id", roleId);
   revalidatePath("/", "layout");
 }
+
+// Follows a company (or unfollows it). Returns whether it's now followed.
+export async function toggleFollow(companyKey: string, name: string): Promise<boolean> {
+  const { db, user } = await currentUser();
+  if (!user) throw new Error("Sign in to follow companies");
+  const { data: existing } = await db.from("follows").select("company_key").eq("company_key", companyKey).maybeSingle();
+  if (existing) {
+    await db.from("follows").delete().eq("company_key", companyKey);
+    return false;
+  }
+  const { error } = await db.from("follows").insert({ user_id: user.id, company_key: companyKey, name: name.slice(0, 120) });
+  if (error) throw error;
+  return true;
+}
