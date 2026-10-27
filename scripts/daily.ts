@@ -88,7 +88,12 @@ function roleRow(l: Listing, match: SponsorMatch, existing: ExistingRole | undef
 
 // Saves listings as roles, merging duplicates (same employer, title and wording) into one
 // role with every location. `byKey` is the in-memory index of roles already stored.
-async function saveListings(listings: Listing[], match: Matcher, byKey: Map<string, ExistingRole>) {
+// One listing per source id: some employers list the same job once per location, and the
+// database rejects a save that touches the same row twice.
+const uniqueListings = (listings: Listing[]) => [...new Map(listings.map((l) => [`${l.source}|${l.sourceId}`, l])).values()];
+
+async function saveListings(all: Listing[], match: Matcher, byKey: Map<string, ExistingRole>) {
+  const listings = uniqueListings(all);
   const now = new Date().toISOString();
   const rows = new Map<string, ReturnType<typeof roleRow>>();
   for (const l of listings) {
@@ -121,7 +126,8 @@ async function saveListings(listings: Listing[], match: Matcher, byKey: Map<stri
 }
 
 // Remembers listings that failed the early-career check, so they aren't re-fetched daily.
-async function saveExcluded(listings: Listing[], reason: string) {
+async function saveExcluded(all: Listing[], reason: string) {
+  const listings = uniqueListings(all);
   const now = new Date().toISOString();
   const rows = listings.map((l) => ({ source: l.source, source_id: l.sourceId, reason, last_seen: now }));
   for (const batch of chunks(rows, 500)) {
@@ -190,7 +196,8 @@ async function pullReed(match: Matcher, byKey: Map<string, ExistingRole>) {
 
 // Cross-check sources (Google Jobs) have no description, so they're matched to known roles
 // by employer + title. Matches are credited to the existing role; anything new joins the feed.
-async function saveCrossCheck(source: string, listings: Listing[], match: Matcher, byKey: Map<string, ExistingRole>) {
+async function saveCrossCheck(source: string, all: Listing[], match: Matcher, byKey: Map<string, ExistingRole>) {
+  const listings = uniqueListings(all);
   const roles = await selectAll<{ id: number; employer: string; title: string; sources: string[] }>((from, to) =>
     db.from("roles").select("id,employer,title,sources").eq("is_open", true).order("id").range(from, to),
   );
