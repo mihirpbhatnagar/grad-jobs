@@ -25,13 +25,13 @@ async function mainStats() {
     db.from("roles").select("id", { count: "exact", head: true }).eq("is_open", true).eq("kind", "job").eq("part_time", false)
       .in("start_status", ["confirmed", "likely"]).or(`expires_at.is.null,expires_at.gte.${today}`).or(`tags->>deadline.is.null,tags->>deadline.gte.${today}`);
   const week = weekAhead();
-  const [sept, closing, sponsors, schemes] = await Promise.all([
-    base().gte("tags->>startDate", "2027-09-01").lt("tags->>startDate", "2027-10-01"),
+  const [all, closing, sponsors, schemes] = await Promise.all([
+    base(),
     base().or(`expires_at.lte.${week},tags->>deadline.lte.${week}`),
     base().eq("sponsor_status", "likely"),
     base().eq("tags->>graduateScheme", "true"),
   ]);
-  return { sept: sept.count ?? 0, closing: closing.count ?? 0, sponsors: sponsors.count ?? 0, schemes: schemes.count ?? 0 };
+  return { all: all.count ?? 0, closing: closing.count ?? 0, sponsors: sponsors.count ?? 0, schemes: schemes.count ?? 0 };
 }
 
 function Stat({ value, label, href }: { value: number; label: string; href: string }) {
@@ -104,8 +104,8 @@ export async function RoleListing({
         </p>
         {stats && (
           <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Stat value={stats.all} label="Graduate roles" href={path} />
             <Stat value={stats.closing} label="Closing this week" href={filtersToQuery(f, { closingSoon: true, sort: "closing" }, path)} />
-            <Stat value={stats.sept} label="Starting September 2027" href={filtersToQuery(f, { start: "sept" }, path)} />
             <Stat value={stats.schemes} label="Graduate schemes" href={filtersToQuery(f, { schemes: true }, path)} />
             <Stat value={stats.sponsors} label="Licensed sponsors" href={filtersToQuery(f, { sponsor: "likely" }, path)} />
           </div>
