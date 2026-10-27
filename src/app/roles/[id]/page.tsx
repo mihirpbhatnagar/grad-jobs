@@ -4,6 +4,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { CompanyLogo } from "@/components/CompanyLogo";
 import { FollowButton } from "@/components/FollowButton";
+import { RoleContacts } from "@/components/Networking";
 import { Chip, SponsorTick } from "@/components/RoleCard";
 import { SaveButton } from "@/components/SaveButton";
 import { currentUser } from "@/lib/auth";
@@ -373,6 +374,10 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
             employer={r.employer}
             follow={r.company_key && <FollowButton companyKey={r.company_key} name={company?.name ?? r.employer} followed={followed} signedIn={!!user} />}
           />
+
+          <Panel title="People to contact" icon="M16 19v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1M9.5 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM21 19v-1a4 4 0 0 0-3-3.9M16 4.1a3 3 0 0 1 0 5.8">
+            <RoleContacts employer={company?.name ?? r.employer} description={r.description} />
+          </Panel>
 
           <Panel title="Visa" icon="M4 7h16v12H4zM8 7V5h8v2M9 12h6">
             <p className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${fitStyle}`}>{fit.label}</p>

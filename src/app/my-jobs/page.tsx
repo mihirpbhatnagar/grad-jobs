@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { ForYou } from "@/components/ForYou";
+import { PeopleToReachOut } from "@/components/Networking";
 import { StoryBankSection } from "@/components/StoryBankSection";
 import { Tracker } from "@/components/Tracker";
 
@@ -21,6 +22,7 @@ export default function MyJobsPage() {
           <Suspense fallback={<div className="h-80 animate-pulse rounded-2xl bg-chip" />}>
             <div className="space-y-4">
               <Tracker />
+              <PeopleToReachOut />
               <StoryBankSection />
             </div>
           </Suspense>
