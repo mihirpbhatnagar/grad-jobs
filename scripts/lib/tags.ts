@@ -11,6 +11,7 @@ export type RoleTags = {
   deadline: string | null;
   lengthMonths: number | null;
   graduateScheme: boolean;
+  programmeTitle: boolean;
   immediateStart: boolean;
   aimedAt2027: boolean;
 };
@@ -74,7 +75,7 @@ function findStart(text: string): { startText: string | null; startDate: string 
 
 function findDeadline(text: string): string | null {
   const re = new RegExp(
-    `\\b(?:closing date|deadline|applications? close|close[sd]? on|apply by|applications? (?:must be|should be) (?:received|submitted) by)\\b[^.\\n]{0,25}?\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(${MONTH_RE})\\s*,?\\s*(202[6-9])?`,
+    `\\b(?:closing date|deadline|applications? close|close[sd]? on|apply by|applications? (?:must be|should be) (?:received|submitted) by)\\b[^.]{0,30}?\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(${MONTH_RE})\\s*,?\\s*(202[6-9])?`,
     "i",
   );
   const m = text.match(re);
@@ -121,7 +122,8 @@ export function roleKind(title: string): "job" | "internship" | "apprenticeship"
 //   confirmed: the listing states a start on or after that date
 //   likely:    no exact date, but it's aimed at 2027 starters ("2027 intake", "final-year students")
 //   before:    it states an earlier start, or an immediate / ASAP start
-//   unknown:   it doesn't say; confirming needs the employer's own page (Stage 4)
+//   unknown:   it doesn't say (the daily job then reads the employer's own page, and
+//              counts it as likely when the same employer's other graduate roles are for 2027)
 export type StartStatus = "confirmed" | "likely" | "before" | "unknown";
 
 export function startStatus(tags: RoleTags, earliestStart: string): StartStatus {
@@ -129,8 +131,13 @@ export function startStatus(tags: RoleTags, earliestStart: string): StartStatus 
     return tags.startDate >= earliestStart ? "confirmed" : "before";
   }
   if (tags.immediateStart) return "before";
-  if (tags.startText && Number(tags.startText) >= Number(earliestStart.slice(0, 4))) return "likely";
+  if (tags.startText && /^\d{4}$/.test(tags.startText)) {
+    return Number(tags.startText) >= Number(earliestStart.slice(0, 4)) ? "likely" : "before";
+  }
   if (tags.aimedAt2027) return "likely";
+  // A graduate scheme or programme advertised in this recruiting season (autumn 2026 onwards)
+  // is for the 2027 intake, even when the listing doesn't repeat the date.
+  if (tags.programmeTitle) return "likely";
   return "unknown";
 }
 
@@ -157,6 +164,7 @@ export function tagListing(title: string, description: string): RoleTags {
     startDate,
     deadline: findDeadline(text),
     lengthMonths: findLengthMonths(text),
+    programmeTitle: /\b(graduate|grad)\b.{0,30}\b(scheme|programme|program|intake|cohort|academy|rotation)\b|\b(scheme|programme|program)\b.{0,30}\bgraduates?\b|\bgraduate development\b/i.test(title),
     graduateScheme: /\bgraduate\s+(scheme|programme|program|trainee|development programme|training scheme)\b/i.test(text),
     immediateStart: /\b(immediate(ly)? start|start(ing)? (asap|immediately|straight away)|asap start|available to start immediately|start date:?\s*(asap|immediate))/i.test(text),
     aimedAt2027: /\b(graduate|programme|program|scheme|intake|rotation|cohort)\b[^\n.]{0,40}\b2027\b|\b2027\b[^\n.]{0,25}\b(graduate|programme|program|scheme|intake|cohort)\b|\b(class of 2027|2027 (graduates?|intake|cohort|start|entry)|graduating (in |summer )?2027|final[- ]year (students?|undergraduates?)|penultimate[- ]year|(due to )?graduate in 2027|for 2027 start)\b/i.test(text),

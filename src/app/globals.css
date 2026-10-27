@@ -2,34 +2,44 @@
 
 /* Design tokens: one place for colours so every page looks consistent. */
 :root {
-  --background: #f7f7f4;
+  --background: #f3f4f8;
   --surface: #ffffff;
-  --foreground: #1a1a19;
-  --muted: #6b6b66;
-  --border: #e6e5df;
-  --accent: #1f6f5c;
-  --accent-soft: #e3efe9;
-  --chip: #f0efea;
-  --amber: #8a5a00;
-  --amber-soft: #f8edd5;
-  --rose: #a2353a;
-  --rose-soft: #f9e4e3;
+  --foreground: #0f1729;
+  --muted: #5f6b7d;
+  --border: #e3e6ee;
+  --accent: #4f46e5;
+  --accent-soft: #eef0ff;
+  --chip: #f1f3f8;
+  --success: #047857;
+  --success-soft: #dcf5ea;
+  --amber: #9a5b00;
+  --amber-soft: #fdf0d8;
+  --rose: #b42335;
+  --rose-soft: #fde6e8;
+  --brand-from: #1e1b4b;
+  --brand-via: #3730a3;
+  --brand-to: #7c3aed;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #121211;
-    --surface: #1b1b1a;
-    --foreground: #ededea;
-    --muted: #9a9a94;
-    --border: #2c2c2a;
-    --accent: #5fbf9f;
-    --accent-soft: #1c2d27;
-    --chip: #252523;
-    --amber: #e5b65a;
-    --amber-soft: #33291a;
-    --rose: #ec8d8d;
-    --rose-soft: #3a2223;
+    --background: #0b0e17;
+    --surface: #131826;
+    --foreground: #e9ecf4;
+    --muted: #96a0b3;
+    --border: #252c3d;
+    --accent: #8b87ff;
+    --accent-soft: #1f2146;
+    --chip: #1b2131;
+    --success: #4fd1a1;
+    --success-soft: #11322a;
+    --amber: #f0bd5c;
+    --amber-soft: #352914;
+    --rose: #f38b98;
+    --rose-soft: #3a1c22;
+    --brand-from: #17153a;
+    --brand-via: #2b2785;
+    --brand-to: #5b2bb8;
   }
 }
 
@@ -42,6 +52,8 @@
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
   --color-chip: var(--chip);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
   --color-amber: var(--amber);
   --color-amber-soft: var(--amber-soft);
   --color-rose: var(--rose);
@@ -54,4 +66,21 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* The brand band used at the top of main pages. */
+.brand-band {
+  background:
+    radial-gradient(1200px 400px at 85% -20%, rgba(167, 139, 250, 0.45), transparent 60%),
+    radial-gradient(800px 300px at 0% 120%, rgba(56, 189, 248, 0.25), transparent 60%),
+    linear-gradient(135deg, var(--brand-from), var(--brand-via) 55%, var(--brand-to));
+}
+
+.card-lift {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.card-lift:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 30px -12px rgba(15, 23, 41, 0.18);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
 }

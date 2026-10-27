@@ -53,13 +53,11 @@ export function visaFit(role: RoleForVisa, s: VisaSettings): VisaFit {
       detail: `Runs past your Graduate visa (${visaEndLabel}), but they're a licensed sponsor and the salary meets the ${floor} new-entrant level, so a Skilled Worker switch is possible.`,
     };
   }
-  const reasons = [
-    role.sponsor_status !== "likely" && (role.sponsor_status === "unclear" ? "sponsor status is unclear" : "they're not on the sponsor register"),
-    !meetsSalary && (pay ? `the salary is below ${floor}` : "the salary isn't stated"),
-  ].filter(Boolean);
+  // Only licensed sponsors are named; not being on the register isn't called out.
+  const salaryNote = role.sponsor_status === "likely" && !meetsSalary ? ` The salary ${pay ? `is below ${floor}` : "isn't stated"}, which a Skilled Worker switch needs.` : "";
   return {
     level: "ask",
     label: "Ask early",
-    detail: `Likely runs past your Graduate visa (${visaEndLabel}) and ${reasons.join(" and ")}. Ask about sponsorship before you're far into the process.`,
+    detail: `Likely runs past your Graduate visa (${visaEndLabel}).${salaryNote} Ask about sponsorship before you're far into the process.`,
   };
 }

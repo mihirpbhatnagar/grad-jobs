@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { RoleCard } from "@/components/RoleCard";
 import { currentUser } from "@/lib/auth";
+import { companiesFor } from "@/lib/companies";
 import { rankForYou } from "@/lib/matching";
 import { withDefaults } from "@/lib/profile";
-import type { Role } from "@/lib/roles";
+import { ROLE_COLUMNS, type Role } from "@/lib/roles";
+import { estimateFor, salaryContext } from "@/lib/salary";
 import { publicClient } from "@/lib/supabase";
 
 const SHOW = 30;
@@ -35,7 +37,7 @@ export async function ForYou() {
   const pub = publicClient()!;
   const { data } = await pub
     .from("roles")
-    .select("id,title,employer,location,locations,salary_min,salary_max,apply_url,posted_at,expires_at,tags,sponsor_status,sponsor_name,sources,start_status,description")
+    .select(`${ROLE_COLUMNS},description`)
     .eq("is_open", true)
     .eq("kind", "job")
     .eq("part_time", false)
@@ -48,6 +50,8 @@ export async function ForYou() {
   }
   const matches = rankForYou((data ?? []) as (Role & { description: string | null })[], answers, similarity);
 
+  const shown = matches.slice(0, SHOW);
+  const [companies, ctx] = await Promise.all([companiesFor(shown.map((m) => m.role.company_key)), salaryContext()]);
   const { data: saved } = await db.from("saved_roles").select("role_id");
   const savedIds = new Set((saved ?? []).map((s) => s.role_id));
 
@@ -60,8 +64,16 @@ export async function ForYou() {
       <p className="text-sm text-muted">
         {matches.length} role{matches.length === 1 ? "" : "s"} match your profile. Best matches first.
       </p>
-      {matches.slice(0, SHOW).map((m) => (
-        <RoleCard key={m.role.id} role={m.role} saved={savedIds.has(m.role.id)} signedIn matchTags={m.tags} />
+      {shown.map((m) => (
+        <RoleCard
+          key={m.role.id}
+          role={m.role}
+          company={m.role.company_key ? companies.get(m.role.company_key) : null}
+          estimate={m.role.salary_min || m.role.salary_max ? null : estimateFor(m.role.title, ctx)?.amount}
+          saved={savedIds.has(m.role.id)}
+          signedIn
+          matchTags={m.tags}
+        />
       ))}
     </div>
   );

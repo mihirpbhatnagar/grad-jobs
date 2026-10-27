@@ -6,9 +6,11 @@ import { adminClient, chunks, must, selectAll } from "./lib/db.ts";
 import { loadEnv } from "./lib/env.ts";
 import { knownRoleIndex } from "./lib/match.ts";
 import { embed, roleText } from "./lib/embed.ts";
-import { dedupeKey, prettyLocation } from "./lib/normalise.ts";
+import { lookupCompanies } from "./lib/companies.ts";
+import { isEmployerPage, readJobPage } from "./lib/employerPages.ts";
+import { companyKey, dedupeKey, prettyLocation } from "./lib/normalise.ts";
 import { refreshSponsors, sponsorMatcher, type SponsorMatch } from "./lib/sponsors.ts";
-import { isEarlyCareer, isSeniorTitle, roleKind, startStatus, tagListing } from "./lib/tags.ts";
+import { isEarlyCareer, isSeniorTitle, roleKind, startStatus, tagListing, type RoleTags } from "./lib/tags.ts";
 import { GOOGLE_JOBS_QUERIES, searchGoogleJobs } from "./sources/googleJobs.ts";
 import { reedDetails, searchReed, toListing } from "./sources/reed.ts";
 import type { Listing } from "./sources/types.ts";
@@ -31,10 +33,26 @@ type ExistingRole = { id: number; dedupe_key: string; sources: string[]; locatio
 
 const keyOf = (l: Listing) => dedupeKey(l.employer, l.title, l.description);
 
+// How complete and clearly-2027 a listing is: the default "best match" order in All roles.
+type QualityInput = { tags: RoleTags; start_status: string | null; salary_min: number | null; salary_max: number | null; sponsor_status: string | null; description: string | null; expires_at: string | null };
+function roleQuality(r: QualityInput): number {
+  return (
+    (r.start_status === "confirmed" ? 3 : r.start_status === "likely" ? 1 : 0) +
+    (r.tags.graduateScheme || r.tags.programmeTitle ? 2 : 0) +
+    (r.salary_min || r.salary_max ? 1 : 0) +
+    (r.sponsor_status === "likely" ? 1 : 0) +
+    ((r.description?.length ?? 0) > 500 ? 1 : 0) +
+    (r.tags.deadline || r.expires_at ? 1 : 0)
+  );
+}
+
 function roleRow(l: Listing, match: SponsorMatch, existing: ExistingRole | undefined, now: string) {
   const tags = tagListing(l.title, l.description);
   const locations = [...new Set([...(existing?.locations ?? []), ...(l.location ? [l.location] : [])])];
+  const start_status = startStatus(tags, earliestStart);
   return {
+    company_key: companyKey(l.employer),
+    quality: roleQuality({ tags, start_status, salary_min: l.salaryMin, salary_max: l.salaryMax, sponsor_status: match.status, description: l.description, expires_at: l.expiresAt }),
     dedupe_key: keyOf(l),
     title: l.title,
     employer: l.employer,
@@ -52,7 +70,7 @@ function roleRow(l: Listing, match: SponsorMatch, existing: ExistingRole | undef
     expires_at: l.expiresAt,
     tags,
     kind: roleKind(l.title),
-    start_status: startStatus(tags, earliestStart),
+    start_status,
     sponsor_status: match.status,
     sponsor_name: match.name,
     sources: [...new Set([...(existing?.sources ?? []), l.source])],
@@ -244,9 +262,9 @@ function sameJson(a: unknown, b: unknown): boolean {
 // Re-applies the early-career check, tagging and sponsor matching to open roles. Roles that
 // no longer pass the check are removed and remembered as excluded; only changed rows are written.
 async function retag(match: Matcher) {
-  type Row = { id: number; title: string; employer: string; location: string | null; description: string | null; tags: unknown; sponsor_status: string | null; sponsor_name: string | null; kind: string; start_status: string | null; locations: string[] };
+  type Row = { id: number; title: string; employer: string; location: string | null; description: string | null; tags: unknown; sponsor_status: string | null; sponsor_name: string | null; kind: string; start_status: string | null; locations: string[]; company_key: string | null; quality: number; salary_min: number | null; salary_max: number | null; expires_at: string | null };
   const roles = await selectAll<Row>((from, to) =>
-    db.from("roles").select("id,title,employer,location,locations,description,tags,sponsor_status,sponsor_name,kind,start_status").eq("is_open", true).order("id").range(from, to),
+    db.from("roles").select("id,title,employer,location,locations,description,tags,sponsor_status,sponsor_name,kind,start_status,company_key,quality,salary_min,salary_max,expires_at").eq("is_open", true).order("id").range(from, to),
   );
 
   const outOfScope = roles.filter((r) => (r.description ? !isEarlyCareer(r.title, r.description) : isSeniorTitle(r.title)));
@@ -265,21 +283,117 @@ async function retag(match: Matcher) {
     if (removed.has(r.id)) continue;
     const tags = tagListing(r.title, r.description ?? "");
     const m = match(r.employer, r.location);
+    const start_status = startStatus(tags, earliestStart);
     const next = {
       tags,
       sponsor_status: m.status,
       sponsor_name: m.name,
       kind: roleKind(r.title),
-      start_status: startStatus(tags, earliestStart),
+      start_status,
       location: prettyLocation(r.location),
       locations: [...new Set(r.locations.map((l) => prettyLocation(l) ?? l))],
+      company_key: companyKey(r.employer),
+      quality: roleQuality({ ...r, tags, start_status, sponsor_status: m.status }),
     };
-    const current = { tags: r.tags, sponsor_status: r.sponsor_status, sponsor_name: r.sponsor_name, kind: r.kind, start_status: r.start_status, location: r.location, locations: r.locations };
+    const current = { tags: r.tags, sponsor_status: r.sponsor_status, sponsor_name: r.sponsor_name, kind: r.kind, start_status: r.start_status, location: r.location, locations: r.locations, company_key: r.company_key, quality: r.quality };
     if (sameJson(next, current)) continue;
     await must(() => db.from("roles").update(next).eq("id", r.id));
     changed++;
   }
   return { removedOutOfScope: removeIds.length, updated: changed };
+}
+
+// Listings without a description (mostly from Google Jobs): read the employer's own job page
+// for the full text, then re-tag it (start date, deadline, degree...). Retried weekly.
+const pageLogos = new Map<string, string>();
+async function fillMissingDetails(limit = 400) {
+  type Row = { id: number; title: string; employer: string; apply_url: string | null; salary_min: number | null; salary_max: number | null; expires_at: string | null; contract_type: string | null; sponsor_status: string | null };
+  const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  const roles = (await must(() =>
+    db.from("roles").select("id,title,employer,apply_url,salary_min,salary_max,expires_at,contract_type,sponsor_status")
+      .eq("is_open", true).eq("kind", "job").eq("part_time", false).in("start_status", ["confirmed", "likely", "unknown"])
+      .or("description.is.null,description.eq.").or(`details_checked_at.is.null,details_checked_at.lt.${weekAgo}`)
+      .order("quality", { ascending: false }).limit(limit),
+  )) as Row[];
+  let filled = 0;
+  for (const r of roles) {
+    const links = await must(() => db.from("role_sources").select("url").eq("role_id", r.id));
+    const urls = [...new Set([...links.map((l) => l.url as string | null), r.apply_url])].filter((u): u is string => !!u && isEmployerPage(u, r.employer));
+    let page = null;
+    for (const url of urls) {
+      page = await readJobPage(url);
+      if (page) break;
+    }
+    const update: Record<string, unknown> = { details_checked_at: new Date().toISOString() };
+    if (page) {
+      const tags = tagListing(r.title, page.description);
+      const start_status = startStatus(tags, earliestStart);
+      const salary_min = r.salary_min ?? page.salaryMin;
+      const salary_max = r.salary_max ?? page.salaryMax;
+      const expires_at = r.expires_at ?? page.deadline ?? tags.deadline;
+      Object.assign(update, {
+        description: page.description, tags, start_status, salary_min, salary_max, expires_at,
+        contract_type: r.contract_type ?? page.employmentType?.toLowerCase().replace(/_/g, " ") ?? null,
+        quality: roleQuality({ tags, start_status, salary_min, salary_max, sponsor_status: r.sponsor_status, description: page.description, expires_at }),
+      });
+      if (page.logo) pageLogos.set(companyKey(r.employer), page.logo);
+      filled++;
+    }
+    await must(() => db.from("roles").update(update).eq("id", r.id));
+  }
+  return { checked: roles.length, filled };
+}
+
+// A graduate role whose listing gives no start date counts as a likely 2027 start when the
+// same employer's other graduate roles are for 2027 (e.g. Asda's six graduate programmes).
+async function inferSiblingStarts() {
+  const roles = await selectAll<{ id: number; title: string; company_key: string | null; start_status: string; quality: number }>((from, to) =>
+    db.from("roles").select("id,title,company_key,start_status,quality").eq("is_open", true).eq("kind", "job").eq("part_time", false)
+      .in("start_status", ["confirmed", "likely", "unknown"]).ilike("title", "%grad%").order("id").range(from, to),
+  );
+  const with2027 = new Set(roles.filter((r) => r.start_status !== "unknown" && r.company_key).map((r) => r.company_key));
+  const upgrade = roles.filter((r) => r.start_status === "unknown" && with2027.has(r.company_key) && /\bgrad(uate)?s?\b/i.test(r.title));
+  for (const r of upgrade) {
+    await must(() => db.from("roles").update({ start_status: "likely", quality: r.quality + 1 }).eq("id", r.id));
+  }
+  return upgrade.length;
+}
+
+// Company facts and logos for employers with open roles; looked up once, refreshed monthly.
+async function refreshCompanies(limit = 1500) {
+  const roles = await selectAll<{ company_key: string | null; employer: string }>((from, to) =>
+    db.from("roles").select("company_key,employer").eq("is_open", true).not("company_key", "is", null).order("id").range(from, to),
+  );
+  const monthAgo = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  const known = await selectAll<{ key: string; logo_url: string | null }>((from, to) =>
+    db.from("companies").select("key,logo_url").gte("checked_at", monthAgo).order("key").range(from, to),
+  );
+  const fresh = new Map(known.map((k) => [k.key, k.logo_url]));
+  const todo = new Map<string, string>();
+  for (const r of roles) if (r.company_key && !fresh.has(r.company_key) && !todo.has(r.company_key)) todo.set(r.company_key, r.employer);
+  const names = [...todo].slice(0, limit);
+  let found = 0;
+  for (const batch of chunks(names, 100)) {
+    const rows = await lookupCompanies(new Map(batch));
+    for (const row of rows) {
+      row.logo_url ??= pageLogos.get(row.key) ?? null;
+      if (row.wikidata_id) found++;
+    }
+    await must(() => db.from("companies").upsert(rows, { onConflict: "key" }));
+  }
+  // Logos found on employers' own job pages fill gaps for companies already stored.
+  for (const [key, logo] of pageLogos) {
+    if (fresh.has(key) && !fresh.get(key)) await must(() => db.from("companies").update({ logo_url: logo }).eq("key", key));
+  }
+  return { lookedUp: names.length, found };
+}
+
+async function enrich(stats: Record<string, unknown>) {
+  stats.details = await fillMissingDetails();
+  console.log("Employer pages:", JSON.stringify(stats.details));
+  stats.inferredStarts = await inferSiblingStarts();
+  stats.companies = await refreshCompanies();
+  console.log("Companies:", JSON.stringify(stats.companies));
 }
 
 async function main() {
@@ -301,6 +415,7 @@ async function main() {
 
     if (retagOnly) {
       stats.retagged = await retag(match);
+      await enrich(stats);
       stats.embedded = await embedNewRoles();
       console.log("Done:", JSON.stringify(stats));
       await db.from("ingest_runs").update({ finished_at: new Date().toISOString(), stats }).eq("id", run.id);
@@ -319,6 +434,7 @@ async function main() {
 
     stats.closed = await closeStaleRoles();
     if (retagAll || refreshed) stats.retagged = await retag(match);
+    await enrich(stats);
     stats.embedded = await embedNewRoles();
 
     const { count } = await db.from("roles").select("id", { count: "exact", head: true }).eq("is_open", true);
