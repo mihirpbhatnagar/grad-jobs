@@ -10,7 +10,7 @@ import { embed, roleText } from "./lib/embed.ts";
 import { GRAD_EMPLOYERS } from "./data/gradEmployers.ts";
 import { lookupCompanies } from "./lib/companies.ts";
 import { isEmployerPage, readJobPage, USER_AGENT } from "./lib/employerPages.ts";
-import { feedFromUrl, probe, readFeed } from "./sources/feeds.ts";
+import { discoverFromWebsite, feedFromUrl, probe, readFeed } from "./sources/feeds.ts";
 import { companyKey, dedupeKey, prettyLocation } from "./lib/normalise.ts";
 import { refreshSponsors, sponsorMatcher, type SponsorMatch } from "./lib/sponsors.ts";
 import { employerFromTitle, isBoardName, isEarlyCareer, isOutsideUk, isSeniorTitle, roleKind, startStatus, tagListing, type RoleTags } from "./lib/tags.ts";
@@ -432,7 +432,7 @@ const seedKeys = new Set(GRAD_EMPLOYERS.map(companyKey));
 // Grows the watch list for free: hiring systems seen in apply links (the coverage loop),
 // careers-site sitemaps of employers' own job pages, and standard board addresses for the
 // seed list of big graduate employers.
-async function discoverFeeds(probeLimit = 80, sitemapLimit = 40) {
+async function discoverFeeds(probeLimit = 120, sitemapLimit = 40) {
   const feeds = await selectAll<FeedRow>((from, to) => db.from("employer_feeds").select("*").order("id").range(from, to));
   const have = new Set(feeds.map((f) => `${f.ats}|${f.ats_id}`));
   const watched = new Set(feeds.map((f) => f.company_key));
@@ -481,19 +481,39 @@ async function discoverFeeds(probeLimit = 80, sitemapLimit = 40) {
     }
   }
 
-  // 3. Seed employers not yet checked: try the standard board addresses.
-  let probed = 0;
-  for (const name of GRAD_EMPLOYERS) {
-    const key = companyKey(name);
-    if (watched.has(key) || probed >= probeLimit) continue;
-    probed++;
-    const hits = await probe(name);
-    if (hits.length === 0) add({ company_key: key, name, ats: "none", ats_id: key, added_by: "probe" });
-    for (const h of hits) add({ company_key: key, name, ...h, added_by: "probe" });
-  }
+  for (const batch of chunks(added.splice(0), 200)) await must(() => db.from("employer_feeds").upsert(batch, { onConflict: "ats,ats_id", ignoreDuplicates: true }));
 
-  for (const batch of chunks(added, 200)) await must(() => db.from("employer_feeds").upsert(batch, { onConflict: "ats,ats_id", ignoreDuplicates: true }));
-  return { added: added.filter((a) => a.ats !== "none").length, sitemaps, probed };
+  // 3. Seed employers not yet checked: their own careers site (via the website on Wikidata)
+  //    and the standard board addresses, six employers at a time, saved as we go.
+  const todo = GRAD_EMPLOYERS.filter((name) => !watched.has(companyKey(name))).slice(0, probeLimit);
+  const known = new Map(
+    (await selectAll<{ key: string; domain: string | null }>((from, to) => db.from("companies").select("key,domain").order("key").range(from, to))).map((c) => [c.key, c.domain]),
+  );
+  const missing = todo.filter((n) => !known.has(companyKey(n)));
+  for (const batch of chunks(missing, 50)) {
+    const rows = await lookupCompanies(new Map(batch.map((n) => [companyKey(n), n])));
+    await must(() => db.from("companies").upsert(rows, { onConflict: "key" }));
+    for (const r of rows) known.set(r.key, r.domain);
+  }
+  let probed = 0;
+  let found = 0;
+  for (const group of chunks(todo, 6)) {
+    await Promise.all(
+      group.map(async (name) => {
+        const key = companyKey(name);
+        const domain = known.get(key);
+        const [boards, site] = await Promise.all([probe(name), domain ? discoverFromWebsite(domain) : Promise.resolve([])]);
+        const hits = [...site, ...boards];
+        if (hits.length === 0) add({ company_key: key, name, ats: "none", ats_id: key, added_by: "probe" });
+        else found++;
+        for (const h of hits) add({ company_key: key, name, ...h, added_by: site.includes(h) ? "website" : "probe" });
+      }),
+    );
+    probed += group.length;
+    for (const batch of chunks(added.splice(0), 200)) await must(() => db.from("employer_feeds").upsert(batch, { onConflict: "ats,ats_id", ignoreDuplicates: true }));
+    console.log(`  watch list: checked ${probed}/${todo.length} seed employers, ${found} with a readable careers system`);
+  }
+  return { sitemaps, probed, found };
 }
 
 // Reads every feed on the watch list (daily, so roles that disappear are closed on time).
@@ -551,6 +571,19 @@ async function recordCoverage() {
   return stats;
 }
 
+// The watch list is newer than the rest of the run: a failure here is logged and the morning
+// run carries on (closing stale roles, tagging, company facts, embeddings).
+async function watchList(stats: Record<string, unknown>, match: Matcher, byKey: Map<string, ExistingRole>) {
+  try {
+    stats.discovered = await discoverFeeds();
+    console.log("Watch list:", JSON.stringify(stats.discovered));
+    stats.employerFeeds = await pullEmployerFeeds(match, byKey);
+  } catch (err) {
+    console.error("Employer watch list failed (run continues):", err);
+    stats.watchListError = String(err);
+  }
+}
+
 async function enrich(stats: Record<string, unknown>) {
   stats.details = await fillMissingDetails();
   console.log("Employer pages:", JSON.stringify(stats.details));
@@ -578,8 +611,7 @@ async function main() {
 
     if (retagOnly || feedsOnly) {
       if (feedsOnly) {
-        stats.discovered = await discoverFeeds();
-        stats.employerFeeds = await pullEmployerFeeds(match, byKey);
+        await watchList(stats, match, byKey);
       } else stats.retagged = await retag(match);
       await enrich(stats);
       stats.coverage = await recordCoverage();
@@ -599,8 +631,7 @@ async function main() {
       stats.googleJobs = { ...(await saveCrossCheck("google_jobs", google.listings, match, byKey)), costUsd: google.costUsd };
     }
 
-    stats.discovered = await discoverFeeds();
-    stats.employerFeeds = await pullEmployerFeeds(match, byKey);
+    await watchList(stats, match, byKey);
 
     stats.closed = await closeStaleRoles();
     if (retagAll || refreshed) stats.retagged = await retag(match);
