@@ -102,7 +102,33 @@ const EARLY_TEXT = /\b(graduates?|grad (scheme|programme)|entry[- ]level|trainee
 const GRAD_IN_TITLE = /\b(graduate|grad|trainee|junior|entry[- ]level|early careers?|intern|internship|work experience)\b/i;
 
 export function isSeniorTitle(title: string): boolean {
-  return SENIOR_TITLE.test(title) && !GRAD_IN_TITLE.test(title);
+  // "Manager" / "Lead" on their own are experienced roles ("Marketing Lead", "Sales Manager");
+  // with a graduate word they aren't ("Graduate Trainee Manager").
+  return (SENIOR_TITLE.test(title) || /\b(manager|lead)\b/i.test(title)) && !GRAD_IN_TITLE.test(title);
+}
+
+// Roles outside the UK that slip in through broad searches (e.g. "On site, Berlin").
+const ABROAD = /\b(germany|berlin|munich|frankfurt|hamburg|france|paris|lyon|spain|madrid|barcelona|netherlands|amsterdam|rotterdam|republic of ireland|dublin|cork|galway|usa|u\.s\.|united states|new york|california|texas|chicago|boston|pennsylvania|villanova|canada|toronto|india|bangalore|bengaluru|mumbai|singapore|australia|sydney|melbourne|dubai|uae|hong kong|switzerland|zurich|geneva|sweden|stockholm|denmark|copenhagen|norway|oslo|poland|warsaw|krakow|italy|milan|rome|belgium|brussels|portugal|lisbon|austria|vienna|czech|prague|luxembourg|south africa|philippines|china|shanghai|japan|tokyo)\b/i;
+
+export function isOutsideUk(title: string, location: string | null): boolean {
+  const place = location ?? "";
+  if (/\b(uk|united kingdom|england|scotland|wales|northern ireland|london)\b/i.test(place)) return false;
+  return ABROAD.test(place) || ABROAD.test(title.replace(/\b(international|global|europe|emea)\b/gi, ""));
+}
+
+// Job boards sometimes appear as the "employer" in Google Jobs. The real employer is often at
+// the end of the title ("... Programme - Macquarie Group"); otherwise the board name stays.
+const BOARDS = /^(targetjobs|efinancialcareers|graduate talent|brighterbox|bright network|gradcracker|milkround|prospects|ratemyplacement|trackr|jobteaser|higherin|inspiring interns|give a grad a go|grb|graduate recruitment bureau|jobleads|jooble|totaljobs|cv-library|indeed|linkedin|glassdoor)\b/i;
+export function isBoardName(employer: string): boolean {
+  return BOARDS.test(employer.trim());
+}
+export function employerFromTitle(title: string): string | null {
+  const m = title.match(/\s[-–—|]\s([A-Z][\w&.'’ ]{2,50})$/) ?? title.match(/\sat\s([A-Z][\w&.'’ ]{2,50})$/);
+  if (!m) return null;
+  const name = m[1].trim();
+  // Not a place, programme word or work pattern.
+  if (/\b(london|manchester|birmingham|leeds|edinburgh|glasgow|bristol|uk|remote|hybrid|on[- ]?site|graduate|programme|program|scheme|intake|20\d\d|operations|career|leadership|growth|launch)\b/i.test(name)) return null;
+  return name;
 }
 
 export function isEarlyCareer(title: string, description: string): boolean {

@@ -144,7 +144,11 @@ export async function fetchRoles(f: RoleFilters, scope: RoleScope = "main") {
     query = query.eq("part_time", true).neq("start_status", "before");
   }
 
-  if (f.q) query = query.textSearch("search", f.q, { type: "websearch", config: "english" });
+  // Every word must appear in the title, company or place, exactly as typed (no word-stemming,
+  // which made "marketing" match "Global Markets").
+  for (const word of f.q.toLowerCase().split(/\s+/).map((w) => w.replace(/[^\p{L}\p{N}&'-]/gu, "")).filter((w) => w.length >= 2).slice(0, 6)) {
+    query = query.or(`title.ilike.%${word}%,employer.ilike.%${word}%,location.ilike.%${word}%`);
+  }
   if (f.sponsor) query = query.eq("sponsor_status", f.sponsor);
   if (f.schemes) query = query.eq("tags->>graduateScheme", "true");
   if (f.sectors.length) {

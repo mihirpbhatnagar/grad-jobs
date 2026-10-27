@@ -1,4 +1,5 @@
 import { requireEnv } from "../lib/env.ts";
+import { employerFromTitle, isBoardName } from "../lib/tags.ts";
 import type { Listing } from "./types.ts";
 
 // Google Jobs results via DataForSEO (prepaid, pay per search page of 10 results).
@@ -125,7 +126,7 @@ export async function searchGoogleJobs(
       sourceId: i.job_id,
       sourceUrl: i.source_url,
       title: i.title.trim(),
-      employer: i.employer_name.trim(),
+      employer: isBoardName(i.employer_name) ? (employerFromTitle(i.title) ?? i.employer_name.trim()) : i.employer_name.trim(),
       location: i.location?.replace(/\s*\(\+\d+ others?\)/i, "").replace(/,?\s*(UK|United Kingdom)$/i, "").trim() || null,
       salaryMin: pay.min,
       salaryMax: pay.max,

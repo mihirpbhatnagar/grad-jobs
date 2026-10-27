@@ -13,7 +13,7 @@ import { isEmployerPage, readJobPage, USER_AGENT } from "./lib/employerPages.ts"
 import { feedFromUrl, probe, readFeed } from "./sources/feeds.ts";
 import { companyKey, dedupeKey, prettyLocation } from "./lib/normalise.ts";
 import { refreshSponsors, sponsorMatcher, type SponsorMatch } from "./lib/sponsors.ts";
-import { isEarlyCareer, isSeniorTitle, roleKind, startStatus, tagListing, type RoleTags } from "./lib/tags.ts";
+import { employerFromTitle, isBoardName, isEarlyCareer, isOutsideUk, isSeniorTitle, roleKind, startStatus, tagListing, type RoleTags } from "./lib/tags.ts";
 import { GOOGLE_JOBS_QUERIES, searchGoogleJobs } from "./sources/googleJobs.ts";
 import { reedDetails, searchReed, toListing } from "./sources/reed.ts";
 import type { Listing } from "./sources/types.ts";
@@ -172,7 +172,7 @@ async function pullReed(match: Matcher, byKey: Map<string, ExistingRole>) {
     // Reed's short preview text.
     const listings = batch.filter((id) => details.has(id)).map((id) => toListing(results.get(id)!, details.get(id)));
     totals.detailsFailed += batch.length - listings.length;
-    const keep = listings.filter((l) => isEarlyCareer(l.title, l.description));
+    const keep = listings.filter((l) => isEarlyCareer(l.title, l.description) && !isOutsideUk(l.title, l.location));
     const drop = listings.filter((l) => !keep.includes(l));
     const saved = await saveListings(keep, match, byKey);
     await saveExcluded(drop, "not early-career");
@@ -206,7 +206,7 @@ async function saveCrossCheck(source: string, listings: Listing[], match: Matche
     if (roleId) {
       links.push({ source: l.source, source_id: l.sourceId, role_id: roleId, url: l.sourceUrl, last_seen: now });
       if (l.description.length > 150) withText.set(roleId, l);
-    } else if (isSeniorTitle(l.title)) senior.push(l);
+    } else if (isSeniorTitle(l.title) || isOutsideUk(l.title, l.location)) senior.push(l);
     else unmatched.push(l);
   }
   // A known role that has no description yet takes this source's full text.
@@ -289,7 +289,7 @@ async function retag(match: Matcher) {
     db.from("roles").select("id,title,employer,location,locations,description,tags,sponsor_status,sponsor_name,kind,start_status,company_key,quality,salary_min,salary_max,expires_at").eq("is_open", true).order("id").range(from, to),
   );
 
-  const outOfScope = roles.filter((r) => (r.description ? !isEarlyCareer(r.title, r.description) : isSeniorTitle(r.title)));
+  const outOfScope = roles.filter((r) => isOutsideUk(r.title, r.location) || (r.description ? !isEarlyCareer(r.title, r.description) : isSeniorTitle(r.title)));
   const removeIds = outOfScope.map((r) => r.id);
   for (const batch of chunks(removeIds, 200)) {
     const links = await must(() => db.from("role_sources").select("source,source_id").in("role_id", batch));
@@ -304,7 +304,9 @@ async function retag(match: Matcher) {
   for (const r of roles) {
     if (removed.has(r.id)) continue;
     const tags = tagListing(r.title, r.description ?? "");
-    const m = match(r.employer, r.location);
+    // A job board listed as the employer: use the real employer named in the title, if any.
+    const employer = isBoardName(r.employer) ? (employerFromTitle(r.title) ?? r.employer) : r.employer;
+    const m = match(employer, r.location);
     const start_status = startStatus(tags, earliestStart);
     const next = {
       tags,
@@ -314,10 +316,11 @@ async function retag(match: Matcher) {
       start_status,
       location: prettyLocation(r.location),
       locations: [...new Set(r.locations.map((l) => prettyLocation(l) ?? l))],
-      company_key: companyKey(r.employer),
+      company_key: companyKey(employer),
+      employer,
       quality: roleQuality({ ...r, tags, start_status, sponsor_status: m.status }),
     };
-    const current = { tags: r.tags, sponsor_status: r.sponsor_status, sponsor_name: r.sponsor_name, kind: r.kind, start_status: r.start_status, location: r.location, locations: r.locations, company_key: r.company_key, quality: r.quality };
+    const current = { employer: r.employer, tags: r.tags, sponsor_status: r.sponsor_status, sponsor_name: r.sponsor_name, kind: r.kind, start_status: r.start_status, location: r.location, locations: r.locations, company_key: r.company_key, quality: r.quality };
     if (sameJson(next, current)) continue;
     await must(() => db.from("roles").update(next).eq("id", r.id));
     changed++;
