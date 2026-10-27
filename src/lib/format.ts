@@ -48,3 +48,12 @@ export const decodeEntities = (text: string) =>
 // "Glasgow (G84 8HL)" -> "Glasgow": postcodes in brackets add nothing on a card.
 export const placeName = (location: string | null | undefined) =>
   location ? location.replace(/\s*\(?\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b\)?/g, "").replace(/\s*,\s*$/, "").trim() || location : null;
+
+// Job boards sometimes appear as the "employer" (Google Jobs lists the board that posted it).
+const BOARDS = /^(targetjobs|efinancialcareers|graduate talent|brighterbox|bright network|gradcracker|milkround|prospects|ratemyplacement|trackr|jobteaser|higherin|inspiring interns|give a grad a go|grb|graduate recruitment bureau|jobleads|jooble|totaljobs|cv-library|indeed|linkedin|glassdoor)\b/i;
+export function isBoardName(employer: string): boolean {
+  return BOARDS.test(employer.trim());
+}
+
+// What to show as the employer: a job board's name is replaced, since it isn't the employer.
+export const employerLabel = (employer: string) => (isBoardName(employer) ? `Employer not named · via ${employer}` : employer);

@@ -3,7 +3,7 @@ import { CompanyLogo } from "@/components/CompanyLogo";
 import { SaveButton } from "@/components/SaveButton";
 import type { Company } from "@/lib/companies";
 import type { Role } from "@/lib/roles";
-import { dateShort, daysUntil, placeName, postedAgo, salaryShort, startLabel } from "@/lib/format";
+import { dateShort, daysUntil, employerLabel, isBoardName, placeName, postedAgo, salaryShort, startLabel } from "@/lib/format";
 
 export function Chip({ children, tone = "plain", title }: { children: React.ReactNode; tone?: "plain" | "accent" | "success" | "amber" | "rose"; title?: string }) {
   const tones = {
@@ -30,7 +30,7 @@ export function SponsorTick() {
 
 export function RoleCard({
   role,
-  company,
+  company: companyInfo,
   estimate,
   saved = false,
   signedIn = false,
@@ -43,6 +43,8 @@ export function RoleCard({
   signedIn?: boolean;
   matchTags?: string[];
 }) {
+  // A job board isn't the employer, so its company facts and logo aren't shown.
+  const company = isBoardName(role.employer) ? null : companyInfo;
   const t = role.tags;
   const pay = salaryShort(role.salary_min, role.salary_max);
   const closes = t.deadline ?? role.expires_at;
@@ -67,7 +69,7 @@ export function RoleCard({
             </Link>
           </h2>
           <p className="mt-0.5 text-sm">
-            <span className="font-medium text-foreground/90">{company?.name && company.name.length <= role.employer.length + 6 ? company.name : role.employer}</span>
+            <span className="font-medium text-foreground/90">{company?.name && company.name.length <= role.employer.length + 6 ? company.name : employerLabel(role.employer)}</span>
             {about && <span className="text-muted"> · {about[0].toUpperCase() + about.slice(1)}</span>}
           </p>
           <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">

@@ -1,6 +1,10 @@
 // Free text rules (no AI) that read a listing and pull out the facts users filter on.
 // Anything a listing doesn't mention stays null, so the UI can show "not stated".
 
+import { isBoardName } from "../../src/lib/format.ts";
+
+export { isBoardName };
+
 export type RoleTags = {
   degree: "First" | "2:1" | "2:2" | null;
   sponsorship: "not_offered" | "offered" | null;
@@ -118,10 +122,6 @@ export function isOutsideUk(title: string, location: string | null): boolean {
 
 // Job boards sometimes appear as the "employer" in Google Jobs. The real employer is often at
 // the end of the title ("... Programme - Macquarie Group"); otherwise the board name stays.
-const BOARDS = /^(targetjobs|efinancialcareers|graduate talent|brighterbox|bright network|gradcracker|milkround|prospects|ratemyplacement|trackr|jobteaser|higherin|inspiring interns|give a grad a go|grb|graduate recruitment bureau|jobleads|jooble|totaljobs|cv-library|indeed|linkedin|glassdoor)\b/i;
-export function isBoardName(employer: string): boolean {
-  return BOARDS.test(employer.trim());
-}
 export function employerFromTitle(title: string): string | null {
   const m = title.match(/\s[-–—|]\s([A-Z][\w&.'’ ]{2,50})$/) ?? title.match(/\sat\s([A-Z][\w&.'’ ]{2,50})$/);
   if (!m) return null;

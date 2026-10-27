@@ -8,7 +8,7 @@ import { Chip, SponsorTick } from "@/components/RoleCard";
 import { SaveButton } from "@/components/SaveButton";
 import { currentUser } from "@/lib/auth";
 import { companyFor, sizeLabel, type Company } from "@/lib/companies";
-import { dateLong, daysUntil, decodeEntities, money, placeName, startLabel } from "@/lib/format";
+import { dateLong, daysUntil, decodeEntities, employerLabel, isBoardName, money, placeName, startLabel } from "@/lib/format";
 import type { RoleTags } from "@/lib/roles";
 import { estimateFor, fieldOf, salaryContext } from "@/lib/salary";
 import { publicClient } from "@/lib/supabase";
@@ -223,7 +223,7 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
   const r = data as FullRole;
   const [{ db: userDb, user }, company, ctx, visa, { data: settings }] = await Promise.all([
     currentUser(),
-    companyFor(r.company_key),
+    isBoardName(r.employer) ? null : companyFor(r.company_key),
     salaryContext(),
     visaSettings(),
     db.from("settings").select("value").eq("key", "visa.standard_salary_gbp").maybeSingle(),
@@ -289,7 +289,7 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
           </div>
           <h1 className="mt-4 text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">{r.title}</h1>
           <p className="mt-1.5 text-muted">
-            <span className="font-medium text-foreground">{company?.name ?? r.employer}</span>
+            <span className="font-medium text-foreground">{company?.name ?? employerLabel(r.employer)}</span>
             {r.location && ` · ${placeName(r.location)}`}
             {r.locations.length > 1 && ` + ${r.locations.length - 1} more`}
           </p>
