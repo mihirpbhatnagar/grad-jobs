@@ -107,6 +107,11 @@ export function RoleCard({
 
       <div className="mt-4 flex flex-wrap items-center gap-1.5 sm:pl-[68px]">
         <Chip tone="accent">{startLabel(role)}</Chip>
+        {t.abroad && (
+          <Chip tone={t.sponsorship === "offered" ? "success" : t.sponsorship === "not_offered" ? "rose" : "amber"}>
+            {t.abroad} · {t.sponsorship === "offered" ? "visa sponsorship offered" : t.sponsorship === "not_offered" ? "no visa sponsorship" : "sponsorship not stated"}
+          </Chip>
+        )}
         {role.sponsor_status === "likely" && (
           <Chip tone="success" title={role.sponsor_name ? `Register entry: ${role.sponsor_name}` : undefined}>
             <SponsorTick />

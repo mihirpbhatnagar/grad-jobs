@@ -23,7 +23,7 @@ async function mainStats() {
   const today = ukToday();
   const base = () =>
     db.from("roles").select("id", { count: "exact", head: true }).eq("is_open", true).eq("kind", "job").eq("part_time", false)
-      .in("start_status", ["confirmed", "likely"]).or(`expires_at.is.null,expires_at.gte.${today}`).or(`tags->>deadline.is.null,tags->>deadline.gte.${today}`);
+      .in("start_status", ["confirmed", "likely"]).is("tags->>abroad", null).or(`expires_at.is.null,expires_at.gte.${today}`).or(`tags->>deadline.is.null,tags->>deadline.gte.${today}`);
   const week = weekAhead();
   const [all, closing, sponsors, schemes] = await Promise.all([
     base(),

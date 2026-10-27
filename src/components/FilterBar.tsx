@@ -193,7 +193,7 @@ export function FilterBar({ filters, path = "/", showStart = true, myFields = []
               </div>
             </div>
             <Group title="Location">
-              {[...CITIES, "Leeds", "Bristol", "Glasgow", "Nottingham", "Remote"].map((c) => (
+              {[...CITIES, "Leeds", "Bristol", "Glasgow", "Nottingham", "Remote", "Abroad"].map((c) => (
                 <Pill key={c} on={draft.locs.includes(c)} onClick={() => set({ locs: toggle(draft.locs, c) })}>
                   {c}
                 </Pill>

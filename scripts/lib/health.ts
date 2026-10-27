@@ -28,7 +28,7 @@ export async function healthCheck(db: SupabaseClient) {
   const today = new Date().toISOString().slice(0, 10);
   const main = await selectAll<MainRole>((from, to) =>
     db.from("roles").select("id,title,employer,location,company_key").eq("is_open", true).eq("kind", "job").eq("part_time", false)
-      .in("start_status", ["confirmed", "likely"]).or(`expires_at.is.null,expires_at.gte.${today}`).or(`tags->>deadline.is.null,tags->>deadline.gte.${today}`)
+      .in("start_status", ["confirmed", "likely"]).is("tags->>abroad", null).or(`expires_at.is.null,expires_at.gte.${today}`).or(`tags->>deadline.is.null,tags->>deadline.gte.${today}`)
       .order("id").range(from, to),
   );
   const checks: Check[] = [];

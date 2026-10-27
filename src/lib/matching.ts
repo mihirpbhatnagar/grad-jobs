@@ -7,6 +7,14 @@ import type { Role } from "./roles.ts";
 
 export type Match = { role: Role; score: number; tags: string[] };
 
+const REGIONS: Record<string, string[]> = {
+  europe: ["germany", "france", "spain", "netherlands", "ireland", "switzerland", "sweden", "denmark", "norway", "poland", "italy", "belgium", "portugal", "austria", "czechia", "luxembourg"],
+  "middle east": ["uae", "qatar"],
+  "north america": ["united states", "canada"],
+  "asia-pacific": ["singapore", "australia", "hong kong", "japan", "china", "philippines"],
+  india: ["india"],
+};
+
 const MONTH = (iso: string | null | undefined) => (iso ? Number(iso.slice(5, 7)) : null);
 
 function inLocations(role: Role, wanted: string[]): string | null {
@@ -27,11 +35,16 @@ export function rankForYou(
     : [];
   const wantedPlaces = [...a.locations.value, ...a.locations.other.split(",").map((s) => s.trim()).filter(Boolean)];
   const d = a.dontShow;
+  // Roles abroad only when the profile asks for that country or its region.
+  const wantedAbroad = new Set(wantedPlaces.flatMap((p) => REGIONS[p.toLowerCase()] ?? [p.toLowerCase()]));
 
   const matches: Match[] = [];
   for (const role of roles) {
     const t = role.tags;
     const start = (t as { startDate?: string | null }).startDate ?? null;
+
+    const abroad = (t as { abroad?: string | null }).abroad;
+    if (abroad && !wantedAbroad.has(abroad.toLowerCase())) continue;
 
     // "Don't show" toggles hide only roles that state the detail.
     if (d.nonSponsors && role.sponsor_status === "not_listed") continue;

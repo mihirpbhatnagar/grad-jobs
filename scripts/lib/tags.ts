@@ -17,6 +17,8 @@ export type RoleTags = {
   graduateScheme: boolean;
   programmeTitle: boolean;
   salaryCompetitive: boolean;
+  // Country for roles outside the UK (null = UK). Every user needs sponsorship abroad.
+  abroad: string | null;
   immediateStart: boolean;
   aimedAt2027: boolean;
 };
@@ -33,6 +35,8 @@ const NUMBER_WORDS: Record<string, number> = {
 };
 
 const NO_SPONSORSHIP = [
+  /\bmust (already )?(have|hold) (the )?(legal )?(right|authori[sz]ation|eligibility) to work in (the )?(us|usa|united states|eu|germany|france|netherlands|ireland|canada|australia|singapore|uae|india|switzerland)\b/i,
+  /\b(authori[sz]ed|eligible) to work in the (us|united states)\b[^.]{0,40}\bwithout\b/i,
   /\b(unable|not able|cannot|can ?not|can't|do not|don't|will not|won't|not in a position)\s+(to\s+)?(offer|provide|support|consider)?\s*(any\s+)?(visa\s+)?sponsor/i,
   /\bno\s+(visa\s+)?sponsorship\b/i,
   /\bsponsorship\s+(is\s+)?(not|unavailable)\b/i,
@@ -40,6 +44,8 @@ const NO_SPONSORSHIP = [
   /\bdoes\s+not\s+offer\s+(visa\s+)?sponsorship\b/i,
 ];
 const OFFERS_SPONSORSHIP = [
+  /\b(visa|work permit|relocation)\s+(support|assistance|package|sponsorship)\s+(is\s+)?(available|provided|offered|included)\b/i,
+  /\b(we|will)\s+(provide|offer|support)\s+(visa|work permit|relocation)\b/i,
   /\b(visa\s+)?sponsorship\s+(is\s+)?(available|offered|provided|possible)\b/i,
   /\bwe\s+(can|will|are able to)\s+(offer\s+|provide\s+)?(visa\s+)?sponsor/i,
   /\bopen to (candidates|applicants) (requiring|who require|needing) (visa )?sponsorship\b/i,
@@ -137,6 +143,26 @@ export function isSeniorTitle(title: string): boolean {
 // Roles outside the UK that slip in through broad searches (e.g. "On site, Berlin").
 const ABROAD = /\b(germany|berlin|munich|frankfurt|hamburg|france|paris|lyon|spain|madrid|barcelona|netherlands|amsterdam|rotterdam|republic of ireland|dublin|cork|galway|usa|u\.s\.|united states|new york|california|texas|chicago|boston|pennsylvania|villanova|canada|toronto|india|bangalore|bengaluru|mumbai|singapore|australia|sydney|melbourne|dubai|uae|hong kong|switzerland|zurich|geneva|sweden|stockholm|denmark|copenhagen|norway|oslo|poland|warsaw|krakow|italy|milan|rome|belgium|brussels|portugal|lisbon|austria|vienna|czech|prague|luxembourg|south africa|philippines|china|shanghai|japan|tokyo)\b/i;
 
+const COUNTRY: [RegExp, string][] = [
+  [/\b(germany|berlin|munich|frankfurt|hamburg)\b/i, "Germany"], [/\b(france|paris|lyon)\b/i, "France"],
+  [/\b(spain|madrid|barcelona)\b/i, "Spain"], [/\b(netherlands|amsterdam|rotterdam)\b/i, "Netherlands"],
+  [/\b(republic of ireland|dublin|cork|galway)\b/i, "Ireland"], [/\b(usa|u\.s\.|united states|new york|california|texas|chicago|boston|pennsylvania|villanova)\b/i, "United States"],
+  [/\b(canada|toronto)\b/i, "Canada"], [/\b(india|bangalore|bengaluru|mumbai)\b/i, "India"], [/\b(singapore)\b/i, "Singapore"],
+  [/\b(australia|sydney|melbourne)\b/i, "Australia"], [/\b(dubai|uae)\b/i, "UAE"], [/\b(hong kong)\b/i, "Hong Kong"],
+  [/\b(switzerland|zurich|geneva)\b/i, "Switzerland"], [/\b(sweden|stockholm)\b/i, "Sweden"], [/\b(denmark|copenhagen)\b/i, "Denmark"],
+  [/\b(norway|oslo)\b/i, "Norway"], [/\b(poland|warsaw|krakow)\b/i, "Poland"], [/\b(italy|milan|rome)\b/i, "Italy"],
+  [/\b(belgium|brussels)\b/i, "Belgium"], [/\b(portugal|lisbon)\b/i, "Portugal"], [/\b(austria|vienna)\b/i, "Austria"],
+  [/\b(czech|prague)\b/i, "Czechia"], [/\b(luxembourg)\b/i, "Luxembourg"], [/\b(south africa)\b/i, "South Africa"],
+  [/\b(philippines)\b/i, "Philippines"], [/\b(china|shanghai)\b/i, "China"], [/\b(japan|tokyo)\b/i, "Japan"], [/\b(qatar)\b/i, "Qatar"],
+];
+
+// The country of a role outside the UK, or null for a UK role.
+export function countryOf(title: string, location: string | null): string | null {
+  if (!isOutsideUk(title, location)) return null;
+  const text = `${location ?? ""} ${title}`;
+  return COUNTRY.find(([re]) => re.test(text))?.[1] ?? "Abroad";
+}
+
 export function isOutsideUk(title: string, location: string | null): boolean {
   const place = location ?? "";
   if (/\b(uk|united kingdom|england|scotland|wales|northern ireland|london)\b/i.test(place)) return false;
@@ -214,6 +240,7 @@ export function tagListing(title: string, description: string): RoleTags {
     deadline: findDeadline(text),
     lengthMonths: findLengthMonths(text),
     programmeTitle: /\b(graduate|grad)\b.{0,30}\b(scheme|programme|program|intake|cohort|academy|rotation)\b|\b(scheme|programme|program)\b.{0,30}\bgraduates?\b|\bgraduate development\b/i.test(title),
+    abroad: countryOf(title, ""),
     salaryCompetitive: /\b(competitive (salary|pay|package|remuneration|starting salary|base)|salary:?\s*(is\s*)?competitive|salary\s*-\s*competitive)\b/i.test(text),
     graduateScheme: /\bgraduate\s+(scheme|programme|program|trainee|development programme|training scheme)\b/i.test(text),
     immediateStart: /\b(immediate(ly)? start|start(ing)? (asap|immediately|straight away)|asap start|available to start immediately|start date:?\s*(asap|immediate))/i.test(text),

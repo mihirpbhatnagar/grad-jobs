@@ -21,7 +21,7 @@ async function fetchSide() {
     internshipRules(db.from("roles").select(COLS).eq("is_open", true)).order("first_seen", { ascending: false }).limit(4),
     // Closing soon: main-list roles with the nearest deadlines.
     db.from("roles").select(COLS).eq("is_open", true).eq("kind", "job").eq("part_time", false)
-      .in("start_status", ["confirmed", "likely"]).gte("expires_at", today).lte("expires_at", week)
+      .in("start_status", ["confirmed", "likely"]).is("tags->>abroad", null).gte("expires_at", today).lte("expires_at", week)
       .or(`tags->>deadline.is.null,tags->>deadline.gte.${today}`).order("expires_at", { ascending: true }).limit(5),
     db.from("roles").select("id", { count: "exact", head: true }).eq("is_open", true).eq("part_time", true).neq("start_status", "before"),
   ]);

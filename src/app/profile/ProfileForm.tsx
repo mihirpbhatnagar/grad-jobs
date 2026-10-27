@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { CITIES, DONT_SHOW, FIELDS, SALARY_OPTIONS, type ProfileAnswers } from "@/lib/profile";
+import { ABROAD_REGIONS, CITIES, DONT_SHOW, FIELDS, SALARY_OPTIONS, type ProfileAnswers } from "@/lib/profile";
 import { embedInBrowser } from "@/lib/embed-browser";
 import { saveProfile } from "./actions";
 
@@ -159,10 +159,19 @@ export function ProfileForm({
             </Pill>
           ))}
         </div>
+        <p className="mt-4 text-sm font-medium">Abroad</p>
+        <p className="text-xs text-muted">Roles outside the UK show in For you only for places you pick. You&apos;ll need visa sponsorship there, so each shows whether it&apos;s offered.</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {ABROAD_REGIONS.map((c) => (
+            <Pill key={c} on={a.locations.value.includes(c)} onClick={() => set("locations", { value: toggle(a.locations.value, c) })}>
+              {c}
+            </Pill>
+          ))}
+        </div>
         <input
           value={a.locations.other}
           onChange={(e) => set("locations", { other: e.target.value })}
-          placeholder="Other places, separated by commas"
+          placeholder="Other places or countries, separated by commas (e.g. Leeds, Germany)"
           className="mt-3 w-full max-w-md rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:border-foreground/40"
         />
       </Question>

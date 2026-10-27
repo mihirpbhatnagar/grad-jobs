@@ -14,6 +14,7 @@ export type RoleTags = {
   graduateScheme: boolean;
   programmeTitle?: boolean;
   salaryCompetitive?: boolean;
+  abroad?: string | null;
   aimedAt2027: boolean;
   startDate?: string | null;
 };
@@ -141,6 +142,8 @@ export async function fetchRoles(f: RoleFilters, scope: RoleScope = "main") {
   // or clearly aimed at 2027 starters. Part-time roles and internships have their own pages.
   if (scope === "main") {
     query = query.eq("kind", "job").eq("part_time", false).in("start_status", f.start === "unstated" ? ["unknown"] : ["confirmed", "likely"]);
+    // UK roles by default; "Abroad" in the location filter shows roles outside the UK instead.
+    query = f.locs.includes("Abroad") ? query.not("tags->>abroad", "is", null) : query.is("tags->>abroad", null);
   } else if (scope === "internships") {
     query = internshipRules(query);
   } else {
@@ -158,7 +161,8 @@ export async function fetchRoles(f: RoleFilters, scope: RoleScope = "main") {
     const words = FIELDS.filter((x) => f.sectors.includes(x.id)).flatMap((x) => x.keywords.map((k) => k.trim()));
     query = query.or(words.map((w) => `title.ilike.%${w}%`).join(","));
   }
-  if (f.locs.length) query = query.or(f.locs.map((l) => `location.ilike.%${l}%`).join(","));
+  const places = f.locs.filter((l) => l !== "Abroad");
+  if (places.length) query = query.or(places.map((l) => `location.ilike.%${l}%`).join(","));
   if (f.salary) query = query.or(`salary_min.gte.${f.salary},salary_max.gte.${f.salary}`);
   if (f.start === "summer") query = query.gte("tags->>startDate", "2027-06-01").lt("tags->>startDate", "2027-09-01");
   if (f.start === "sept") query = query.gte("tags->>startDate", "2027-09-01").lt("tags->>startDate", "2027-10-01");

@@ -20,6 +20,8 @@ export const FIELDS: { id: string; label: string; keywords: string[] }[] = [
 ];
 
 export const CITIES = ["London", "Manchester", "Birmingham", "Edinburgh"];
+// Region shortcuts for roles abroad (matched to countries in lib/matching.ts).
+export const ABROAD_REGIONS = ["Europe", "Middle East", "North America", "Asia-Pacific", "India"];
 
 export const SALARY_OPTIONS = [
   { value: 0, label: "Any" },

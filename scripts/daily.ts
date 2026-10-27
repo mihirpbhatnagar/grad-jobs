@@ -14,7 +14,7 @@ import { isEmployerPage, readJobPage, USER_AGENT } from "./lib/employerPages.ts"
 import { discoverFromWebsite, feedFromUrl, probe, readFeed } from "./sources/feeds.ts";
 import { companyKey, dedupeKey, prettyLocation } from "./lib/normalise.ts";
 import { refreshSponsors, sponsorMatcher, type SponsorMatch } from "./lib/sponsors.ts";
-import { employerFromTitle, findSalary, isBoardName, isEarlyCareer, isOutsideUk, isSeniorTitle, roleKind, startStatus, tagListing, type RoleTags } from "./lib/tags.ts";
+import { countryOf, employerFromTitle, findSalary, isBoardName, isEarlyCareer, isSeniorTitle, roleKind, startStatus, tagListing, type RoleTags } from "./lib/tags.ts";
 import { GOOGLE_JOBS_QUERIES, searchGoogleJobs, SWEEP_QUERIES } from "./sources/googleJobs.ts";
 import { reedDetails, searchReed, toListing } from "./sources/reed.ts";
 import type { Listing } from "./sources/types.ts";
@@ -54,7 +54,7 @@ function roleQuality(r: QualityInput): number {
 }
 
 function roleRow(l: Listing, match: SponsorMatch, existing: ExistingRole | undefined, now: string) {
-  const tags = tagListing(l.title, l.description);
+  const tags = { ...tagListing(l.title, l.description), abroad: countryOf(l.title, l.location) };
   const locations = [...new Set([...(existing?.locations ?? []), ...(l.location ? [l.location] : [])])];
   const start_status = startStatus(tags, earliestStart);
   // The source's salary fields, else a salary written in the description ("£35,000 per annum").
@@ -184,7 +184,8 @@ async function pullReed(match: Matcher, byKey: Map<string, ExistingRole>) {
     // Reed's short preview text.
     const listings = batch.filter((id) => details.has(id)).map((id) => toListing(results.get(id)!, details.get(id)));
     totals.detailsFailed += batch.length - listings.length;
-    const keep = listings.filter((l) => isEarlyCareer(l.title, l.description) && !isOutsideUk(l.title, l.location));
+    // Roles abroad are kept (tagged with their country) for users whose profile asks for them.
+    const keep = listings.filter((l) => isEarlyCareer(l.title, l.description));
     const drop = listings.filter((l) => !keep.includes(l));
     const saved = await saveListings(keep, match, byKey);
     await saveExcluded(drop, "not early-career");
@@ -219,7 +220,7 @@ async function saveCrossCheck(source: string, all: Listing[], match: Matcher, by
     if (roleId) {
       links.push({ source: l.source, source_id: l.sourceId, role_id: roleId, url: l.sourceUrl, last_seen: now });
       if (l.description.length > 150) withText.set(roleId, l);
-    } else if (isSeniorTitle(l.title) || isOutsideUk(l.title, l.location)) senior.push(l);
+    } else if (isSeniorTitle(l.title)) senior.push(l);
     else unmatched.push(l);
   }
   // A known role that has no description yet takes this source's full text.
@@ -302,7 +303,7 @@ async function retag(match: Matcher) {
     db.from("roles").select("id,title,employer,location,locations,description,tags,sponsor_status,sponsor_name,kind,start_status,company_key,quality,salary_min,salary_max,expires_at").eq("is_open", true).order("id").range(from, to),
   );
 
-  const outOfScope = roles.filter((r) => isOutsideUk(r.title, r.location) || (r.description ? !isEarlyCareer(r.title, r.description) : isSeniorTitle(r.title)));
+  const outOfScope = roles.filter((r) => (r.description ? !isEarlyCareer(r.title, r.description) : isSeniorTitle(r.title)));
   const removeIds = outOfScope.map((r) => r.id);
   for (const batch of chunks(removeIds, 200)) {
     const links = await must(() => db.from("role_sources").select("source,source_id").in("role_id", batch));
@@ -316,7 +317,7 @@ async function retag(match: Matcher) {
   const removed = new Set(removeIds);
   for (const r of roles) {
     if (removed.has(r.id)) continue;
-    const tags = tagListing(r.title, r.description ?? "");
+    const tags = { ...tagListing(r.title, r.description ?? ""), abroad: countryOf(r.title, r.location) };
     // A job board listed as the employer: use the real employer named in the title, if any.
     const employer = isBoardName(r.employer) ? (employerFromTitle(r.title) ?? r.employer) : r.employer;
     const m = match(employer, r.location);
