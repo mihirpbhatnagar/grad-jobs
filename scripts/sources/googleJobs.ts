@@ -119,6 +119,26 @@ export async function searchGoogleJobs(
     }
   }
 
+  return { ...(await collect(ids)), costUsd, tasks: ids.length };
+}
+
+// Re-downloads (free) the results of searches already paid for in a time window, e.g. when a
+// run lost its connection while saving. Uses DataForSEO's list of past task ids.
+export async function recoverGoogleJobs(fromIso: string, toIso: string): Promise<Listing[]> {
+  const auth = Buffer.from(`${requireEnv("DATAFORSEO_LOGIN")}:${requireEnv("DATAFORSEO_PASSWORD")}`).toString("base64");
+  const res = await fetch("https://api.dataforseo.com/v3/serp/id_list", {
+    method: "POST",
+    headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json" },
+    body: JSON.stringify([{ datetime_from: fromIso, datetime_to: toIso, limit: 1000 }]),
+  });
+  const json = (await res.json()) as { tasks?: { result?: { id: string; url?: string }[] }[] };
+  const ids = (json.tasks?.[0]?.result ?? []).filter((r) => !r.url || r.url.includes("/jobs/")).map((r) => r.id);
+  console.log(`Recovering ${ids.length} Google Jobs searches`);
+  return (await collect(ids)).listings;
+}
+
+// Fetches finished tasks' results and turns them into listings.
+async function collect(ids: string[]): Promise<{ listings: Listing[] }> {
   // Standard-queue tasks usually finish within a few minutes.
   const pending = new Set(ids);
   const items: JobItem[] = [];
@@ -160,5 +180,5 @@ export async function searchGoogleJobs(
       via: i.source_name,
     });
   }
-  return { listings: [...byId.values()], costUsd, tasks: ids.length };
+  return { listings: [...byId.values()] };
 }

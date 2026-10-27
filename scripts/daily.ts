@@ -15,7 +15,7 @@ import { discoverFromWebsite, feedFromUrl, probe, readFeed } from "./sources/fee
 import { companyKey, dedupeKey, prettyLocation } from "./lib/normalise.ts";
 import { refreshSponsors, sponsorMatcher, type SponsorMatch } from "./lib/sponsors.ts";
 import { countryOf, employerFromTitle, findSalary, isBoardName, isEarlyCareer, isSeniorTitle, roleKind, startStatus, tagListing, type RoleTags } from "./lib/tags.ts";
-import { GOOGLE_JOBS_QUERIES, searchGoogleJobs, SWEEP_QUERIES, SWEEP_QUERIES_2 } from "./sources/googleJobs.ts";
+import { GOOGLE_JOBS_QUERIES, recoverGoogleJobs, searchGoogleJobs, SWEEP_QUERIES, SWEEP_QUERIES_2 } from "./sources/googleJobs.ts";
 import { reedDetails, searchReed, toListing } from "./sources/reed.ts";
 import type { Listing } from "./sources/types.ts";
 
@@ -666,6 +666,20 @@ async function main() {
       db.from("roles").select("id,dedupe_key,sources,locations,first_seen").order("id").range(from, to),
     );
     const byKey = new Map(existing.map((r) => [r.dedupe_key, r]));
+
+    // Re-save a sweep whose connection dropped: --google-recover <from ISO> <to ISO>
+    const recoverAt = process.argv.indexOf("--google-recover");
+    if (recoverAt >= 0) {
+      const listings = await recoverGoogleJobs(process.argv[recoverAt + 1], process.argv[recoverAt + 2]);
+      stats.googleJobs = await saveCrossCheck("google_jobs", listings, match, byKey);
+      console.log("Recovered:", JSON.stringify(stats.googleJobs));
+      await must(() => db.from("settings").update({ value: 0 }).eq("key", "google_jobs.max_cost_usd_per_run"));
+      stats.retagged = await retag(match);
+      stats.coverage = await recordCoverage();
+      stats.embedded = await embedNewRoles();
+      await db.from("ingest_runs").update({ finished_at: new Date().toISOString(), stats }).eq("id", run.id);
+      return;
+    }
 
     if (googleSweep) {
       await googleJobs(stats, match, byKey, process.env.SWEEP_SET === "2" ? SWEEP_QUERIES_2 : SWEEP_QUERIES, { depth: 100, maxCost: Number(process.env.SWEEP_MAX_USD ?? 0.78) });
