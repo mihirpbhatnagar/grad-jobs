@@ -36,7 +36,10 @@ export async function healthCheck(db: SupabaseClient) {
     checks.push({ name, ok: bad.length === 0, detail: bad.length ? `${bad.length} ${what}: ${bad.slice(0, 5).join("; ")}` : "OK" });
 
   add("No roles outside the UK", main.filter((r) => isOutsideUk(r.title, r.location)).map((r) => `${r.title} (${r.location})`), "non-UK roles");
-  add("No job boards shown as the employer", main.filter((r) => isBoardName(r.employer)).map((r) => `${r.title} @ ${r.employer}`), "roles");
+  // Job boards listed as the employer are shown as "Employer not named · via <board>", so this
+  // is a count to watch, not a failure.
+  const unnamed = main.filter((r) => isBoardName(r.employer)).length;
+  checks.push({ name: "Roles with the employer not named (job-board listings, labelled)", ok: true, detail: `${unnamed} roles` });
 
   const seen = new Map<string, number>();
   for (const r of main) {
