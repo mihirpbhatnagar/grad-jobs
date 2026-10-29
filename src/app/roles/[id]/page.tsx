@@ -2,7 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
+import { ApplyTools, type Saved } from "@/components/ApplyTools";
 import { CompanyLogo } from "@/components/CompanyLogo";
+import { aiAvailable } from "@/lib/ai";
 import { FollowButton } from "@/components/FollowButton";
 import { RoleContacts } from "@/components/Networking";
 import { Chip, SponsorTick } from "@/components/RoleCard";
@@ -257,6 +259,10 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
     visaSettings(),
     db.from("settings").select("value").eq("key", "visa.standard_salary_gbp").maybeSingle(),
   ]);
+  const { data: aiRows } = user
+    ? await userDb.from("ai_outputs").select("kind,content,created_at").eq("role_id", r.id).neq("kind", "ai_check").order("created_at", { ascending: false }).limit(20)
+    : { data: [] };
+  const aiSaved = [...new Map(((aiRows ?? []) as Saved[]).map((x) => [x.kind, x])).values()];
   const [saved, followed] = user
     ? await Promise.all([
         userDb.from("saved_roles").select("role_id").eq("role_id", r.id).maybeSingle().then((x) => !!x.data),
@@ -369,6 +375,10 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
               </p>
             )}
           </section>
+
+          <Panel title="Apply tools" icon="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z">
+            <ApplyTools roleId={r.id} initial={aiSaved} enabled={aiAvailable()} signedIn={!!user} />
+          </Panel>
 
           <Panel title="Requirements" icon="M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9">
             <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">

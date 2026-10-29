@@ -1,12 +1,38 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { requireUser } from "@/lib/auth";
+import { currentUser, requireUser } from "@/lib/auth";
 import { withDefaults } from "@/lib/profile";
 import { signOut } from "../sign-in/actions";
 import { Alerts } from "./Alerts";
 import { CvUpload } from "./CvUpload";
 import { DeleteAccount } from "./DeleteAccount";
 import { ProfileForm } from "./ProfileForm";
+
+// At-cost AI spend for this user (exact tokens logged per request), USD as on the Anthropic
+// Console plus approximate GBP.
+async function AiSpend() {
+  const { db } = await currentUser();
+  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+  const { data } = await db.from("ai_outputs").select("cost_usd,created_at");
+  const all = (data ?? []).reduce((n, r) => n + Number(r.cost_usd), 0);
+  const month = (data ?? []).filter((r) => r.created_at >= monthStart).reduce((n, r) => n + Number(r.cost_usd), 0);
+  return (
+    <section className="rounded-2xl border border-border bg-surface p-5">
+      <h2 className="font-semibold tracking-tight">Your AI costs</h2>
+      <p className="mt-1 text-sm text-muted">Apply tools are charged at cost, from the exact tokens each request used.</p>
+      <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+        <div className="rounded-xl bg-chip px-3 py-2">
+          <div className="text-xs text-muted">This month</div>
+          <div className="font-semibold">${month.toFixed(2)} <span className="text-xs font-normal text-muted">≈ £{(month * 0.79).toFixed(2)}</span></div>
+        </div>
+        <div className="rounded-xl bg-chip px-3 py-2">
+          <div className="text-xs text-muted">All time ({data?.length ?? 0} requests)</div>
+          <div className="font-semibold">${all.toFixed(2)} <span className="text-xs font-normal text-muted">≈ £{(all * 0.79).toFixed(2)}</span></div>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 async function Profile() {
   const { db, user } = await requireUser("/profile");
@@ -30,6 +56,7 @@ async function Profile() {
           linkCode={data.telegram_link_code}
         />
       )}
+      <AiSpend />
       <Link href="/admin" className="card-lift flex items-center justify-between rounded-2xl border border-border bg-surface p-5">
         <span>
           <span className="font-semibold tracking-tight">Data coverage</span>
