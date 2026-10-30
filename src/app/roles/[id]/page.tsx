@@ -42,6 +42,24 @@ type FullRole = {
 const SOURCE_NAMES: Record<string, string> = { reed: "Reed", google_jobs: "Google Jobs" };
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 
+// The site a listing link points to, by name ("Bright Network"), for links to the full text.
+const SITE_NAMES: Record<string, string> = {
+  "brightnetwork.co.uk": "Bright Network", "linkedin.com": "LinkedIn", "indeed.com": "Indeed", "targetjobs.co.uk": "targetjobs",
+  "studysmarter.co.uk": "StudySmarter", "jobleads.com": "JobLeads", "jobrapido.com": "Jobrapido", "jooble.org": "Jooble",
+  "totaljobs.com": "Totaljobs", "higherin.com": "HigherIn", "jobteaser.com": "JobTeaser", "glassdoor.co.uk": "Glassdoor",
+  "prospects.ac.uk": "Prospects", "gradcracker.com": "Gradcracker", "milkround.com": "Milkround", "reed.co.uk": "Reed",
+};
+function siteName(url: string | null): string {
+  if (!url) return "Google Jobs";
+  try {
+    const host = new URL(url).hostname.replace(/^(www|uk|talents)\./, "");
+    const hit = Object.entries(SITE_NAMES).find(([d]) => host === d || host.endsWith(`.${d}`));
+    return hit ? hit[1] : host;
+  } catch {
+    return "the original listing";
+  }
+}
+
 // ---------- description formatting ----------
 
 type Block = { kind: "h" | "p" | "ul" | "kv"; lines: string[] };
@@ -365,14 +383,22 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
             {blocks.length > 0 ? (
               <Description blocks={blocks} />
             ) : (
-              <p className="mt-3 text-muted">
-                The full description isn&apos;t available from our sources yet. We check the employer&apos;s own page daily.{" "}
+              <div className="mt-3 rounded-xl border border-dashed border-border p-5">
+                <p className="text-muted">
+                  This role was found through {siteName(r.apply_url)}, which doesn&apos;t share the full text. We check the employer&apos;s own careers site
+                  every morning and add it here when we find it.
+                </p>
                 {r.apply_url && (
-                  <a href={r.apply_url} target="_blank" rel="noopener noreferrer" className="font-medium text-accent hover:underline">
-                    Read it on the original listing ↗
+                  <a
+                    href={r.apply_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-4 inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-semibold text-white hover:opacity-90"
+                  >
+                    Read the full description on {siteName(r.apply_url)} ↗
                   </a>
                 )}
-              </p>
+              </div>
             )}
           </section>
 
