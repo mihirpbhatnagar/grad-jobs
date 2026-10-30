@@ -22,12 +22,13 @@ async function fetchSide() {
     // Closing soon: main-list roles with the nearest deadlines.
     db.from("roles").select(COLS).eq("is_open", true).eq("kind", "job").eq("part_time", false)
       .in("start_status", ["confirmed", "likely"]).is("tags->>abroad", null).gte("expires_at", today).lte("expires_at", week)
-      .or(`tags->>deadline.is.null,tags->>deadline.gte.${today}`).order("expires_at", { ascending: true }).limit(5),
+      .or(`tags->>deadline.is.null,tags->>deadline.gte.${today}`).order("expires_at", { ascending: true }).limit(12),
     db.from("roles").select("id", { count: "exact", head: true }).eq("is_open", true).eq("part_time", true).neq("start_status", "before"),
   ]);
   const all = [...(internships.data ?? []), ...(closing.data ?? [])] as Item[];
   const companies = await companiesFor(all.map((r) => r.company_key));
-  return { internships: (internships.data ?? []) as Item[], closing: (closing.data ?? []) as Item[], partTime: partTime.count ?? 0, companies, events: upcomingEvents().slice(0, 3) };
+  return { internships: (internships.data ?? []) as Item[], // One entry per role (some employers post the same job twice).
+    closing: [...new Map(((closing.data ?? []) as Item[]).map((r) => [`${r.employer}|${r.title}`, r])).values()].slice(0, 5), partTime: partTime.count ?? 0, companies, events: upcomingEvents().slice(0, 3) };
 }
 
 function Block({ title, icon, href, children }: { title: string; icon: string; href: string; children: React.ReactNode }) {
@@ -89,7 +90,7 @@ export async function SidePanel() {
   const side = await fetchSide();
   if (!side) return null;
   return (
-    <div className="space-y-4 lg:sticky lg:top-20">
+    <div className="space-y-4 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pb-4 lg:pr-1">
       <Block title="Closing soon" href="/?closing=1&sort=closing" icon="M12 7v5l3 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z">
         <RoleItems items={side.closing} companies={side.companies} empty="Nothing closes in the next 7 days." countdown />
       </Block>
