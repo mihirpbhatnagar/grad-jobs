@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { logoDataUri } from "@/lib/logo";
 
 // Desktop and iPad: three sections across the top. Phone: five tabs along the bottom,
 // because the combined My jobs view is too dense for a small screen.
@@ -35,7 +36,8 @@ export function NavView({ pathname }: { pathname: string }) {
       <header className="sticky top-0 z-20 border-b border-border bg-background/85 backdrop-blur">
         <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-6 px-4 sm:px-6">
           <Link href="/" className="flex items-center gap-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-soft text-sm font-semibold text-accent">G</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={logoDataUri()} alt="" width={32} height={32} className="h-8 w-8" />
             <span className="font-semibold tracking-tight">Grad Jobs</span>
           </Link>
           <nav className="ml-4 hidden items-center gap-1 md:flex">
