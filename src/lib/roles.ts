@@ -53,7 +53,7 @@ export type RoleFilters = {
   sectors: string[];
   locs: string[];
   salary: number;
-  start: "" | "summer" | "sept" | "later" | "unstated";
+  start: "" | "summer" | "sept" | "later";
   closingSoon: boolean;
   source: "" | "reed" | "google_jobs";
 };
@@ -82,7 +82,7 @@ export function parseFilters(params: Record<string, string | string[] | undefine
     sectors: list("sector").filter((id) => FIELDS.some((f) => f.id === id)),
     locs: list("loc").map((l) => l.replace(/[^\p{L} '-]/gu, "")).filter(Boolean),
     salary: Math.max(0, Math.min(200000, Number(one("salary")) || 0)),
-    start: start === "summer" || start === "sept" || start === "later" || start === "unstated" ? start : "",
+    start: start === "summer" || start === "sept" || start === "later" ? start : "",
     closingSoon: one("closing") === "1",
     source: source === "reed" || source === "google_jobs" ? source : "",
   };
@@ -141,7 +141,7 @@ export async function fetchRoles(f: RoleFilters, scope: RoleScope = "main") {
   // Main list: full-time jobs starting on or after the earliest start (June 2027), stated
   // or clearly aimed at 2027 starters. Part-time roles and internships have their own pages.
   if (scope === "main") {
-    query = query.eq("kind", "job").eq("part_time", false).in("start_status", f.start === "unstated" ? ["unknown"] : ["confirmed", "likely"]);
+    query = query.eq("kind", "job").eq("part_time", false).in("start_status", ["confirmed", "likely"]);
     // UK roles by default; "Abroad" in the location filter shows roles outside the UK instead.
     query = f.locs.includes("Abroad") ? query.not("tags->>abroad", "is", null) : query.is("tags->>abroad", null);
   } else if (scope === "internships") {

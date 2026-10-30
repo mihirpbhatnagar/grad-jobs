@@ -10,7 +10,6 @@ const START_OPTIONS: { value: RoleFilters["start"]; label: string }[] = [
   { value: "summer", label: "June–August 2027" },
   { value: "sept", label: "September 2027" },
   { value: "later", label: "October 2027 or later" },
-  { value: "unstated", label: "Start date not stated" },
 ];
 
 function Pill({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {

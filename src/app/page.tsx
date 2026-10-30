@@ -13,7 +13,7 @@ export default function Home(props: PageProps<"/">) {
             path="/"
             title="Graduate roles starting 2027"
             lead={(total, f) =>
-              `${total.toLocaleString("en-GB")} full-time UK roles ${f.start === "unstated" ? "that don't state a start date" : "starting June 2027 or later"}`
+              `${total.toLocaleString("en-GB")} full-time UK roles starting June 2027 or later`
             }
           />
         </Suspense>

@@ -14,7 +14,7 @@ import { isEmployerPage, readJobPage, USER_AGENT } from "./lib/employerPages.ts"
 import { discoverFromWebsite, feedFromUrl, probe, readFeed } from "./sources/feeds.ts";
 import { companyKey, dedupeKey, prettyLocation } from "./lib/normalise.ts";
 import { refreshSponsors, sponsorMatcher, type SponsorMatch } from "./lib/sponsors.ts";
-import { countryOf, employerFromTitle, findSalary, isBoardName, isEarlyCareer, isSeniorTitle, roleKind, startStatus, tagListing, type RoleTags } from "./lib/tags.ts";
+import { countryOf, employerFromTitle, findSalary, isBoardName, isEarlyCareer, isGraduateTitle, isSeniorTitle, roleKind, startStatus, tagListing, type RoleTags } from "./lib/tags.ts";
 import { GOOGLE_JOBS_QUERIES, recoverGoogleJobs, searchGoogleJobs, SWEEP_QUERIES, SWEEP_QUERIES_2 } from "./sources/googleJobs.ts";
 import { reedDetails, searchReed, toListing } from "./sources/reed.ts";
 import type { Listing } from "./sources/types.ts";
@@ -430,7 +430,7 @@ async function inferSiblingStarts() {
       .in("start_status", ["confirmed", "likely", "unknown"]).ilike("title", "%grad%").order("id").range(from, to),
   );
   const with2027 = new Set(roles.filter((r) => r.start_status !== "unknown" && r.company_key).map((r) => r.company_key));
-  const upgrade = roles.filter((r) => r.start_status === "unknown" && with2027.has(r.company_key) && /\bgrad(uate)?s?\b/i.test(r.title));
+  const upgrade = roles.filter((r) => r.start_status === "unknown" && with2027.has(r.company_key) && isGraduateTitle(r.title) && !/\b(temp|temporary|interviewing now|immediate)\b/i.test(r.title));
   for (const r of upgrade) {
     await must(() => db.from("roles").update({ start_status: "likely", quality: r.quality + 1 }).eq("id", r.id));
   }

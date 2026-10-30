@@ -16,6 +16,10 @@ export type RoleTags = {
   lengthMonths: number | null;
   graduateScheme: boolean;
   programmeTitle: boolean;
+  // A graduate job title ("Graduate Accountant", "Finance Graduate"), not "...ideal for graduates".
+  graduateTitle: boolean;
+  // Temp / immediate jobs ("temporary", "interviewing now"): they start now, not in 2027.
+  tempTitle: boolean;
   salaryCompetitive: boolean;
   // Country for roles outside the UK (null = UK). Every user needs sponsorship abroad.
   abroad: string | null;
@@ -201,18 +205,26 @@ export function roleKind(title: string): "job" | "internship" | "apprenticeship"
 //              counts it as likely when the same employer's other graduate roles are for 2027)
 export type StartStatus = "confirmed" | "likely" | "before" | "unknown";
 
+// "Graduate Accountant", "Finance Graduate", "Graduate - Marketing" are graduate jobs; titles
+// that only say the job suits graduates ("...ideal for graduates", "graduates welcome") aren't.
+export function isGraduateTitle(title: string): boolean {
+  if (!/\b(graduate|grad)\b/i.test(title)) return false;
+  if (/\b(for|ideal for|suit(s|able for)?|welcome|recent|attention|calling all|open to|including|and)\s+(recent\s+)?graduates?\b|\bgraduates?\s+(welcome|wanted|considered|encouraged)\b|\bnon[- ]graduate\b|\bgraduate (calibre|level|caliber)\b/i.test(title)) return false;
+  return true;
+}
+
 export function startStatus(tags: RoleTags, earliestStart: string): StartStatus {
   if (tags.startDate && tags.startText !== tags.startDate.slice(0, 4)) {
     return tags.startDate >= earliestStart ? "confirmed" : "before";
   }
-  if (tags.immediateStart) return "before";
+  if (tags.immediateStart || tags.tempTitle) return "before";
   if (tags.startText && /^\d{4}$/.test(tags.startText)) {
     return Number(tags.startText) >= Number(earliestStart.slice(0, 4)) ? "likely" : "before";
   }
   if (tags.aimedAt2027) return "likely";
   // A graduate scheme or programme advertised in this recruiting season (autumn 2026 onwards)
   // is for the 2027 intake, even when the listing doesn't repeat the date.
-  if (tags.programmeTitle) return "likely";
+  if (tags.programmeTitle || tags.graduateTitle) return "likely";
   return "unknown";
 }
 
@@ -239,6 +251,8 @@ export function tagListing(title: string, description: string): RoleTags {
     startDate,
     deadline: findDeadline(text),
     lengthMonths: findLengthMonths(text),
+    graduateTitle: isGraduateTitle(title),
+    tempTitle: /\b(temp|temporary|interviewing now|immediate(ly)?|asap|start (this|next) week|christmas|seasonal)\b/i.test(title),
     programmeTitle: /\b(graduate|grad)\b.{0,30}\b(scheme|programme|program|intake|cohort|academy|rotation)\b|\b(scheme|programme|program)\b.{0,30}\bgraduates?\b|\bgraduate development\b/i.test(title),
     abroad: countryOf(title, ""),
     salaryCompetitive: /\b(competitive (salary|pay|package|remuneration|starting salary|base)|salary:?\s*(is\s*)?competitive|salary\s*-\s*competitive)\b/i.test(text),
