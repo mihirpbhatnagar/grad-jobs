@@ -474,7 +474,7 @@ const seedKeys = new Set(GRAD_EMPLOYERS.map(companyKey));
 // Grows the watch list for free: hiring systems seen in apply links (the coverage loop),
 // careers-site sitemaps of employers' own job pages, and standard board addresses for the
 // seed list of big graduate employers.
-async function discoverFeeds(probeLimit = 120, sitemapLimit = 40) {
+async function discoverFeeds(probeLimit = 200, sitemapLimit = 40) {
   const feeds = await selectAll<FeedRow>((from, to) => db.from("employer_feeds").select("*").order("id").range(from, to));
   const have = new Set(feeds.map((f) => `${f.ats}|${f.ats_id}`));
   const watched = new Set(feeds.map((f) => f.company_key));
@@ -530,7 +530,16 @@ async function discoverFeeds(probeLimit = 120, sitemapLimit = 40) {
 
   // 3. Seed employers not yet checked: their own careers site (via the website on Wikidata)
   //    and the standard board addresses, six employers at a time, saved as we go.
-  const todo = GRAD_EMPLOYERS.filter((name) => !watched.has(companyKey(name))).slice(0, probeLimit);
+  // Big graduate employers first, then employers whose main-list roles have no description
+  // (found only via job boards), most roles first: their own careers site has the full text.
+  const undescribed = await selectAll<{ employer: string }>((from, to) =>
+    db.from("roles").select("employer").eq("is_open", true).eq("kind", "job").in("start_status", ["confirmed", "likely"])
+      .or("description.is.null,description.eq.").order("id").range(from, to),
+  );
+  const counts = new Map<string, number>();
+  for (const r of undescribed) if (!isBoardName(r.employer)) counts.set(r.employer, (counts.get(r.employer) ?? 0) + 1);
+  const busiest = [...counts].sort((a, b) => b[1] - a[1]).map(([name]) => name);
+  const todo = [...new Set([...GRAD_EMPLOYERS, ...busiest])].filter((name) => !watched.has(companyKey(name))).slice(0, probeLimit);
   const known = new Map(
     (await selectAll<{ key: string; domain: string | null }>((from, to) => db.from("companies").select("key,domain").order("key").range(from, to))).map((c) => [c.key, c.domain]),
   );
