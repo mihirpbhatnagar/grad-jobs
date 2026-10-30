@@ -38,7 +38,7 @@ export function postedAgo(iso: string): string {
 
 export function startLabel(role: { start_status: string | null; tags: { startText: string | null } }): string {
   if (role.start_status === "confirmed" && role.tags.startText) return `Starts ${role.tags.startText}`;
-  if (role.start_status === "likely") return "2027 intake";
+  if (role.start_status === "likely") return "Exact start date not mentioned";
   return "Start not stated";
 }
 

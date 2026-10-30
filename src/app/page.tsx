@@ -12,7 +12,7 @@ export default function Home(props: PageProps<"/">) {
             scope="main"
             path="/"
             title="Graduate roles starting 2027"
-            lead={(total, f) =>
+            lead={(total) =>
               `${total.toLocaleString("en-GB")} full-time UK roles starting June 2027 or later`
             }
           />

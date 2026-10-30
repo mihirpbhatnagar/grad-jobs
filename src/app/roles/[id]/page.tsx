@@ -347,7 +347,7 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         <Fact label="Salary" value={salaryValue} />
         <Fact label="Location" value={placeName(r.location) ?? "Not stated"} sub={r.locations.length > 1 ? `+ ${r.locations.length - 1} more` : undefined} />
-        <Fact label="Starts" value={r.start_status === "confirmed" && t.startText ? t.startText : r.start_status === "likely" ? "2027 intake" : "Not stated"} sub={r.start_status === "likely" ? "Exact month not stated" : undefined} />
+        <Fact label="Starts" value={r.start_status === "confirmed" && t.startText ? t.startText : r.start_status === "likely" ? "Not mentioned" : "Not stated"} sub={r.start_status === "likely" ? "Exact date not mentioned in the listing" : undefined} />
         <Fact
           label="Deadline"
           value={closes ? (days !== null && days < 0 ? "May have closed" : dateLong(closes)) : "Not stated"}
