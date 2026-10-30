@@ -142,7 +142,8 @@ async function saveExcluded(all: Listing[], reason: string) {
 
 async function markSeen(source: string, sourceIds: string[]) {
   const now = new Date().toISOString();
-  for (const batch of chunks(sourceIds, 200)) {
+  // Small batches: ids can be long web addresses, and a too-long request is rejected.
+  for (const batch of chunks(sourceIds, 40)) {
     const linked = await must(() =>
       db.from("role_sources").update({ last_seen: now }).eq("source", source).in("source_id", batch).select("role_id"),
     );
@@ -197,6 +198,7 @@ async function pullReed(match: Matcher, byKey: Map<string, ExistingRole>) {
   }
 
   await markSeen("reed", [...results.keys()].map(String).filter((id) => linkedIds.has(id)));
+  ranSources.add("reed");
   return totals;
 }
 
@@ -276,10 +278,30 @@ async function setting<T>(key: string, fallback: T): Promise<T> {
   return (data?.value as T) ?? fallback;
 }
 
+// Sources that ran successfully this morning. A role only counts as gone when every source
+// that lists it ran and didn't see it; a paused or failed source never closes roles. Anything
+// unseen for 21 days closes regardless.
+const ranSources = new Set<string>();
+let safetyStop: string | null = null;
+
 async function closeStaleRoles(): Promise<number> {
   const cutoff = new Date(Date.now() - CLOSE_AFTER_DAYS * 86_400_000).toISOString();
+  const longGone = new Date(Date.now() - 21 * 86_400_000).toISOString();
   const today = new Date().toISOString().slice(0, 10);
-  const stale = await must(() => db.from("roles").update({ is_open: false }).eq("is_open", true).lt("last_seen", cutoff).select("id"));
+  const candidates = await selectAll<{ id: number; sources: string[]; last_seen: string }>((from, to) =>
+    db.from("roles").select("id,sources,last_seen").eq("is_open", true).lt("last_seen", cutoff).order("id").range(from, to),
+  );
+  const staleIds = candidates.filter((r) => r.last_seen < longGone || r.sources.every((src) => ranSources.has(src))).map((r) => r.id);
+  // Safety net: never close more than 30% of open roles in one morning; that means something
+  // upstream failed, not that the market vanished. Logged so the Coverage page shows it.
+  const { count: openCount } = await db.from("roles").select("id", { count: "exact", head: true }).eq("is_open", true);
+  if (openCount && staleIds.length > openCount * 0.3) {
+    console.error(`SAFETY STOP: would close ${staleIds.length} of ${openCount} open roles; closing none`);
+    safetyStop = `Would have closed ${staleIds.length} of ${openCount} open roles, so none were closed. A source probably failed.`;
+    staleIds.length = 0;
+  }
+  for (const batch of chunks(staleIds, 200)) await must(() => db.from("roles").update({ is_open: false }).in("id", batch));
+  const stale = staleIds;
   const expired = await must(() => db.from("roles").update({ is_open: false }).eq("is_open", true).lt("expires_at", today).select("id"));
   // The listing's own stated closing date counts too (boards sometimes keep roles up longer).
   const pastDeadline = await must(() => db.from("roles").update({ is_open: false }).eq("is_open", true).lt("tags->>deadline", today).select("id"));
@@ -557,6 +579,9 @@ async function pullEmployerFeeds(match: Matcher, byKey: Map<string, ExistingRole
     );
     if (!found) {
       failed++;
+      // A feed that couldn't be read today keeps its roles open rather than closing them.
+      const prefix = `${f.ats}:${f.ats_id}:`;
+      await markSeen("employer", [...known].filter((id) => id.startsWith(prefix)));
       continue;
     }
     ok++;
@@ -590,6 +615,7 @@ async function recordCoverage() {
     googleOnlyPct: roles.length ? Math.round((googleOnly / roles.length) * 1000) / 10 : null,
     bySource: Object.fromEntries(["reed", "google_jobs", "employer"].map((s) => [s, roles.filter((r) => r.sources.includes(s)).length])),
     health: await healthCheck(db),
+    ...(safetyStop ? { safetyStop } : {}),
     ...(linkedIn ? { linkedIn: { ...linkedIn, pct: linkedIn.seen ? Math.round((linkedIn.alreadyHad / linkedIn.seen) * 1000) / 10 : null } } : {}),
   };
   const h = stats.health;
@@ -621,6 +647,7 @@ async function googleJobs(stats: Record<string, unknown>, match: Matcher, byKey:
     const viaLinkedIn = google.listings.filter((l) => /linkedin/i.test(l.via ?? ""));
     const had = viaLinkedIn.filter((l) => findRole(l.employer, l.title)).length;
     stats.googleJobs = { ...(await saveCrossCheck("google_jobs", google.listings, match, byKey)), costUsd: google.costUsd };
+    ranSources.add("google_jobs");
     linkedIn = { seen: viaLinkedIn.length, alreadyHad: had, added: viaLinkedIn.length - had };
     console.log(`LinkedIn (via Google Jobs): ${linkedIn.seen} seen, ${linkedIn.alreadyHad} already in the app, ${linkedIn.added} added`);
   } catch (err) {
@@ -636,6 +663,7 @@ async function watchList(stats: Record<string, unknown>, match: Matcher, byKey: 
     stats.discovered = await discoverFeeds();
     console.log("Watch list:", JSON.stringify(stats.discovered));
     stats.employerFeeds = await pullEmployerFeeds(match, byKey);
+    ranSources.add("employer");
   } catch (err) {
     console.error("Employer watch list failed (run continues):", err);
     stats.watchListError = String(err);

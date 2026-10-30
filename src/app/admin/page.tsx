@@ -11,6 +11,7 @@ type Coverage = {
   coveragePct: number | null;
   googleOnlyPct: number | null;
   bySource: Record<string, number>;
+  safetyStop?: string;
   linkedIn?: { seen: number; alreadyHad: number; added: number; pct: number | null };
   health?: { checks: { name: string; ok: boolean; detail: string }[]; employers: { name: string; roles: number; reason: string }[]; passed: number; total: number };
 };
@@ -46,6 +47,12 @@ async function CoverageView() {
         <Big label="Found only by Google Jobs" value={today.googleOnlyPct === null ? "–" : `${today.googleOnlyPct}%`} sub="Roles no other source had" />
         <Big label="Main list" value={today.mainList.toLocaleString("en-GB")} sub="Full-time, starting June 2027+" />
       </div>
+      {today.safetyStop && (
+        <section className="rounded-2xl border border-rose/40 bg-rose-soft p-5 text-rose">
+          <h2 className="font-semibold">Safety stop this morning</h2>
+          <p className="mt-1 text-sm">{today.safetyStop}</p>
+        </section>
+      )}
       {today.linkedIn && (
         <section className="rounded-2xl border border-border bg-surface p-5">
           <h2 className="font-semibold tracking-tight">LinkedIn check</h2>
