@@ -19,7 +19,7 @@ export default function PrivacyPage() {
       <ul className="mt-2 list-disc space-y-1 pl-5">
         <li>Your email address and sign-in (email and password, or Google sign-in: your name and email only).</li>
         <li>Your profile answers, the CV you upload, your story bank notes, saved roles and applications, and the CVs and cover letters you choose to attach to them.</li>
-        <li>If you link Gmail: an encrypted permission token, and the details of emails from employers you&apos;ve applied to (sender, date, and what stage they mean, like an interview invite).</li>
+        <li>If you link Gmail: an encrypted permission token, and the subject line and date of emails from employers you&apos;ve applied to, and what stage they mean (like an interview invite). Email bodies are never stored.</li>
       </ul>
 
       <H>Gmail (optional, read-only)</H>

@@ -74,10 +74,14 @@ export async function runTool(
     .join("")
     .trim();
 
-  const u = response.usage;
-  const p = PRICES[tool.model];
+  return { text, model: tool.model, usage: usageOf(tool.model, response.usage) };
+}
+
+// Exact token counts and cost (US$) of one request, for at-cost tracking.
+export function usageOf(model: string, u: Anthropic.Usage): Usage {
+  const p = PRICES[model];
   const webSearches = (u as { server_tool_use?: { web_search_requests?: number } }).server_tool_use?.web_search_requests ?? 0;
-  const usage: Usage = {
+  return {
     input: u.input_tokens,
     output: u.output_tokens,
     cacheRead: u.cache_read_input_tokens ?? 0,
@@ -87,5 +91,4 @@ export async function runTool(
       (u.input_tokens * p.input + u.output_tokens * p.output + (u.cache_read_input_tokens ?? 0) * p.cacheRead + (u.cache_creation_input_tokens ?? 0) * p.input * 1.25) / 1_000_000 +
       webSearches * WEB_SEARCH_USD,
   };
-  return { text, model: tool.model, usage };
 }

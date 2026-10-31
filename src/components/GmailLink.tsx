@@ -1,5 +1,6 @@
 import { connection } from "next/server";
 import { currentUser } from "@/lib/auth";
+import { CheckInboxNow, InboxAutoSync } from "@/components/InboxSync";
 import { gmailAvailable } from "@/lib/gmail";
 import { dismissGmailQuestion, unlinkGmail } from "@/lib/gmail-actions";
 
@@ -25,7 +26,8 @@ export async function GmailQuestion() {
     db.from("profiles").select("gmail_asked_at").maybeSingle(),
     db.from("gmail_links").select("user_id").maybeSingle(),
   ]);
-  if (link || profile?.gmail_asked_at) return null;
+  if (link) return <InboxAutoSync />;
+  if (profile?.gmail_asked_at) return null;
   return (
     <section className="rounded-2xl border-2 border-accent/25 bg-surface p-5">
       <h2 className="flex items-center gap-2 font-semibold tracking-tight">
@@ -76,14 +78,17 @@ export async function GmailSection({ result }: { result?: string }) {
           <span className="text-sm">
             Linked to <span className="font-semibold">{link.email}</span>
             <span className="block text-xs text-muted">
-              {link.last_synced_at ? `Last checked ${new Date(link.last_synced_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}` : "Inbox checking switches on soon"}
+              {link.last_synced_at ? `Last checked ${new Date(link.last_synced_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}` : "Checked each time you open My jobs"}
             </span>
           </span>
-          <form action={unlinkGmail}>
+          <span className="flex flex-wrap items-center gap-2">
+            <CheckInboxNow />
+            <form action={unlinkGmail}>
             <button type="submit" className="rounded-xl border border-border px-4 py-2 text-sm text-muted hover:text-rose">
               Unlink
             </button>
-          </form>
+            </form>
+          </span>
         </div>
       ) : (
         <a href="/api/gmail/start" className="mt-4 inline-flex rounded-xl bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90">

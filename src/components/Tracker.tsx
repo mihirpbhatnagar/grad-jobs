@@ -11,14 +11,19 @@ type Row = {
   company: string | null;
   title: string | null;
   closes_on: string | null;
+  updated_at: string;
   role: { id: number; title: string; employer: string; expires_at: string | null; is_open: boolean; tags: { deadline: string | null } } | null;
 };
 
 // In progress first, then still to apply, then outcomes.
 const ORDER: Record<Stage, number> = { applied: 0, test: 0, interview: 0, assessment_centre: 0, saved: 1, applying: 1, offer: 2, rejected: 2 };
 
-// A short warning under the role when the deadline is close or the listing has gone.
-function warning(row: Row): string | null {
+// A short warning under the role: deadline close, listing gone, or no reply for a while.
+function warning(row: Row, noReplyWeeks: number): string | null {
+  if (row.stage === "applied") {
+    const weeks = Math.floor((Date.now() - new Date(row.updated_at).getTime()) / (7 * 86_400_000));
+    return weeks >= noReplyWeeks ? `No reply for ${weeks} weeks` : null;
+  }
   if (row.stage !== "saved" && row.stage !== "applying") return null;
   if (row.role && !row.role.is_open) return "Listing may have closed";
   const iso = row.role ? (row.role.tags.deadline ?? row.role.expires_at) : row.closes_on;
@@ -54,10 +59,11 @@ export async function Tracker() {
     );
   }
 
-  const { data } = await db
-    .from("saved_roles")
-    .select("id,stage,company,title,closes_on,role:roles(id,title,employer,expires_at,is_open,tags)")
-    .order("updated_at", { ascending: false });
+  const [{ data }, { data: setting }] = await Promise.all([
+    db.from("saved_roles").select("id,stage,company,title,closes_on,updated_at,role:roles(id,title,employer,expires_at,is_open,tags)").order("updated_at", { ascending: false }),
+    db.from("settings").select("value").eq("key", "inbox.no_reply_weeks").maybeSingle(),
+  ]);
+  const noReplyWeeks = Number(setting?.value ?? 4);
   const rows = ((data ?? []) as unknown as Row[])
     .filter((r) => r.role || r.title)
     .sort((a, b) => ORDER[a.stage] - ORDER[b.stage]);
@@ -95,7 +101,7 @@ export async function Tracker() {
           <tbody>
             {rows.map((row) => {
               const href = row.role ? `/roles/${row.role.id}` : `/applications/${row.id}`;
-              const note = warning(row);
+              const note = warning(row, noReplyWeeks);
               return (
                 <tr key={row.id} className="border-b border-border/60 align-top last:border-0">
                   <td className="py-2.5 pr-2">
