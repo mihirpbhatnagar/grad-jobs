@@ -4,7 +4,7 @@ import { SignInForm } from "./SignInForm";
 async function Form({ searchParams }: { searchParams: PageProps<"/sign-in">["searchParams"] }) {
   const params = await searchParams;
   const next = typeof params.next === "string" && params.next.startsWith("/") ? params.next : "/my-jobs";
-  return <SignInForm next={next} confirmed={params.confirmed === "1"} />;
+  return <SignInForm next={next} confirmed={params.confirmed === "1"} googleFailed={params.google === "failed"} />;
 }
 
 export default function SignInPage(props: PageProps<"/sign-in">) {

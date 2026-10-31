@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { GmailQuestion } from "@/components/GmailLink";
 import { StoryBankSection } from "@/components/StoryBankSection";
 import { Tracker } from "@/components/Tracker";
 
@@ -11,8 +12,9 @@ export default function ApplyPage() {
       <div className="mt-6">
         <Suspense fallback={<div className="h-80 animate-pulse rounded-2xl bg-chip" />}>
           <div className="space-y-4">
-            <StoryBankSection />
+            <GmailQuestion />
             <Tracker />
+            <StoryBankSection />
           </div>
         </Suspense>
       </div>

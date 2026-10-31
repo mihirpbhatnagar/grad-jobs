@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import { GmailSection } from "@/components/GmailLink";
 import { currentUser, requireUser } from "@/lib/auth";
 import { withDefaults } from "@/lib/profile";
 import { signOut } from "../sign-in/actions";
@@ -34,7 +35,8 @@ async function AiSpend() {
   );
 }
 
-async function Profile() {
+async function Profile({ searchParams }: { searchParams: PageProps<"/profile">["searchParams"] }) {
+  const { gmail } = await searchParams;
   const { db, user } = await requireUser("/profile");
   const { data } = await db.from("profiles").select("display_name,answers,cv_name,cv_uploaded_at,cv_suggested_fields,telegram_link_code,telegram_chat_id,alerts").maybeSingle();
   const cv = (
@@ -56,6 +58,7 @@ async function Profile() {
           linkCode={data.telegram_link_code}
         />
       )}
+      <GmailSection result={typeof gmail === "string" ? gmail : undefined} />
       <AiSpend />
       <Link href="/admin" className="card-lift flex items-center justify-between rounded-2xl border border-border bg-surface p-5">
         <span>
@@ -69,7 +72,7 @@ async function Profile() {
   );
 }
 
-export default function ProfilePage() {
+export default function ProfilePage(props: PageProps<"/profile">) {
   return (
     <main className="mx-auto w-full max-w-3xl px-4 pb-24 pt-8 sm:px-6">
       <div className="flex items-end justify-between gap-4">
@@ -85,7 +88,7 @@ export default function ProfilePage() {
       </div>
       <div className="mt-8">
         <Suspense fallback={<div className="h-[70vh] animate-pulse rounded-2xl bg-chip" />}>
-          <Profile />
+          <Profile searchParams={props.searchParams} />
         </Suspense>
       </div>
     </main>

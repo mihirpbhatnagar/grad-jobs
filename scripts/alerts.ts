@@ -64,7 +64,7 @@ async function main() {
     return;
   }
   const profiles = await selectAll<Profile>((from, to) => db.from("profiles").select("user_id,display_name,answers,goal_embedding,telegram_chat_id,alerts,last_digest_at").order("user_id").range(from, to));
-  const saved = await selectAll<Saved>((from, to) => db.from("saved_roles").select("user_id,role_id,stage,saved_at").order("user_id").range(from, to));
+  const saved = await selectAll<Saved>((from, to) => db.from("saved_roles").select("user_id,role_id,stage,saved_at").not("role_id", "is", null).order("user_id").range(from, to));
   const sent = await selectAll<{ user_id: string; role_id: number; kind: string }>((from, to) => db.from("alerts_sent").select("user_id,role_id,kind").order("user_id").range(from, to));
   const already = new Set(sent.map((s) => `${s.user_id}|${s.role_id}|${s.kind}`));
   const follows = await selectAll<{ user_id: string; company_key: string }>((from, to) => db.from("follows").select("user_id,company_key").order("user_id").range(from, to));

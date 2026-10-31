@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
 import { cvToText, suggestFields } from "@/lib/cv";
+import { unlinkGmail } from "@/lib/gmail-actions";
 import { withDefaults, type ProfileAnswers } from "@/lib/profile";
 
 export async function saveProfile(
@@ -85,8 +86,19 @@ export async function checkTelegram(): Promise<boolean> {
 export async function deleteAccount(): Promise<void> {
   const { db, user } = await currentUser();
   if (!user) redirect("/");
-  const { data: files } = await db.storage.from("cvs").list(user.id);
-  if (files?.length) await db.storage.from("cvs").remove(files.map((f) => `${user.id}/${f.name}`));
+  // Folders (e.g. each application's documents) come back without an id; walk into them.
+  const paths: string[] = [];
+  const walk = async (folder: string) => {
+    const { data } = await db.storage.from("cvs").list(folder, { limit: 1000 });
+    for (const f of data ?? []) {
+      if (f.id) paths.push(`${folder}/${f.name}`);
+      else await walk(`${folder}/${f.name}`);
+    }
+  };
+  await walk(user.id);
+  if (paths.length) await db.storage.from("cvs").remove(paths);
+  const { data: gmail } = await db.from("gmail_links").select("user_id").maybeSingle();
+  if (gmail) await unlinkGmail();
   const { error } = await db.rpc("delete_my_account");
   if (error) throw error;
   await db.auth.signOut();

@@ -131,6 +131,7 @@ Each question has a "Use in For You" switch. On = shapes For You. Off = saved, a
 ### Stage 5: Polish (day 7)
 - [ ] Dashboard stats, opening-soon flags, grad scheme calendar recording
 - [ ] Speed, design and mobile polish
+- [ ] Dark mode switch in Profile settings: Light / Dark / Match my phone (Mihir, 31 Oct 2026; later, not now)
 ### After launch
 - [ ] Weekly check: errors, data freshness, costs, coverage score
 - [ ] Update visa rules when GOV.UK changes them

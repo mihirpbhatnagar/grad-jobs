@@ -1,23 +1,32 @@
 import Link from "next/link";
 import { connection } from "next/server";
-import { StageControls } from "@/components/StageControls";
+import { StageSelect } from "@/components/StageControls";
 import { currentUser } from "@/lib/auth";
-import { RESPONDED, stageLabel, type Stage } from "@/lib/pipeline";
+import { employerLabel } from "@/lib/format";
+import { RESPONDED, type Stage } from "@/lib/pipeline";
 
 type Row = {
+  id: number;
   stage: Stage;
-  saved_at: string;
-  applied_at: string | null;
+  company: string | null;
+  title: string | null;
+  closes_on: string | null;
   role: { id: number; title: string; employer: string; expires_at: string | null; is_open: boolean; tags: { deadline: string | null } } | null;
 };
 
-function closes(row: Row): string | null {
-  const iso = row.role?.tags.deadline ?? row.role?.expires_at;
+// In progress first, then still to apply, then outcomes.
+const ORDER: Record<Stage, number> = { applied: 0, test: 0, interview: 0, assessment_centre: 0, saved: 1, applying: 1, offer: 2, rejected: 2 };
+
+// A short warning under the role when the deadline is close or the listing has gone.
+function warning(row: Row): string | null {
+  if (row.stage !== "saved" && row.stage !== "applying") return null;
+  if (row.role && !row.role.is_open) return "Listing may have closed";
+  const iso = row.role ? (row.role.tags.deadline ?? row.role.expires_at) : row.closes_on;
   if (!iso) return null;
   const days = Math.ceil((new Date(iso).getTime() - Date.now()) / 86_400_000);
   if (days < 0) return "May have closed";
   if (days === 0) return "Closes today";
-  return `Closes in ${days} day${days === 1 ? "" : "s"}`;
+  return days <= 7 ? `Closes in ${days} day${days === 1 ? "" : "s"}` : null;
 }
 
 function Stat({ label, value }: { label: string; value: string | number }) {
@@ -29,38 +38,7 @@ function Stat({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-function Group({ title, rows }: { title: string; rows: Row[] }) {
-  if (rows.length === 0) return null;
-  return (
-    <section>
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
-        {title} · {rows.length}
-      </h3>
-      <ul className="mt-2 space-y-2">
-        {rows.map((row) => {
-          const due = closes(row);
-          const urgent = due && /today|in [1-7] days?$/.test(due);
-          return (
-            <li key={row.role!.id} className="rounded-xl border border-border bg-background p-3">
-              <Link href={`/roles/${row.role!.id}`} className="block hover:opacity-80">
-                <span className="line-clamp-2 text-sm font-medium leading-snug">{row.role!.title}</span>
-                <span className="mt-0.5 block truncate text-xs text-muted">{row.role!.employer}</span>
-              </Link>
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                <span className={`text-xs ${!row.role!.is_open || urgent ? "text-rose" : "text-muted"}`}>
-                  {!row.role!.is_open ? "Listing may have closed" : row.stage === "saved" || row.stage === "applying" ? due ?? "No deadline stated" : `${stageLabel(row.stage)}${row.applied_at ? ` · applied ${new Date(row.applied_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}` : ""}`}
-                </span>
-                <StageControls roleId={row.role!.id} stage={row.stage} />
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </section>
-  );
-}
-
-// Saved roles, application pipeline and dashboard numbers for the signed-in user.
+// Every saved role and application for the signed-in user, as one table: company, role, status.
 export async function Tracker() {
   await connection();
   const { db, user } = await currentUser();
@@ -78,9 +56,11 @@ export async function Tracker() {
 
   const { data } = await db
     .from("saved_roles")
-    .select("stage,saved_at,applied_at,role:roles(id,title,employer,expires_at,is_open,tags)")
+    .select("id,stage,company,title,closes_on,role:roles(id,title,employer,expires_at,is_open,tags)")
     .order("updated_at", { ascending: false });
-  const rows = ((data ?? []) as unknown as Row[]).filter((r) => r.role);
+  const rows = ((data ?? []) as unknown as Row[])
+    .filter((r) => r.role || r.title)
+    .sort((a, b) => ORDER[a.stage] - ORDER[b.stage]);
 
   const applied = rows.filter((r) => !["saved", "applying"].includes(r.stage));
   const responded = applied.filter((r) => RESPONDED.includes(r.stage));
@@ -88,18 +68,56 @@ export async function Tracker() {
   const rate = applied.length ? `${Math.round((responded.length / applied.length) * 100)}%` : "–";
 
   return (
-    <div className="space-y-5 rounded-2xl border border-border bg-surface p-5">
-      <h2 className="font-semibold tracking-tight">Your applications</h2>
-      <div className="grid grid-cols-2 gap-2">
+    <div className="space-y-4 rounded-2xl border border-border bg-surface p-5">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="font-semibold tracking-tight">Your applications</h2>
+        <Link href="/applications/new" className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium hover:border-foreground/30">
+          + Add
+        </Link>
+      </div>
+      <div className="grid grid-cols-4 gap-2">
         <Stat label="Saved" value={rows.length - applied.length} />
         <Stat label="Applied" value={applied.length} />
         <Stat label="Interviews" value={interviews} />
-        <Stat label="Response rate" value={rate} />
+        <Stat label="Replies" value={rate} />
       </div>
-      {rows.length === 0 && <p className="text-sm text-muted">Tap the bookmark on any role to save it here.</p>}
-      <Group title="To apply" rows={rows.filter((r) => r.stage === "saved" || r.stage === "applying")} />
-      <Group title="In progress" rows={rows.filter((r) => ["applied", "test", "interview", "assessment_centre"].includes(r.stage))} />
-      <Group title="Outcomes" rows={rows.filter((r) => r.stage === "offer" || r.stage === "rejected")} />
+      {rows.length === 0 ? (
+        <p className="text-sm text-muted">Tap the bookmark on any role to save it here, or add an application you made elsewhere.</p>
+      ) : (
+        <table className="w-full table-fixed text-left text-sm">
+          <thead>
+            <tr className="border-b border-border text-xs text-muted">
+              <th className="w-[32%] pb-2 font-medium">Company</th>
+              <th className="pb-2 font-medium">Role</th>
+              <th className="w-[34%] pb-2 font-medium">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const href = row.role ? `/roles/${row.role.id}` : `/applications/${row.id}`;
+              const note = warning(row);
+              return (
+                <tr key={row.id} className="border-b border-border/60 align-top last:border-0">
+                  <td className="py-2.5 pr-2">
+                    <Link href={href} className="line-clamp-2 font-medium hover:underline">
+                      {row.role ? employerLabel(row.role.employer) : row.company}
+                    </Link>
+                  </td>
+                  <td className="py-2.5 pr-2">
+                    <Link href={href} className="line-clamp-2 text-foreground/85 hover:underline">
+                      {row.role?.title ?? row.title}
+                    </Link>
+                    {note && <span className="mt-0.5 block text-xs text-rose">{note}</span>}
+                  </td>
+                  <td className="py-2">
+                    <StageSelect applicationId={row.id} stage={row.stage} compact />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }

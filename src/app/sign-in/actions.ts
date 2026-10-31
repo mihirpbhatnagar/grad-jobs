@@ -39,6 +39,19 @@ export async function signUp(_: AuthState, form: FormData): Promise<AuthState> {
   return { message: "Check your email and tap the confirmation link, then sign in here." };
 }
 
+// "Continue with Google": Supabase sends the user to Google, then back to /auth/callback.
+export async function signInWithGoogle(form: FormData): Promise<void> {
+  const h = await headers();
+  const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
+  const db = await userClient();
+  const { data, error } = await db.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(safeNext(form.get("next")))}` },
+  });
+  if (error || !data.url) redirect("/sign-in?google=failed");
+  redirect(data.url);
+}
+
 export async function signOut() {
   const db = await userClient();
   await db.auth.signOut();

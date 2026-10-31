@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
+import { APPLICATION_COLUMNS, ApplicationPanel, type Application } from "@/components/ApplicationPanel";
 import { ApplyTools, type Saved } from "@/components/ApplyTools";
 import { CompanyLogo } from "@/components/CompanyLogo";
 import { aiAvailable } from "@/lib/ai";
@@ -281,12 +282,12 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
     ? await userDb.from("ai_outputs").select("kind,content,created_at").eq("role_id", r.id).neq("kind", "ai_check").order("created_at", { ascending: false }).limit(20)
     : { data: [] };
   const aiSaved = [...new Map(((aiRows ?? []) as Saved[]).map((x) => [x.kind, x])).values()];
-  const [saved, followed] = user
+  const [application, followed] = user
     ? await Promise.all([
-        userDb.from("saved_roles").select("role_id").eq("role_id", r.id).maybeSingle().then((x) => !!x.data),
+        userDb.from("saved_roles").select(APPLICATION_COLUMNS).eq("role_id", r.id).maybeSingle().then((x) => x.data as Application | null),
         r.company_key ? userDb.from("follows").select("company_key").eq("company_key", r.company_key).maybeSingle().then((x) => !!x.data) : false,
       ])
-    : [false, false];
+    : [null, false];
   const t = r.tags;
   const closes = t.deadline ?? r.expires_at;
   const days = closes ? daysUntil(closes) : null;
@@ -328,7 +329,7 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
               <CompanyLogo name={r.employer} logoUrl={company?.logo_url} domain={company?.domain} size={80} />
             </div>
             <div className="flex gap-2">
-              <SaveButton roleId={r.id} saved={saved} signedIn={!!user} large />
+              <SaveButton roleId={r.id} saved={!!application} signedIn={!!user} large />
               {r.apply_url && (
                 <a
                   href={r.apply_url}
@@ -378,6 +379,7 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-4">
+          {application && user && <ApplicationPanel app={application} userId={user.id} roleCloses={closes} />}
           <section className="rounded-2xl border border-border bg-surface p-6 sm:p-8">
             <h2 className="text-xl font-semibold tracking-tight">About the role</h2>
             {blocks.length > 0 ? (
