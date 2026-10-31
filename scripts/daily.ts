@@ -10,6 +10,7 @@ import { embed, roleText } from "./lib/embed.ts";
 import { GRAD_EMPLOYERS, KNOWN_FEEDS } from "./data/gradEmployers.ts";
 import { lookupCompanies } from "./lib/companies.ts";
 import { healthCheck } from "./lib/health.ts";
+import { closeReposts } from "./lib/reposts.ts";
 import { isEmployerPage, readJobPage, USER_AGENT } from "./lib/employerPages.ts";
 import { discoverFromWebsite, feedFromUrl, probe, readFeed } from "./sources/feeds.ts";
 import { companyKey, dedupeKey, prettyLocation } from "./lib/normalise.ts";
@@ -750,6 +751,7 @@ async function main() {
     await watchList(stats, match, byKey);
 
     stats.closed = await closeStaleRoles();
+    stats.closedReposts = await closeReposts(db);
     // Re-applied every morning so rule fixes reach every stored role (only changed rows are written).
     stats.retagged = await retag(match);
     await enrich(stats);
