@@ -65,7 +65,7 @@ async function gmail<T>(token: string, path: string): Promise<T> {
 // One Haiku call for all the emails the rules couldn't place (subject + Gmail's short preview only).
 async function aiOutcomes(db: SupabaseClient, userId: string, mails: Mail[]): Promise<Map<string, Outcome | null>> {
   const out = new Map<string, Outcome | null>();
-  if (!mails.length || !aiAvailable()) return out;
+  if (!mails.length || !(await aiAvailable())) return out;
   const model = "claude-haiku-5-5";
   const list = mails.map((m, i) => `${i + 1}. From: ${m.from}\nSubject: ${m.subject}\nPreview: ${m.snippet}`).join("\n\n");
   const response = await new Anthropic().messages.create({

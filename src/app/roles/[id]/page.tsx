@@ -271,12 +271,13 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
     .maybeSingle();
   if (!data) notFound();
   const r = data as FullRole;
-  const [{ db: userDb, user }, company, ctx, visa, { data: settings }] = await Promise.all([
+  const [{ db: userDb, user }, company, ctx, visa, { data: settings }, aiOn] = await Promise.all([
     currentUser(),
     isBoardName(r.employer) ? null : companyFor(r.company_key),
     salaryContext(),
     visaSettings(),
     db.from("settings").select("value").eq("key", "visa.standard_salary_gbp").maybeSingle(),
+    aiAvailable(),
   ]);
   const { data: aiRows } = user
     ? await userDb.from("ai_outputs").select("kind,content,created_at").eq("role_id", r.id).neq("kind", "ai_check").order("created_at", { ascending: false }).limit(20)
@@ -405,7 +406,7 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
           </section>
 
           <Panel title="Apply tools" icon="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z">
-            <ApplyTools roleId={r.id} initial={aiSaved} enabled={aiAvailable()} signedIn={!!user} />
+            <ApplyTools roleId={r.id} initial={aiSaved} enabled={aiOn} signedIn={!!user} />
           </Panel>
 
           <Panel title="Requirements" icon="M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9">

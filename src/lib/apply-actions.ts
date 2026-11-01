@@ -8,7 +8,7 @@ export type ToolResult = { ok: true; text: string; costUsd: number; createdAt: s
 // Runs one Apply tool for the signed-in user and saves the result (and its exact cost).
 export async function runApplyTool(kind: ToolKind, roleId: number | null, draft?: string): Promise<ToolResult> {
   if (!(kind in TOOLS)) return { ok: false, error: "Unknown tool" };
-  if (!aiAvailable()) return { ok: false, error: "The AI tools switch on once the Anthropic key is added." };
+  if (!(await aiAvailable())) return { ok: false, error: "The AI tools are switched off for now." };
   const { db, user } = await currentUser();
   if (!user) return { ok: false, error: "Sign in first" };
   if (kind === "ai_check" && !draft?.trim()) return { ok: false, error: "Paste your draft first." };

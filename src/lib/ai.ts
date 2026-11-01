@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { publicClient } from "@/lib/supabase";
 
 // The Apply tools. AI is an editor, not a ghostwriter: it never writes cover letters, never
 // submits anything and never adds experience the user doesn't have. Runs only when a user
@@ -23,7 +24,13 @@ const PRICES: Record<string, { input: number; output: number; cacheRead: number 
 };
 const WEB_SEARCH_USD = 0.01;
 
-export const aiAvailable = () => !!process.env.ANTHROPIC_API_KEY;
+// AI runs only with the key set AND the "ai.enabled" setting on: an overall switch Mihir controls,
+// so nothing is spent until he authorises it.
+export async function aiAvailable(): Promise<boolean> {
+  if (!process.env.ANTHROPIC_API_KEY) return false;
+  const { data } = (await publicClient()?.from("settings").select("value").eq("key", "ai.enabled").maybeSingle()) ?? { data: null };
+  return data?.value === true;
+}
 
 const RULES = `You help UK graduates apply for jobs. You are an editor, not a ghostwriter.
 Hard rules:
