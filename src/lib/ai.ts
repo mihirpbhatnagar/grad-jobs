@@ -37,7 +37,17 @@ Hard rules:
 - Never write a cover letter or any part of one, even if asked. Give structure and points only.
 - Never invent, exaggerate or imply experience, skills, grades or results the user doesn't have. Use only what is in their CV and story bank below. If something the role needs is missing, say it's missing and suggest how they could honestly address it.
 - Write in plain UK English. Be specific and practical. No filler, no flattery.
-- Format with short headings (## Heading) and bullet points (- point). Keep it scannable.`;
+- Format with short headings (## Heading) and bullet points (- point). Keep it scannable.
+
+UK graduate CV playbook (follow it in every CV suggestion and rewrite):
+- Length and layout: 2 pages maximum (1 is fine for little experience). Reverse chronological. Sections: contact line, short profile (2-3 lines, optional), Education, Experience, Skills, then Achievements/Interests only if they add evidence. No photo, date of birth, nationality or marital status. Never mention visa status.
+- Education goes first for graduates: degree, university, expected or achieved grade (e.g. "Predicted 2:1"), dates, 2-3 relevant modules or the dissertation title with one line on what it showed.
+- Every experience bullet = strong past-tense verb + what you did + result or scale. Example: weak "Responsible for social media" becomes strong "Grew the club's Instagram from 1,200 to 3,400 followers in one season by planning a weekly matchday content calendar". Only use numbers that are in the user's material; if a number would help but isn't there, write [add number].
+- Lead with the experiences closest to the job. Part-time jobs, sport, societies and volunteering count: show the transferable skill (customer service shows stakeholder management; captaincy shows leadership).
+- Mirror the job's own words for skills the user really has, so employers' screening software (ATS) matches them. Never keyword-stuff skills they don't have.
+- Graduate recruiters scan for: degree and grade, evidence of the competencies in the advert (teamwork, leadership, problem solving, communication, commercial awareness), results with numbers, and motivation for the sector. Make those findable in 10 seconds.
+- Cut: objectives, "references available on request", lists of soft skills without evidence, school detail beyond one line of A-levels.
+- Voice: write like the user, using their own vocabulary from their CV, story bank and style notes. Avoid words that sound AI-written (passionate, leverage, utilise, spearhead, dynamic, synergy, thrive, seamless, robust, delve, journey, foster, meticulous) and em dashes.`;
 
 const TASKS: Record<ToolKind, string> = {
   brief: "Write a company brief for this employer to prepare an application: what they do (3 lines), their values and mission in their own words (quote their site where you can), 2–4 recent news items with dates, and what they look for in graduates. Search the web for the company's own pages and recent news. Say clearly when something couldn't be found.",
@@ -50,16 +60,35 @@ const TASKS: Record<ToolKind, string> = {
 
 export type Usage = { input: number; output: number; cacheRead: number; cacheWrite: number; webSearches: number; costUsd: number };
 
-export async function runTool(
-  kind: ToolKind,
-  ctx: { cvText: string | null; storyBank: string | null; role: { title: string; employer: string; description: string | null } | null; draft?: string },
-): Promise<{ text: string; model: string; usage: Usage }> {
+// Rough cost of one run, shown on each button before anyone presses it.
+export const ESTIMATE_PENCE: Partial<Record<ToolKind, number>> = { brief: 4, cv: 5, rewrite: 8, cover: 4 };
+
+export type ToolContext = {
+  cvText: string | null;
+  storyBank: string | null;
+  styleNotes?: string | null;
+  voiceSample?: string | null;
+  role: { title: string; employer: string; description: string | null } | null;
+  keywordSummary?: string;
+  draft?: string;
+};
+
+export async function runTool(kind: ToolKind, ctx: ToolContext): Promise<{ text: string; model: string; usage: Usage }> {
   const tool = TOOLS[kind];
   const client = new Anthropic();
-  // Stable part first (rules + the user's CV and story bank) and cached, so repeat requests
-  // for different roles reuse it at a tenth of the price.
-  const profile = `## The user's CV\n${ctx.cvText?.slice(0, 20000) || "(no CV uploaded)"}\n\n## The user's story bank (real experiences, their own notes)\n${ctx.storyBank?.slice(0, 20000) || "(empty)"}`;
-  const roleText = ctx.role ? `## The role\n${ctx.role.title} at ${ctx.role.employer}\n\n${(ctx.role.description ?? "(no description)").slice(0, 15000)}` : "";
+  // Stable part first (rules + the user's CV, story bank and style) and cached, so repeat
+  // requests for different roles reuse it at a tenth of the price.
+  const profile = [
+    `## The user's CV\n${ctx.cvText?.slice(0, 20000) || "(no CV uploaded)"}`,
+    `## The user's story bank (real experiences, their own notes)\n${ctx.storyBank?.slice(0, 20000) || "(empty)"}`,
+    ctx.styleNotes?.trim() ? `## How the user likes to sound (follow this)\n${ctx.styleNotes.slice(0, 3000)}` : "",
+    ctx.voiceSample?.trim() ? `## A CV the user edited themselves (their preferred wording and choices: match this voice)\n${ctx.voiceSample.slice(0, 8000)}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  const roleText = ctx.role
+    ? `## The role\n${ctx.role.title} at ${ctx.role.employer}\n\n${(ctx.role.description ?? "(no description)").slice(0, 15000)}${ctx.keywordSummary ? `\n\n## Keyword check (already done by a free tool)\n${ctx.keywordSummary}` : ""}`
+    : "";
   const ask = `${TASKS[kind]}\n\n${roleText}${ctx.draft ? `\n\n## The user's draft\n${ctx.draft.slice(0, 8000)}` : ""}`;
 
   const response = await client.messages.create({

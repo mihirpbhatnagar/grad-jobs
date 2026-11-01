@@ -12,3 +12,16 @@ export async function embedInBrowser(text: string): Promise<number[] | null> {
     return null; // matching falls back to keywords
   }
 }
+
+// Several texts at once (one model load): for ranking story bank notes and CV bullets against a role.
+export async function embedManyInBrowser(texts: string[]): Promise<number[][] | null> {
+  if (!texts.length) return [];
+  try {
+    const { pipeline } = await import("@huggingface/transformers");
+    const extractor = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2", { dtype: "q8" });
+    const out = await extractor(texts, { pooling: "mean", normalize: true });
+    return out.tolist() as number[][];
+  } catch {
+    return null;
+  }
+}

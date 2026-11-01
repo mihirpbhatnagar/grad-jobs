@@ -1,14 +1,13 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import type { ToolKind } from "@/lib/ai";
-import { runApplyTool } from "@/lib/apply-actions";
+import { ESTIMATE_PENCE, type ToolKind } from "@/lib/ai";
+import { runApplyTool, saveEditedRewrite } from "@/lib/apply-actions";
 
 export type Saved = { kind: ToolKind; content: string; created_at: string };
 
 const BUTTONS: { kind: ToolKind; label: string; hint: string }[] = [
   { kind: "brief", label: "Company brief", hint: "What they do, values, news, what they want in grads" },
-  { kind: "keywords", label: "Keyword gaps", hint: "What the job asks for vs your CV" },
   { kind: "cv", label: "CV recommendations", hint: "What to lead with, strengthen and cut" },
   { kind: "rewrite", label: "CV rewrite", hint: "Your CV tailored to this role, from your real experience" },
   { kind: "cover", label: "Cover letter pointers", hint: "A structure and 4–6 points (never the letter itself)" },
@@ -51,7 +50,7 @@ export function ApplyTools({ roleId, initial, enabled, signedIn }: { roleId: num
   const [open, setOpen] = useState<ToolKind | null>(initial[0]?.kind ?? null);
   const [busy, setBusy] = useState<ToolKind | null>(null);
   const [error, setError] = useState("");
-  const [draft, setDraft] = useState("");
+  const [editing, setEditing] = useState<string | null>(null);
   const [, start] = useTransition();
 
   if (!signedIn) return <p className="text-sm text-muted">Sign in to use the Apply tools.</p>;
@@ -61,7 +60,7 @@ export function ApplyTools({ roleId, initial, enabled, signedIn }: { roleId: num
     start(async () => {
       setBusy(kind);
       setError("");
-      const res = await runApplyTool(kind, roleId, kind === "ai_check" ? draft : undefined);
+      const res = await runApplyTool(kind, roleId);
       setBusy(null);
       if (!res.ok) return setError(res.error);
       setResults((r) => ({ ...r, [kind]: { kind, content: res.text, created_at: res.createdAt } }));
@@ -82,20 +81,15 @@ export function ApplyTools({ roleId, initial, enabled, signedIn }: { roleId: num
           >
             <span className="block text-sm font-semibold">
               {busy === b.kind ? "Working… (up to a minute)" : b.label}
-              {results[b.kind] && <span className="ml-1.5 text-xs font-medium text-success">✓ ready</span>}
+              {results[b.kind] ? (
+                <span className="ml-1.5 text-xs font-medium text-success">✓ ready</span>
+              ) : (
+                <span className="ml-1.5 text-xs font-normal text-muted">~{ESTIMATE_PENCE[b.kind]}p</span>
+              )}
             </span>
             <span className="block text-xs text-muted">{b.hint}</span>
           </button>
         ))}
-      </div>
-
-      <div className="rounded-xl border border-border p-3">
-        <p className="text-sm font-semibold">Sounds like AI?</p>
-        <p className="text-xs text-muted">Paste your own draft (cover letter, answer, email) to see which phrases sound generic.</p>
-        <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={4} className="mt-2 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent" />
-        <button type="button" disabled={!!busy} onClick={() => run("ai_check")} className="mt-2 rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60">
-          {busy === "ai_check" ? "Checking…" : "Check my draft"}
-        </button>
       </div>
 
       {error && <p className="text-sm text-rose">{error}</p>}
@@ -103,16 +97,46 @@ export function ApplyTools({ roleId, initial, enabled, signedIn }: { roleId: num
         <div className="rounded-xl bg-chip p-4">
           <div className="mb-2 flex items-center justify-between gap-2">
             <span className="text-xs text-muted">Saved {new Date(shown.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</span>
-            {shown.kind !== "ai_check" && (
+            <span className="flex gap-3">
+              {shown.kind === "rewrite" && editing === null && (
+                <button type="button" onClick={() => setEditing(shown.content)} className="text-xs font-semibold text-accent hover:underline">
+                  Edit as my version
+                </button>
+              )}
               <button type="button" disabled={!!busy} onClick={() => run(shown.kind)} className="text-xs font-semibold text-accent hover:underline">
-                Redo
+                Redo (~{ESTIMATE_PENCE[shown.kind]}p)
               </button>
-            )}
+            </span>
           </div>
-          <Formatted text={shown.content} />
+          {shown.kind === "rewrite" && editing !== null ? (
+            <div>
+              <textarea value={editing} onChange={(e) => setEditing(e.target.value)} rows={18} className="w-full rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs leading-5 outline-none focus:border-accent" />
+              <div className="mt-2 flex items-center justify-end gap-3">
+                <button type="button" onClick={() => setEditing(null)} className="text-xs text-muted hover:text-foreground">
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    start(async () => {
+                      const { createdAt } = await saveEditedRewrite(roleId, editing);
+                      setResults((r) => ({ ...r, rewrite: { kind: "rewrite", content: editing, created_at: createdAt } }));
+                      setEditing(null);
+                    })
+                  }
+                  className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white"
+                >
+                  Save my version
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-muted">Your edits teach later rewrites how you like to sound. Saving is free.</p>
+            </div>
+          ) : (
+            <Formatted text={shown.content} />
+          )}
         </div>
       )}
-      <p className="text-xs text-muted">Built only from your CV and story bank. It never writes your cover letter or invents experience. Each run is a few pence, saved so you never pay twice.</p>
+      <p className="text-xs text-muted">Built only from your CV, story bank and style notes. It never writes your cover letter or invents experience. Each run costs the pence shown and is saved, so you never pay twice.</p>
     </div>
   );
 }

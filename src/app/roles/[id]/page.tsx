@@ -4,6 +4,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { APPLICATION_COLUMNS, ApplicationPanel, type Application } from "@/components/ApplicationPanel";
 import { ApplyTools, type Saved } from "@/components/ApplyTools";
+import { FreeTools } from "@/components/FreeTools";
 import { CompanyLogo } from "@/components/CompanyLogo";
 import { aiAvailable } from "@/lib/ai";
 import { FollowButton } from "@/components/FollowButton";
@@ -279,9 +280,12 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
     db.from("settings").select("value").eq("key", "visa.standard_salary_gbp").maybeSingle(),
     aiAvailable(),
   ]);
-  const { data: aiRows } = user
-    ? await userDb.from("ai_outputs").select("kind,content,created_at").eq("role_id", r.id).neq("kind", "ai_check").order("created_at", { ascending: false }).limit(20)
-    : { data: [] };
+  const [{ data: aiRows }, { data: mine }] = user
+    ? await Promise.all([
+        userDb.from("ai_outputs").select("kind,content,created_at").eq("role_id", r.id).in("kind", ["brief", "cv", "rewrite", "cover"]).order("created_at", { ascending: false }).limit(20),
+        userDb.from("profiles").select("cv_text,story_bank").maybeSingle(),
+      ])
+    : [{ data: [] }, { data: null }];
   const aiSaved = [...new Map(((aiRows ?? []) as Saved[]).map((x) => [x.kind, x])).values()];
   const [application, followed] = user
     ? await Promise.all([
@@ -406,7 +410,18 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
           </section>
 
           <Panel title="Apply tools" icon="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z">
-            <ApplyTools roleId={r.id} initial={aiSaved} enabled={aiOn} signedIn={!!user} />
+            {user && (
+              <>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Free and instant</p>
+                <div className="mt-2">
+                  <FreeTools job={r.description ? decodeEntities(r.description) : ""} company={company?.name ?? r.employer} title={r.title} cvText={mine?.cv_text ?? ""} storyBank={mine?.story_bank ?? ""} />
+                </div>
+                <p className="mt-6 text-xs font-semibold uppercase tracking-wide text-muted">AI tools</p>
+              </>
+            )}
+            <div className="mt-2">
+              <ApplyTools roleId={r.id} initial={aiSaved} enabled={aiOn} signedIn={!!user} />
+            </div>
           </Panel>
 
           <Panel title="Requirements" icon="M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9">
