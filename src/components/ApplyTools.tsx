@@ -54,7 +54,7 @@ export function ApplyTools({ roleId, initial, enabled, signedIn }: { roleId: num
   const [, start] = useTransition();
 
   if (!signedIn) return <p className="text-sm text-muted">Sign in to use the Apply tools.</p>;
-  if (!enabled) return <p className="text-sm text-muted">Company brief, keyword gaps, CV help and cover letter pointers are switched off for now.</p>;
+  if (!enabled) return <p className="text-sm text-muted">Company brief, CV recommendations, CV rewrite and cover letter pointers are switched off for now.</p>;
 
   const run = (kind: ToolKind) =>
     start(async () => {
