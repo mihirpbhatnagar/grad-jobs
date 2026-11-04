@@ -30,6 +30,8 @@ const feedsOnly = process.argv.includes("--feeds-only");
 const googleSweep = process.argv.includes("--google-sweep");
 // A role not seen by any source for this long is treated as closed.
 const CLOSE_AFTER_DAYS = 2;
+// GitHub stops the job at 330 minutes; the saving, closing and tagging steps need the rest.
+const FEEDS_STOP_AFTER_MINUTES = 240;
 // New Reed listings are fetched and saved this many at a time, so progress is never lost.
 const REED_BATCH = 250;
 // Earliest start users can take; read from settings in main(). Roles starting earlier are
@@ -600,7 +602,9 @@ async function discoverFeeds(probeLimit = 200, sitemapLimit = 40) {
 // Reads every feed on the watch list (daily, so roles that disappear are closed on time).
 async function pullEmployerFeeds(match: Matcher, byKey: Map<string, ExistingRole>) {
   const feeds = await selectAll<FeedRow>((from, to) =>
-    db.from("employer_feeds").select("*").neq("ats", "none").order("priority").order("id").range(from, to),
+    // Main graduate employers first, then whichever were read longest ago, so a day that runs out
+    // of time picks up where the last one stopped instead of always missing the same employers.
+    db.from("employer_feeds").select("*").neq("ats", "none").order("priority").order("last_checked", { nullsFirst: true }).order("id").range(from, to),
   );
   const known = new Set(
     (await selectAll<{ source_id: string }>((from, to) => db.from("role_sources").select("source_id").eq("source", "employer").order("source_id").range(from, to))).map((r) => r.source_id),
@@ -615,7 +619,16 @@ async function pullEmployerFeeds(match: Matcher, byKey: Map<string, ExistingRole
   const listings: Listing[] = [];
   let ok = 0;
   let failed = 0;
+  let notReached = 0;
   for (const f of feeds) {
+    // Out of time: stop reading so what's been read gets saved and the closing steps still run.
+    // Feeds not reached keep their roles open, the same as one that couldn't be read.
+    if (process.uptime() / 60 > FEEDS_STOP_AFTER_MINUTES) {
+      notReached++;
+      const prefix = `${f.ats}:${f.ats_id}:`;
+      await markSeen("employer", [...known].filter((id) => id.startsWith(prefix)));
+      continue;
+    }
     // One employer's site answering with something unexpected mustn't stop the other feeds.
     const before = run.stillListed.size;
     const found = await readFeed(f, run).catch((err) => {
@@ -646,8 +659,8 @@ async function pullEmployerFeeds(match: Matcher, byKey: Map<string, ExistingRole
   const ruledOut = [...run.ruledOut].map(([source_id, reason]) => ({ source: "employer", source_id, reason, last_seen: now }));
   for (const batch of chunks(ruledOut, 200)) await must(() => db.from("excluded_listings").upsert(batch, { onConflict: "source,source_id" }));
   const saved = await saveCrossCheck("employer", listings, match, byKey);
-  console.log(`Employer feeds: ${ok} read, ${failed} unreachable, ${listings.length} early-career UK listings`);
-  return { feeds: feeds.length, ok, failed, ...saved };
+  console.log(`Employer feeds: ${ok} read, ${failed} unreachable, ${notReached} not reached in time, ${listings.length} early-career UK listings`);
+  return { feeds: feeds.length, ok, failed, notReached, ...saved };
 }
 
 // Daily coverage score: of open main-list roles at employers we watch, the share that the
