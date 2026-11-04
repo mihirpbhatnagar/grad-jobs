@@ -183,7 +183,7 @@ async function collect(ids: string[]): Promise<{ listings: Listing[] }> {
       salaryText: i.salary,
       contractType: i.contract_type,
       fullTime: i.contract_type ? /full/i.test(i.contract_type) : null,
-      partTime: /part/i.test(i.contract_type ?? "") || /\bpart[- ]time\b/i.test(i.title),
+      partTime: (/part/i.test(i.contract_type ?? "") && !/full/i.test(i.contract_type ?? "")) || /\bpart[- ]time\b/i.test(i.title),
       description: "",
       applyUrl: i.source_url,
       postedAt: i.timestamp?.slice(0, 10) ?? null,

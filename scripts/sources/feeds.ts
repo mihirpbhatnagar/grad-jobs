@@ -1,5 +1,5 @@
 import { gunzipSync } from "node:zlib";
-import { USER_AGENT, readJobPage } from "../lib/employerPages.ts";
+import { USER_AGENT, readJobPage, readPlainPage } from "../lib/employerPages.ts";
 import { htmlToText, prettyLocation } from "../lib/normalise.ts";
 import { isOutsideUk, isPlacementOrApprenticeship } from "../lib/tags.ts";
 import type { Listing } from "./types.ts";
@@ -423,7 +423,9 @@ async function sitemap(feed: Feed, run: FeedRun): Promise<Listing[] | null> {
   // Part of the sitemap couldn't be read: everything stored stays open today.
   if (missedPart) for (const id of run.known) if (id.startsWith(`sitemap:${feed.ats_id}:`)) run.stillListed.add(id);
 
-  const JOB_PATH = /\/(job|vacanc|position|opportunit|role|career|opening|posting|requisition)/i;
+  const JOB_PATH = /\/(job|vacanc|position|opportunit|role|career|opening|posting|requisition|scheme|programme)/i;
+  // Folders that hold one role or scheme per page, so a plain page there is a real role.
+  const ONE_ROLE_FOLDER = /\/(schemes?|programmes?|roles?|vacanc(y|ies))\/[^/]*(graduate|grad|trainee|scheme|programme)[^/]*\/?$/i;
   const pathOf = (u: string) => u.replace(/^https?:\/\/[^/]+/, "");
   // Listing and search pages on careers sites have early-career words too, but no one job.
   const LISTING_PAGE = /\/(category|location|business|employment|search-jobs|search|our-stories|stories|blog|news|article|events?|talent-community|job-search)(\/|$)/i;
@@ -443,7 +445,11 @@ async function sitemap(feed: Feed, run: FeedRun): Promise<Listing[] | null> {
     run.pagesLeft--;
     const page = await readJobPage(u);
     if (!page) {
-      run.ruledOut.set(idOf(u), "no job data on page");
+      const plain = ONE_ROLE_FOLDER.test(pathOf(u)) ? await readPlainPage(u) : null;
+      const plainTitle = plain && (titleFromUrl(u) || plain.title);
+      if (plain && plainTitle && wantedTitle(plainTitle) && inUk(plain.description.slice(0, 6000))) {
+        out.push(listing(feed, u, { title: plain.title && wantedTitle(plain.title) ? plain.title : plainTitle, url: u, location: inUk(urlWords(u)) ? null : "United Kingdom", description: plain.description }));
+      } else run.ruledOut.set(idOf(u), "no job data on page");
       continue;
     }
     const words = urlWords(u);

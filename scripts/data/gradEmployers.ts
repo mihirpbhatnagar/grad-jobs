@@ -66,6 +66,8 @@ export const KNOWN_FEEDS: { name: string; ats: string; ats_id: string }[] = [
   { name: "Lloyds Banking Group", ats: "workday", ats_id: "lbg.wd3.myworkdayjobs.com/lbg/lbg_Careers" },
   // Careers-site sitemaps, tried one by one on 4 Nov 2026 (the automatic search had missed these,
   // or had picked another company's or another country's site).
+  { name: "Softwire", ats: "sitemap", ats_id: "https://www.softwire.com/sitemap.xml" },
+  { name: "Network Rail", ats: "sitemap", ats_id: "https://www.earlycareers.networkrail.co.uk/sitemap.xml" },
   { name: "Barclays", ats: "sitemap", ats_id: "https://search.jobs.barclays/sitemap.xml" },
   { name: "Citi", ats: "sitemap", ats_id: "https://jobs.citi.com/sitemap.xml" },
   { name: "Unilever", ats: "sitemap", ats_id: "https://careers.unilever.com/en/sitemap.xml" },

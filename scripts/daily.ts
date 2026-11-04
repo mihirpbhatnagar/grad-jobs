@@ -15,7 +15,7 @@ import { isEmployerPage, readJobPage, USER_AGENT } from "./lib/employerPages.ts"
 import { discoverFromWebsite, feedFromUrl, newFeedRun, pickSitemap, probe, readFeed } from "./sources/feeds.ts";
 import { companyKey, dedupeKey, prettyLocation } from "./lib/normalise.ts";
 import { refreshSponsors, sponsorMatcher, type SponsorMatch } from "./lib/sponsors.ts";
-import { countryOf, employerFromTitle, findSalary, isBoardName, isEarlyCareer, isGraduateTitle, isPlacementOrApprenticeship, isSeniorTitle, roleKind, startStatus, tagListing, type RoleTags } from "./lib/tags.ts";
+import { countryOf, employerFromTitle, findSalary, isBoardName, isEarlyCareer, isGraduateTitle, isPartTime, isPlacementOrApprenticeship, isSeniorTitle, roleKind, startStatus, tagListing, type RoleTags } from "./lib/tags.ts";
 import { GOOGLE_JOBS_QUERIES, recoverGoogleJobs, searchGoogleJobs, SWEEP_QUERIES, SWEEP_QUERIES_2, SWEEP_QUERIES_3 } from "./sources/googleJobs.ts";
 import { reedDetails, searchReed, toListing } from "./sources/reed.ts";
 import type { Listing } from "./sources/types.ts";
@@ -75,7 +75,7 @@ function roleRow(l: Listing, match: SponsorMatch, existing: ExistingRole | undef
     salary_text: l.salaryText,
     contract_type: l.contractType,
     full_time: l.fullTime,
-    part_time: l.partTime,
+    part_time: isPartTime(l.partTime, l.title),
     description: l.description,
     apply_url: l.applyUrl,
     posted_at: l.postedAt,
@@ -341,9 +341,9 @@ function sameJson(a: unknown, b: unknown): boolean {
 // Re-applies the early-career check, tagging and sponsor matching to open roles. Roles that
 // no longer pass the check are removed and remembered as excluded; only changed rows are written.
 async function retag(match: Matcher) {
-  type Row = { id: number; title: string; employer: string; location: string | null; description: string | null; tags: unknown; sponsor_status: string | null; sponsor_name: string | null; kind: string; start_status: string | null; locations: string[]; company_key: string | null; quality: number; salary_min: number | null; salary_max: number | null; expires_at: string | null };
+  type Row = { id: number; title: string; employer: string; location: string | null; description: string | null; tags: unknown; sponsor_status: string | null; sponsor_name: string | null; kind: string; start_status: string | null; locations: string[]; company_key: string | null; quality: number; salary_min: number | null; salary_max: number | null; expires_at: string | null; part_time: boolean };
   const roles = await selectAll<Row>((from, to) =>
-    db.from("roles").select("id,title,employer,location,locations,description,tags,sponsor_status,sponsor_name,kind,start_status,company_key,quality,salary_min,salary_max,expires_at").eq("is_open", true).order("id").range(from, to),
+    db.from("roles").select("id,title,employer,location,locations,description,tags,sponsor_status,sponsor_name,kind,start_status,company_key,quality,salary_min,salary_max,expires_at,part_time").eq("is_open", true).order("id").range(from, to),
   );
 
   const outOfScope = roles.filter((r) => isPlacementOrApprenticeship(r.title) || (r.description ? !isEarlyCareer(r.title, r.description) : isSeniorTitle(r.title)));
@@ -381,8 +381,9 @@ async function retag(match: Matcher) {
       company_key: companyKey(employer),
       employer,
       quality: roleQuality({ ...r, tags, start_status, salary_min, salary_max, sponsor_status: m.status }),
+      part_time: isPartTime(r.part_time, r.title),
     };
-    const current = { salary_min: r.salary_min, salary_max: r.salary_max, employer: r.employer, tags: r.tags, sponsor_status: r.sponsor_status, sponsor_name: r.sponsor_name, kind: r.kind, start_status: r.start_status, location: r.location, locations: r.locations, company_key: r.company_key, quality: r.quality };
+    const current = { part_time: r.part_time, salary_min: r.salary_min, salary_max: r.salary_max, employer: r.employer, tags: r.tags, sponsor_status: r.sponsor_status, sponsor_name: r.sponsor_name, kind: r.kind, start_status: r.start_status, location: r.location, locations: r.locations, company_key: r.company_key, quality: r.quality };
     if (sameJson(next, current)) continue;
     await must(() => db.from("roles").update(next).eq("id", r.id));
     changed++;

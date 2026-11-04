@@ -103,6 +103,27 @@ async function allowedByRobots(url: URL): Promise<boolean> {
   return robotsAllows(robotsCache.get(url.host)!, url.pathname + url.search);
 }
 
+// A page with no job data at all, for sites that list each scheme on its own plain page
+// ("/scheme/finance-graduate"): the page's title and main text.
+export async function readPlainPage(url: string): Promise<{ title: string | null; description: string } | null> {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  if (!(await allowedByRobots(parsed))) return null;
+  await sleep(800);
+  const res = await get(url);
+  if (!res?.ok || !/html/i.test(res.headers.get("content-type") ?? "html")) return null;
+  const html = await res.text();
+  const main = innerHtml(html, /<main\b[^>]*>/i) ?? innerHtml(html, /<body\b[^>]*>/i) ?? "";
+  const description = htmlToText(main.replace(/<(script|style|nav|footer|header|form)\b[\s\S]*?<\/\1>/gi, " "));
+  if (description.length < 300) return null;
+  const heading = innerHtml(html, /<h1\b[^>]*>/i);
+  return { title: htmlToText(heading ?? "") || htmlToText(metaContent(html, "og:title") ?? "") || null, description: description.slice(0, 12_000) };
+}
+
 export type PageJob = {
   title: string | null;
   location: string | null;

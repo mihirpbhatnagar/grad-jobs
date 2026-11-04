@@ -225,6 +225,13 @@ export function isGraduateTitle(title: string): boolean {
   return true;
 }
 
+// Job boards and Google sometimes label a role part-time wrongly. A graduate job or scheme is
+// full-time unless its own title says otherwise (Sky's Finance Graduate Programme was hidden this way).
+export function isPartTime(flag: boolean | null | undefined, title: string): boolean {
+  if (/\bpart[- ]?time\b/i.test(title)) return true;
+  return !!flag && !isGraduateTitle(title);
+}
+
 export function startStatus(tags: RoleTags, earliestStart: string): StartStatus {
   if (tags.startDate && tags.startText !== tags.startDate.slice(0, 4)) {
     return tags.startDate >= earliestStart ? "confirmed" : "before";
