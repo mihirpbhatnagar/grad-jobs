@@ -117,9 +117,13 @@ function findDeadline(text: string): string | null {
   );
   const m = text.match(re);
   if (!m) return null;
-  const month = MONTHS.indexOf(m[2].toLowerCase()) + 1;
+  // Short names count too ("10 Jan"): matched on the first three letters.
+  const month = MONTHS.findIndex((full) => full.startsWith(m[2].toLowerCase().slice(0, 3))) + 1;
   const year = m[3] ?? String(new Date().getFullYear() + (month < new Date().getMonth() + 1 ? 1 : 0));
-  return `${year}-${String(month).padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  const iso = `${year}-${String(month).padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  // A date that doesn't exist ("31 February") isn't a deadline, and the database would reject it.
+  const parsed = new Date(`${iso}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === iso ? iso : null;
 }
 
 function findLengthMonths(text: string): number | null {
