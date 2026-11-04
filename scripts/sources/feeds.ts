@@ -370,7 +370,7 @@ function urlWords(u: string): string {
 // A title from the address when the page gives none: the longest part that isn't an id.
 function titleFromUrl(u: string): string {
   const segs = safeDecode(safeDecode(u.split(/[?#]/)[0])).split("/").filter((seg) => seg && !/^\d+$/.test(seg) && !/^(job|jobs|details?|vacancy|vacancies|careers?|en|[a-z]{2}[-_][a-z]{2})$/i.test(seg));
-  const best = segs.slice(1).sort((x, y) => y.length - x.length)[0] ?? "";
+  const best = segs.slice(2).sort((x, y) => y.length - x.length)[0] ?? "";
   return best.replace(/^\d+[-_]/, "").replace(/[-_]+/g, " ").replace(/\s+[A-Z]?\d{4,}.*$/, "").replace(/\b[a-z]/g, (c) => c.toUpperCase()).trim();
 }
 
@@ -425,7 +425,7 @@ async function sitemap(feed: Feed, run: FeedRun): Promise<Listing[] | null> {
 
   const JOB_PATH = /\/(job|vacanc|position|opportunit|role|career|opening|posting|requisition|scheme|programme)/i;
   // Folders that hold one role or scheme per page, so a plain page there is a real role.
-  const ONE_ROLE_FOLDER = /\/(schemes?|programmes?|roles?|vacanc(y|ies))\/[^/]*(graduate|grad|trainee|scheme|programme)[^/]*\/?$/i;
+  const ONE_ROLE_FOLDER = /\/(schemes?|programmes?|(open-)?roles?|vacanc(y|ies))\/[^/]*(graduate|grad|trainee|scheme|programme)[^/]*\/?$/i;
   const pathOf = (u: string) => u.replace(/^https?:\/\/[^/]+/, "");
   // Listing and search pages on careers sites have early-career words too, but no one job.
   const LISTING_PAGE = /\/(category|location|business|employment|search-jobs|search|our-stories|stories|blog|news|article|events?|talent-community|job-search)(\/|$)/i;
@@ -446,9 +446,9 @@ async function sitemap(feed: Feed, run: FeedRun): Promise<Listing[] | null> {
     const page = await readJobPage(u);
     if (!page) {
       const plain = ONE_ROLE_FOLDER.test(pathOf(u)) ? await readPlainPage(u) : null;
-      const plainTitle = plain && (titleFromUrl(u) || plain.title);
+      const plainTitle = plain && (plain.title && wantedTitle(plain.title) ? plain.title : titleFromUrl(u));
       if (plain && plainTitle && wantedTitle(plainTitle) && inUk(plain.description.slice(0, 6000))) {
-        out.push(listing(feed, u, { title: plain.title && wantedTitle(plain.title) ? plain.title : plainTitle, url: u, location: inUk(urlWords(u)) ? null : "United Kingdom", description: plain.description }));
+        out.push(listing(feed, u, { title: plainTitle, url: u, location: inUk(urlWords(u)) ? null : "United Kingdom", description: plain.description }));
       } else run.ruledOut.set(idOf(u), "no job data on page");
       continue;
     }
