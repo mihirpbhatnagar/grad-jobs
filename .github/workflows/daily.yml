@@ -2,8 +2,9 @@ name: Daily data job
 
 on:
   schedule:
-    # 05:00 UTC = 05:00 UK time in winter, 06:00 in summer.
-    - cron: "0 5 * * *"
+    # About 04:17 UTC. Not on the hour: GitHub delays on-the-hour schedules the most
+    # (the 05:00 run was starting around 12:00-13:00).
+    - cron: "17 4 * * *"
   workflow_dispatch: {}
 
 concurrency:

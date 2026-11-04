@@ -19,6 +19,11 @@ const SEARCHES: Record<string, string>[] = [
   { keywords: "september 2027" },
   { keywords: "2027 intake" },
   { keywords: "final year students" },
+  { keywords: "graduate trainee" },
+  { keywords: "management trainee" },
+  { keywords: "training contract" },
+  { keywords: "early careers" },
+  { keywords: "degree apprenticeship" },
   // Internships and short work experience (their own section, not the main list).
   { keywords: "internship" },
   { keywords: "work experience" },

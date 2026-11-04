@@ -4,20 +4,32 @@ import { companyKey, textKey } from "./normalise.ts";
 // (Adzuna, Google Jobs), whose wording differs from Reed's, so the strict dedupe key
 // (which includes the description) can't be used.
 
-const STOP = new Set(["and", "the", "of", "in", "for", "a", "to", "with", "uk", "role", "job", "graduate"]);
+// Words that don't change which job a title means: scheme wording, dates and places.
+const STOP = new Set([
+  "and", "the", "of", "in", "for", "a", "to", "with", "at", "uk", "role", "job", "graduate", "grad", "graduates",
+  "programme", "program", "scheme", "intake", "cohort", "start", "starting", "trainee", "training", "early", "career", "careers", "entry", "level", "opportunity",
+  "jan", "january", "feb", "february", "mar", "march", "apr", "april", "may", "jun", "june", "jul", "july", "aug", "august", "sep", "sept", "september", "oct", "october", "nov", "november", "dec", "december",
+  "spring", "summer", "autumn", "winter", "united", "kingdom", "remote", "hybrid", "london", "manchester", "birmingham", "leeds", "glasgow", "edinburgh", "bristol", "cardiff", "belfast", "liverpool", "newcastle", "sheffield", "nottingham", "reading",
+]);
 
 function titleTokens(title: string): Set<string> {
-  return new Set(textKey(title).split(" ").filter((w) => w && !STOP.has(w)));
+  return new Set(textKey(title).split(" ").filter((w) => w && !STOP.has(w) && !/^20\d\d$/.test(w) && !/^\d{1,2}$/.test(w)));
 }
 
+// The same job only if one title's meaningful words all appear in the other: "Graduate Scheme -
+// Finance" matches "Finance Graduate Programme 2027", but "Graduate Management Trainee -
+// Marketing" is a different job from "Graduate Management Trainee - Supply Chain".
 function similar(a: Set<string>, b: Set<string>): boolean {
+  if (a.size === 0 && b.size === 0) return true;
   if (a.size === 0 || b.size === 0) return false;
-  let shared = 0;
-  for (const w of a) if (b.has(w)) shared++;
-  return shared / Math.max(a.size, b.size) >= 0.6;
+  const [small, big] = a.size <= b.size ? [a, b] : [b, a];
+  for (const w of small) if (!big.has(w)) return false;
+  return small.size / big.size >= 0.5;
 }
 
-// Returns a lookup giving the id of the matching known role, or null.
+const same = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].every((w) => b.has(w));
+
+// Returns a lookup giving the id of the matching known role, or null (exact wording first).
 export function knownRoleIndex(roles: { id: number; employer: string; title: string }[]) {
   const byCompany = new Map<string, { id: number; tokens: Set<string> }[]>();
   for (const r of roles) {
@@ -27,6 +39,7 @@ export function knownRoleIndex(roles: { id: number; employer: string; title: str
   }
   return (employer: string, title: string): number | null => {
     const t = titleTokens(title);
-    return byCompany.get(companyKey(employer))?.find((known) => similar(known.tokens, t))?.id ?? null;
+    const known = byCompany.get(companyKey(employer));
+    return (known?.find((k) => same(k.tokens, t)) ?? known?.find((k) => similar(k.tokens, t)))?.id ?? null;
   };
 }

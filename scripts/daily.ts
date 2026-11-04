@@ -12,7 +12,7 @@ import { lookupCompanies } from "./lib/companies.ts";
 import { healthCheck } from "./lib/health.ts";
 import { closeReposts } from "./lib/reposts.ts";
 import { isEmployerPage, readJobPage, USER_AGENT } from "./lib/employerPages.ts";
-import { discoverFromWebsite, feedFromUrl, probe, readFeed } from "./sources/feeds.ts";
+import { discoverFromWebsite, feedFromUrl, newFeedRun, pickSitemap, probe, readFeed } from "./sources/feeds.ts";
 import { companyKey, dedupeKey, prettyLocation } from "./lib/normalise.ts";
 import { refreshSponsors, sponsorMatcher, type SponsorMatch } from "./lib/sponsors.ts";
 import { countryOf, employerFromTitle, findSalary, isBoardName, isEarlyCareer, isGraduateTitle, isSeniorTitle, roleKind, startStatus, tagListing, type RoleTags } from "./lib/tags.ts";
@@ -171,7 +171,9 @@ async function pullReed(match: Matcher, byKey: Map<string, ExistingRole>) {
   const knownIds = await knownSourceIds("reed");
 
   const { results, calls } = await searchReed();
-  const newIds = [...results.keys()].filter((id) => !knownIds.has(String(id)));
+  // A listing ruled out earlier comes back if its title now counts (the rules improve over time).
+  const linkedOrOk = (id: number) => !knownIds.has(String(id)) || (!linkedIds.has(String(id)) && isEarlyCareer(results.get(id)!.jobTitle, ""));
+  const newIds = [...results.keys()].filter(linkedOrOk);
   console.log(`Reed: ${results.size} listings found (${calls} searches), ${newIds.length} not seen before`);
 
   // Clearly senior titles are ruled out from the search result alone, saving a details call each.
@@ -207,8 +209,8 @@ async function pullReed(match: Matcher, byKey: Map<string, ExistingRole>) {
 // by employer + title. Matches are credited to the existing role; anything new joins the feed.
 async function saveCrossCheck(source: string, all: Listing[], match: Matcher, byKey: Map<string, ExistingRole>) {
   const listings = uniqueListings(all);
-  const roles = await selectAll<{ id: number; employer: string; title: string; sources: string[] }>((from, to) =>
-    db.from("roles").select("id,employer,title,sources").eq("is_open", true).order("id").range(from, to),
+  const roles = await selectAll<{ id: number; employer: string; title: string; sources: string[]; location: string | null; locations: string[] }>((from, to) =>
+    db.from("roles").select("id,employer,title,sources,location,locations").eq("is_open", true).order("id").range(from, to),
   );
   const findRole = knownRoleIndex(roles);
   const sourcesById = new Map(roles.map((r) => [r.id, r.sources]));
@@ -218,10 +220,13 @@ async function saveCrossCheck(source: string, all: Listing[], match: Matcher, by
   const unmatched: Listing[] = [];
   const senior: Listing[] = [];
   const withText = new Map<number, Listing>();
+  const newTowns = new Map<number, Set<string>>();
+  const rolesById = new Map(roles.map((r) => [r.id, r]));
   for (const l of listings) {
     const roleId = findRole(l.employer, l.title);
     if (roleId) {
       links.push({ source: l.source, source_id: l.sourceId, role_id: roleId, url: l.sourceUrl, last_seen: now });
+      if (l.location && !rolesById.get(roleId)!.locations.includes(l.location)) newTowns.set(roleId, (newTowns.get(roleId) ?? new Set()).add(l.location));
       if (l.description.length > 150) withText.set(roleId, l);
     } else if (isSeniorTitle(l.title)) senior.push(l);
     else unmatched.push(l);
@@ -230,7 +235,7 @@ async function saveCrossCheck(source: string, all: Listing[], match: Matcher, by
   let described = 0;
   for (const ids of chunks([...withText.keys()], 200)) {
     const empty = (await must(() =>
-      db.from("roles").select("id,title,salary_min,salary_max,expires_at,contract_type,sponsor_status").in("id", ids).or("description.is.null,description.eq."),
+      db.from("roles").select("id,title,location,salary_min,salary_max,expires_at,contract_type,sponsor_status").in("id", ids).or("description.is.null,description.eq."),
     )) as DescribeRow[];
     for (const r of empty) {
       const l = withText.get(r.id)!;
@@ -252,6 +257,13 @@ async function saveCrossCheck(source: string, all: Listing[], match: Matcher, by
     for (const batch of chunks(ids, 200)) {
       await must(() => db.from("roles").update({ sources: JSON.parse(key), last_seen: now, is_open: true }).in("id", batch));
     }
+  }
+
+  // The same job in another town: keep every town on the one role, so location filters find it.
+  for (const [id, towns] of newTowns) {
+    const r = rolesById.get(id)!;
+    const locations = [...r.locations, ...towns];
+    await must(() => db.from("roles").update({ locations, location: r.location ?? locations[0] }).eq("id", id));
   }
 
   await saveExcluded(senior, "senior title");
@@ -281,18 +293,20 @@ async function setting<T>(key: string, fallback: T): Promise<T> {
 
 // Sources that ran successfully this morning. A role only counts as gone when every source
 // that lists it ran and didn't see it; a paused or failed source never closes roles. Anything
-// unseen for 21 days closes regardless.
+// unseen for 60 days closes regardless (long enough that pausing Google Jobs, whose roles can't
+// be re-checked while it's off, doesn't empty the list).
 const ranSources = new Set<string>();
 let safetyStop: string | null = null;
 
 async function closeStaleRoles(): Promise<number> {
   const cutoff = new Date(Date.now() - CLOSE_AFTER_DAYS * 86_400_000).toISOString();
-  const longGone = new Date(Date.now() - 21 * 86_400_000).toISOString();
+  const longGone = new Date(Date.now() - 60 * 86_400_000).toISOString();
   const today = new Date().toISOString().slice(0, 10);
   const candidates = await selectAll<{ id: number; sources: string[]; last_seen: string }>((from, to) =>
     db.from("roles").select("id,sources,last_seen").eq("is_open", true).lt("last_seen", cutoff).order("id").range(from, to),
   );
-  const staleIds = candidates.filter((r) => r.last_seen < longGone || r.sources.every((src) => ranSources.has(src))).map((r) => r.id);
+  const agedOut = candidates.filter((r) => r.last_seen < longGone).map((r) => r.id);
+  const staleIds = candidates.filter((r) => r.last_seen >= longGone && r.sources.every((src) => ranSources.has(src))).map((r) => r.id);
   // Safety net: never close more than 30% of open roles in one morning; that means something
   // upstream failed, not that the market vanished. Logged so the Coverage page shows it.
   const { count: openCount } = await db.from("roles").select("id", { count: "exact", head: true }).eq("is_open", true);
@@ -301,8 +315,8 @@ async function closeStaleRoles(): Promise<number> {
     safetyStop = `Would have closed ${staleIds.length} of ${openCount} open roles, so none were closed. A source probably failed.`;
     staleIds.length = 0;
   }
-  for (const batch of chunks(staleIds, 200)) await must(() => db.from("roles").update({ is_open: false }).in("id", batch));
-  const stale = staleIds;
+  const stale = [...staleIds, ...agedOut];
+  for (const batch of chunks(stale, 200)) await must(() => db.from("roles").update({ is_open: false }).in("id", batch));
   const expired = await must(() => db.from("roles").update({ is_open: false }).eq("is_open", true).lt("expires_at", today).select("id"));
   // The listing's own stated closing date counts too (boards sometimes keep roles up longer).
   const pastDeadline = await must(() => db.from("roles").update({ is_open: false }).eq("is_open", true).lt("tags->>deadline", today).select("id"));
@@ -370,12 +384,12 @@ async function retag(match: Matcher) {
   return { removedOutOfScope: removeIds.length, updated: changed };
 }
 
-type DescribeRow = { id: number; title: string; salary_min: number | null; salary_max: number | null; expires_at: string | null; contract_type: string | null; sponsor_status: string | null };
+type DescribeRow = { id: number; title: string; location?: string | null; salary_min: number | null; salary_max: number | null; expires_at: string | null; contract_type: string | null; sponsor_status: string | null };
 type Details = { description: string; salaryMin: number | null; salaryMax: number | null; deadline: string | null; employmentType: string | null };
 
 // Gives a role its full description (from an employer page or feed) and re-tags it.
 async function applyDescription(r: DescribeRow, d: Details) {
-  const tags = tagListing(r.title, d.description);
+  const tags = { ...tagListing(r.title, d.description), abroad: countryOf(r.title, r.location ?? null) };
   const start_status = startStatus(tags, earliestStart);
   const written = findSalary(d.description);
   const salary_min = r.salary_min ?? d.salaryMin ?? written?.min ?? null;
@@ -398,7 +412,7 @@ async function fillMissingDetails(limit = 400) {
   type Row = DescribeRow & { employer: string; apply_url: string | null };
   const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
   const roles = (await must(() =>
-    db.from("roles").select("id,title,employer,apply_url,salary_min,salary_max,expires_at,contract_type,sponsor_status")
+    db.from("roles").select("id,title,location,employer,apply_url,salary_min,salary_max,expires_at,contract_type,sponsor_status")
       .eq("is_open", true).eq("kind", "job").eq("part_time", false).in("start_status", ["confirmed", "likely", "unknown"])
       .or("description.is.null,description.eq.").or(`details_checked_at.is.null,details_checked_at.lt.${weekAgo}`)
       .order("quality", { ascending: false }).limit(limit),
@@ -469,7 +483,7 @@ async function refreshCompanies(limit = 1500) {
 
 // ---------- employer watch list ----------
 
-type FeedRow = { id: number; company_key: string; name: string; ats: string; ats_id: string; priority: number; last_checked: string | null };
+type FeedRow = { id: number; company_key: string; name: string; ats: string; ats_id: string; priority: number; last_checked: string | null; last_found: number | null; created_at: string };
 const seedKeys = new Set(GRAD_EMPLOYERS.map(companyKey));
 
 // Grows the watch list for free: hiring systems seen in apply links (the coverage loop),
@@ -478,7 +492,10 @@ const seedKeys = new Set(GRAD_EMPLOYERS.map(companyKey));
 async function discoverFeeds(probeLimit = 200, sitemapLimit = 40) {
   const feeds = await selectAll<FeedRow>((from, to) => db.from("employer_feeds").select("*").order("id").range(from, to));
   const have = new Set(feeds.map((f) => `${f.ats}|${f.ats_id}`));
-  const watched = new Set(feeds.map((f) => f.company_key));
+  // Sorted for good once a feed finds roles. An employer we found nothing useful for is tried
+  // again every 30 days: its site may have changed, or an earlier look may have just failed.
+  const retryBefore = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  const watched = new Set(feeds.filter((f) => (f.ats !== "none" && (f.last_found ?? 0) > 0) || (f.ats === "none" && (f.last_checked ?? f.created_at) >= retryBefore)).map((f) => f.company_key));
   const added: Record<string, unknown>[] = [];
   const add = (row: { company_key: string; name: string; ats: string; ats_id: string; added_by: string }) => {
     const k = `${row.ats}|${row.ats_id}`;
@@ -517,7 +534,7 @@ async function discoverFeeds(probeLimit = 200, sitemapLimit = 40) {
       const res = await fetch(`${origin}/robots.txt`, { headers: { "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(15_000) });
       const text = res.ok ? await res.text() : "";
       const maps = [...text.matchAll(/^\s*sitemap:\s*(\S+)/gim)].map((m) => m[1]);
-      const pick = maps.find((m) => /job|vacanc|career/i.test(m)) ?? maps[0];
+      const pick = pickSitemap(maps, origin);
       if (pick) {
         add({ company_key: key, name: role.employer, ats: "sitemap", ats_id: pick, added_by: "apply_link" });
         sitemaps++;
@@ -559,8 +576,10 @@ async function discoverFeeds(probeLimit = 200, sitemapLimit = 40) {
         const domain = known.get(key);
         const [boards, site] = await Promise.all([probe(name), domain ? discoverFromWebsite(domain) : Promise.resolve([])]);
         const hits = [...site, ...boards];
-        if (hits.length === 0) add({ company_key: key, name, ats: "none", ats_id: key, added_by: "probe" });
-        else found++;
+        // The "none" row also records when this employer was last looked for.
+        add({ company_key: key, name, ats: "none", ats_id: key, added_by: "probe" });
+        await must(() => db.from("employer_feeds").update({ last_checked: new Date().toISOString() }).eq("ats", "none").eq("company_key", key));
+        if (hits.length) found++;
         for (const h of hits) add({ company_key: key, name, ...h, added_by: site.includes(h) ? "website" : "probe" });
       }),
     );
@@ -579,13 +598,26 @@ async function pullEmployerFeeds(match: Matcher, byKey: Map<string, ExistingRole
   const known = new Set(
     (await selectAll<{ source_id: string }>((from, to) => db.from("role_sources").select("source_id").eq("source", "employer").order("source_id").range(from, to))).map((r) => r.source_id),
   );
+  // Pages recently ruled out (abroad, not early-career, no job data) wait 30 days before another
+  // look, so the daily reading allowance goes on pages not yet read.
+  const monthAgo = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  const skip = new Set(
+    (await selectAll<{ source_id: string }>((from, to) => db.from("excluded_listings").select("source_id").eq("source", "employer").like("source_id", "sitemap:%").gte("last_seen", monthAgo).order("source_id").range(from, to))).map((r) => r.source_id),
+  );
+  const run = newFeedRun(known, skip);
   const listings: Listing[] = [];
   let ok = 0;
   let failed = 0;
   for (const f of feeds) {
-    const found = await readFeed(f, known);
+    // One employer's site answering with something unexpected mustn't stop the other feeds.
+    const before = run.stillListed.size;
+    const found = await readFeed(f, run).catch((err) => {
+      console.warn(`  ${f.name} (${f.ats}) failed: ${String(err).slice(0, 120)}`);
+      return null;
+    });
+    const stored = run.stillListed.size - before;
     await must(() =>
-      db.from("employer_feeds").update({ last_checked: new Date().toISOString(), last_status: found ? "ok" : "unreachable", last_found: found?.length ?? 0 }).eq("id", f.id),
+      db.from("employer_feeds").update({ last_checked: new Date().toISOString(), last_status: found ? "ok" : "unreachable", last_found: (found?.length ?? 0) + stored }).eq("id", f.id),
     );
     if (!found) {
       failed++;
@@ -595,11 +627,17 @@ async function pullEmployerFeeds(match: Matcher, byKey: Map<string, ExistingRole
       continue;
     }
     ok++;
-    listings.push(...found.filter((l) => !isSeniorTitle(l.title)));
+    // Same test the morning re-check applies, so nothing is saved one minute and deleted the next.
+    for (const l of found) {
+      if (!isSeniorTitle(l.title) && (!l.description || isEarlyCareer(l.title, l.description))) listings.push(l);
+      else run.ruledOut.set(l.sourceId, "not early-career");
+    }
   }
-  // Sitemap feeds only return pages not seen before; keep the ones already linked open too.
-  const sitemapIds = [...known].filter((id) => id.startsWith("sitemap:"));
-  await markSeen("employer", sitemapIds);
+  // Sitemap feeds only return pages not stored yet; stored ones stay open while still listed.
+  await markSeen("employer", [...run.stillListed]);
+  const now = new Date().toISOString();
+  const ruledOut = [...run.ruledOut].map(([source_id, reason]) => ({ source: "employer", source_id, reason, last_seen: now }));
+  for (const batch of chunks(ruledOut, 200)) await must(() => db.from("excluded_listings").upsert(batch, { onConflict: "source,source_id" }));
   const saved = await saveCrossCheck("employer", listings, match, byKey);
   console.log(`Employer feeds: ${ok} read, ${failed} unreachable, ${listings.length} early-career UK listings`);
   return { feeds: feeds.length, ok, failed, ...saved };

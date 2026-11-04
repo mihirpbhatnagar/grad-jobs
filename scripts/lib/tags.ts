@@ -138,6 +138,9 @@ const EARLY_TITLE = /\b(graduate|grad|trainee|junior|entry[- ]level|early career
 const EARLY_TEXT = /\b(graduates?|grad (scheme|programme)|entry[- ]level|trainee|recent(ly)? graduated?|final[- ]year (students?|undergraduates?)|no (prior |previous )?experience (is )?(required|needed|necessary)|full training (is )?(given|provided)|early careers?|first (step|role) in your career|class of 2027|2027 (start|intake|cohort|graduates?))\b/i;
 const GRAD_IN_TITLE = /\b(graduate|grad|trainee|junior|entry[- ]level|early careers?|intern|internship|work experience)\b/i;
 
+// Titles that are early-career by definition even if the wording never says "graduate".
+const EARLY_ONLY_TITLE = /\b(apprentice|apprenticeship|placements?|summer analysts?|summer associates?|off[- ]cycle|spring week|spring insight|insight (day|week|programme|program)|year in industry|industrial placement|vacation scheme|training contract|early talent|early professionals?|emerging talent|(analyst|associate|leadership|rotational) program(me)?|20(27|28)\s+(analyst|associate)|(analyst|associate)\D{0,20}20(27|28))\b/i;
+
 export function isSeniorTitle(title: string): boolean {
   // "Manager" / "Lead" on their own are experienced roles ("Marketing Lead", "Sales Manager");
   // with a graduate word they aren't ("Graduate Trainee Manager").
@@ -186,7 +189,7 @@ export function employerFromTitle(title: string): string | null {
 
 export function isEarlyCareer(title: string, description: string): boolean {
   if (isSeniorTitle(title)) return false;
-  if (GRAD_IN_TITLE.test(title)) return true;
+  if (GRAD_IN_TITLE.test(title) || EARLY_ONLY_TITLE.test(title)) return true;
   return EARLY_TEXT.test(`${title}\n${description}`) && (EARLY_TITLE.test(title) || /\bgraduates?\b/i.test(description));
 }
 

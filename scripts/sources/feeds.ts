@@ -1,3 +1,4 @@
+import { gunzipSync } from "node:zlib";
 import { USER_AGENT, readJobPage } from "../lib/employerPages.ts";
 import { htmlToText, prettyLocation } from "../lib/normalise.ts";
 import { isOutsideUk } from "../lib/tags.ts";
@@ -9,11 +10,13 @@ import type { Listing } from "./types.ts";
 
 export type Feed = { ats: string; ats_id: string; name: string };
 
-const EARLY = /\b(graduate|grad|graduates|trainee|entry[- ]level|early careers?|intern|internship|placement|industrial placement|summer analyst|spring week|insight|apprentice|apprenticeship|2027|junior|new grad|campus|futures?|undergraduate|year in industry)\b/i;
+const EARLY = /\b(graduate|grad|graduates|trainee|entry[- ]level|early careers?|early talent|early professional|emerging talent|intern|interns|internship|placement|industrial placement|summer analyst|summer associate|off[- ]cycle|spring week|spring insight|insight|apprentice|apprenticeship|junior|new grad|campus|futures?|undergraduate|year in industry|vacation scheme|training contract|(analyst|associate|leadership|development|rotational|management) program(me)?)\b/i;
 const SENIOR = /\b(senior|snr|sr\.?|principal|head of|director|vp|vice president|chief|lead|manager|partner|staff|experienced)\b/i;
-const UK = /\b(uk|u\.k\.|united kingdom|great britain|england|scotland|wales|northern ireland|london|manchester|birmingham|leeds|glasgow|edinburgh|bristol|cardiff|belfast|liverpool|newcastle|sheffield|nottingham|leicester|cambridge|oxford|reading|milton keynes|southampton|aberdeen|coventry|derby|warrington|york|brighton|guildford|farnborough|bath|exeter|plymouth|norwich|ipswich|swindon|slough|stevenage|crawley|chester|preston|lancaster|loughborough|cheltenham|gloucester|barrow|warton|portsmouth|basingstoke|bracknell|uxbridge|watford|hatfield|luton|peterborough|northampton|telford|wolverhampton|hull|dundee|inverness|swansea|newport|remote - uk|gb)\b/i;
+const UK = /\b(uk|u\.k\.|united kingdom|great britain|england|scotland|wales|northern ireland|surrey|kent|essex|sussex|hampshire|berkshire|hertfordshire|buckinghamshire|oxfordshire|cambridgeshire|bedfordshire|leicestershire|nottinghamshire|derbyshire|staffordshire|warwickshire|west midlands|east midlands|yorkshire|lancashire|cheshire|cumbria|merseyside|tyne and wear|county durham|somerset|devon|cornwall|dorset|wiltshire|gloucestershire|worcestershire|shropshire|norfolk|suffolk|lincolnshire|bedford|stoke|sunderland|middlesbrough|darlington|carlisle|bolton|stockport|solihull|harlow|chelmsford|colchester|maidstone|canterbury|woking|staines|harrogate|huddersfield|bradford|wakefield|doncaster|london|manchester|birmingham|leeds|glasgow|edinburgh|bristol|cardiff|belfast|liverpool|newcastle|sheffield|nottingham|leicester|cambridge|oxford|reading|milton keynes|southampton|aberdeen|coventry|derby|warrington|york|brighton|guildford|farnborough|bath|exeter|plymouth|norwich|ipswich|swindon|slough|stevenage|crawley|chester|preston|lancaster|loughborough|cheltenham|gloucester|barrow|warton|portsmouth|basingstoke|bracknell|uxbridge|watford|hatfield|luton|peterborough|northampton|telford|wolverhampton|hull|dundee|inverness|swansea|newport|remote - uk|gb)\b/i;
 
-export const wantedTitle = (title: string) => EARLY.test(title) && !(SENIOR.test(title) && !/\b(graduate|grad|intern|trainee|placement)\b/i.test(title));
+// "2027" counts unless it's part of a date ("FTC until 01/06/2027").
+const YEAR_2027 = /(?<![\d/.-])2027\b/;
+export const wantedTitle = (title: string) => (EARLY.test(title) || YEAR_2027.test(title)) && !(SENIOR.test(title) && !/\b(graduate|grad|intern|trainee|placement|apprentice)\b/i.test(title));
 // "New York" contains "York": anything that reads as abroad is not the UK.
 export const inUk = (location: string | null | undefined) => !!location && UK.test(location) && !isOutsideUk("", location);
 
@@ -65,11 +68,11 @@ function listing(feed: Feed, id: string, f: Partial<Listing> & { title: string; 
 // ---- one reader per hiring system ----
 
 async function greenhouse(feed: Feed): Promise<Listing[] | null> {
-  type J = { id: number; title: string; location?: { name?: string }; absolute_url: string; content?: string; updated_at?: string; first_published?: string };
+  type J = { id: number; title: string; location?: { name?: string }; offices?: { name?: string; location?: string | null }[]; absolute_url: string; content?: string; updated_at?: string; first_published?: string };
   const res = await json<{ jobs: J[] }>(`https://boards-api.greenhouse.io/v1/boards/${feed.ats_id}/jobs?content=true`);
   if (!res) return null;
   return res.jobs
-    .filter((j) => wantedTitle(j.title) && inUk(j.location?.name))
+    .filter((j) => wantedTitle(j.title) && inUk([j.location?.name, ...(j.offices ?? []).flatMap((o) => [o.name, o.location])].filter(Boolean).join(" ")))
     .map((j) =>
       listing(feed, String(j.id), {
         title: j.title,
@@ -111,32 +114,36 @@ async function ashby(feed: Feed): Promise<Listing[] | null> {
 
 async function smartrecruiters(feed: Feed): Promise<Listing[] | null> {
   type P = { id: string; name: string; releasedDate?: string; location?: { city?: string; country?: string; fullLocation?: string }; typeOfEmployment?: { label?: string } };
-  const out: Listing[] = [];
-  let seenAny = false;
-  for (const q of ["graduate", "intern", "placement", "trainee", "early careers"]) {
-    const res = await json<{ content: P[]; totalFound: number }>(`https://api.smartrecruiters.com/v1/companies/${feed.ats_id}/postings?limit=100&country=gb&q=${encodeURIComponent(q)}`);
-    if (!res) continue;
-    seenAny = true;
-    for (const p of res.content) {
-      if (!wantedTitle(p.name) || out.some((o) => o.sourceId.endsWith(`:${p.id}`))) continue;
-      const d = await json<{ jobAd?: { sections?: Record<string, { title?: string; text?: string }> }; postingUrl?: string; applyUrl?: string }>(
-        `https://api.smartrecruiters.com/v1/companies/${feed.ats_id}/postings/${p.id}`,
-      );
-      const sections = Object.values(d?.jobAd?.sections ?? {});
-      out.push(
-        listing(feed, p.id, {
-          title: p.name,
-          url: d?.postingUrl ?? `https://jobs.smartrecruiters.com/${feed.ats_id}/${p.id}`,
-          location: p.location?.fullLocation ?? p.location?.city ?? "United Kingdom",
-          contractType: p.typeOfEmployment?.label ?? null,
-          description: sections.map((s) => `${s.title ?? ""}\n${htmlToText(s.text ?? "")}`).join("\n\n"),
-          postedAt: p.releasedDate ?? null,
-        }),
-      );
-      await sleep(300);
+  // The feed filters by country, so read every UK posting and judge each by its title.
+  const postings: P[] = [];
+  for (let offset = 0; offset < 2000; offset += 100) {
+    const res = await json<{ content: P[]; totalFound: number }>(`https://api.smartrecruiters.com/v1/companies/${feed.ats_id}/postings?limit=100&offset=${offset}&country=gb`);
+    if (!res) {
+      if (offset === 0) return null;
+      break;
     }
+    postings.push(...res.content);
+    if (res.content.length < 100 || offset + 100 >= res.totalFound) break;
   }
-  return seenAny ? out : null;
+  const out: Listing[] = [];
+  for (const p of postings.filter((x) => wantedTitle(x.name))) {
+    const d = await json<{ jobAd?: { sections?: Record<string, { title?: string; text?: string }> }; postingUrl?: string; applyUrl?: string }>(
+      `https://api.smartrecruiters.com/v1/companies/${feed.ats_id}/postings/${p.id}`,
+    );
+    const sections = Object.values(d?.jobAd?.sections ?? {});
+    out.push(
+      listing(feed, p.id, {
+        title: p.name,
+        url: d?.postingUrl ?? `https://jobs.smartrecruiters.com/${feed.ats_id}/${p.id}`,
+        location: p.location?.fullLocation ?? p.location?.city ?? "United Kingdom",
+        contractType: p.typeOfEmployment?.label ?? null,
+        description: sections.map((x) => `${x.title ?? ""}\n${htmlToText(x.text ?? "")}`).join("\n\n"),
+        postedAt: p.releasedDate ?? null,
+      }),
+    );
+    await sleep(300);
+  }
+  return out;
 }
 
 async function workable(feed: Feed): Promise<Listing[] | null> {
@@ -148,31 +155,64 @@ async function workable(feed: Feed): Promise<Listing[] | null> {
     .map((j) => listing(feed, j.shortcode, { title: j.title, url: j.url, location: j.city ?? j.country ?? null, description: htmlToText(j.description ?? ""), postedAt: j.published_on ?? null, contractType: j.employment_type ?? null }));
 }
 
+// Finds the "United Kingdom" entry in a Workday board's filters (their names vary by employer).
+function ukFacet(facets: unknown, param?: string): { param: string; id: string } | null {
+  if (!Array.isArray(facets)) return null;
+  for (const raw of facets) {
+    const f = raw as { facetParameter?: string; descriptor?: string; id?: string; values?: unknown };
+    if (param && f.id && /^(united kingdom|uk|great britain|gb)$/i.test(f.descriptor ?? "")) return { param, id: f.id };
+    const inner = ukFacet(f.values, f.facetParameter ?? param);
+    if (inner) return inner;
+  }
+  return null;
+}
+
 // Workday: ats_id is "host/tenant/site", e.g. "baesystems.wd3.myworkdayjobs.com/baesystems/External".
 async function workday(feed: Feed): Promise<Listing[] | null> {
   const [host, tenant, site] = feed.ats_id.split("/");
   const base = `https://${host}/wday/cxs/${tenant}/${site}`;
   type P = { title: string; externalPath: string; locationsText?: string; postedOn?: string };
+  type Res = { total: number; jobPostings: P[]; facets?: unknown[] };
+  const search = (body: Record<string, unknown>) => json<Res>(`${base}/jobs`, { method: "POST", body: JSON.stringify({ limit: 20, ...body }) });
   const found = new Map<string, P>();
-  let reachable = false;
-  for (const searchText of ["graduate", "intern", "placement", "trainee", "early careers", "2027"]) {
-    for (let offset = 0; offset < 100; offset += 20) {
-      const res = await json<{ total: number; jobPostings: P[] }>(`${base}/jobs`, { method: "POST", body: JSON.stringify({ appliedFacets: {}, limit: 20, offset, searchText }) });
+  const first = await search({ appliedFacets: {}, offset: 0, searchText: "" });
+  if (!first) return null;
+  // Most boards have a country filter: read every UK job and judge each by its title. A keyword
+  // search of the whole world misses UK roles (Accenture's top 100 "graduate" results were all
+  // abroad) and any early-career title without the keyword.
+  const uk = ukFacet(first.facets);
+  const inFacet = new Set<string>();
+  if (uk) {
+    for (let offset = 0; offset < 2000; offset += 20) {
+      const res = await search({ appliedFacets: { [uk.param]: [uk.id] }, offset, searchText: "" });
       if (!res) break;
-      reachable = true;
-      for (const p of res.jobPostings ?? []) if (wantedTitle(p.title)) found.set(p.externalPath, p);
+      for (const p of res.jobPostings ?? []) {
+        if (!wantedTitle(p.title)) continue;
+        found.set(p.externalPath, p);
+        inFacet.add(p.externalPath);
+      }
       if ((res.jobPostings ?? []).length < 20) break;
       await sleep(400);
     }
   }
-  if (!reachable) return null;
+  // Keywords as well: the filter can miss roles (BP's London apprenticeships aren't under it).
+  const clearlyAbroad = (p: P) => (p.locationsText && !/locations?$/i.test(p.locationsText) ? !inUk(p.locationsText) : isOutsideUk(p.title, null) && !inUk(p.title));
+  for (const searchText of ["graduate", "intern", "placement", "trainee", "early careers", "apprentice", "2027"]) {
+    for (let offset = 0; offset < (uk ? 100 : 300); offset += 20) {
+      const res = await search({ appliedFacets: {}, offset, searchText });
+      if (!res) break;
+      for (const p of res.jobPostings ?? []) if (wantedTitle(p.title) && !clearlyAbroad(p)) found.set(p.externalPath, p);
+      if ((res.jobPostings ?? []).length < 20) break;
+      await sleep(400);
+    }
+  }
   const out: Listing[] = [];
   for (const p of found.values()) {
     type D = { jobPostingInfo?: { jobDescription?: string; location?: string; additionalLocations?: string[]; country?: { descriptor?: string }; timeType?: string; externalUrl?: string; startDate?: string; endDate?: string; jobReqId?: string } };
     const d = await json<D>(`${base}${p.externalPath}`);
     const info = d?.jobPostingInfo;
     const where = [info?.location, ...(info?.additionalLocations ?? []), info?.country?.descriptor, p.locationsText].filter(Boolean).join(" ");
-    if (!inUk(where)) continue;
+    if (!inFacet.has(p.externalPath) && !inUk(where)) continue;
     out.push(
       listing(feed, info?.jobReqId ?? p.externalPath, {
         title: p.title,
@@ -194,17 +234,32 @@ async function oracle(feed: Feed): Promise<Listing[] | null> {
   const [host, site] = feed.ats_id.split("/");
   const api = `https://${host}/hcmRestApi/resources/latest`;
   type R = { Id: string; Title: string; PrimaryLocation?: string; PostedDate?: string; ShortDescriptionStr?: string };
+  type Res = { items: { TotalJobsCount?: number; requisitionList?: R[]; locationsFacet?: { Id: number; Name: string }[] }[] };
+  const finder = (extra: string) => json<Res>(`${api}/recruitingCEJobRequisitions?onlyData=true&expand=requisitionList,locationsFacet&finder=findReqs;siteNumber=${site},${extra}`);
+  const first = await finder("facetsList=LOCATIONS,limit=1,offset=0");
+  if (!first) return null;
+  // Read every UK job and judge each by its title; keyword searches of the whole world miss them.
+  const ukId = first.items?.[0]?.locationsFacet?.find((l) => /^united kingdom$/i.test(l.Name.trim()))?.Id;
   const found = new Map<string, R>();
-  let reachable = false;
-  for (const keyword of ["graduate", "intern", "placement", "trainee", "early careers"]) {
-    const res = await json<{ items: { requisitionList?: R[] }[] }>(
-      `${api}/recruitingCEJobRequisitions?onlyData=true&expand=requisitionList&finder=findReqs;siteNumber=${site},keyword=${encodeURIComponent(keyword)},limit=100`,
-    );
-    if (!res) continue;
-    reachable = true;
-    for (const r of res.items?.[0]?.requisitionList ?? []) if (wantedTitle(r.Title) && inUk(r.PrimaryLocation)) found.set(r.Id, r);
+  if (ukId) {
+    for (let offset = 0; offset < 2000; offset += 25) {
+      const res = await finder(`selectedLocationsFacet=${ukId},lastSelectedFacet=LOCATIONS,limit=25,offset=${offset}`);
+      const page = res?.items?.[0]?.requisitionList ?? [];
+      for (const r of page) if (wantedTitle(r.Title)) found.set(r.Id, r);
+      if (page.length < 25) break;
+      await sleep(300);
+    }
+  } else {
+    for (const keyword of ["graduate", "intern", "placement", "trainee", "early careers", "apprentice"]) {
+      for (let offset = 0; offset < 300; offset += 25) {
+        const res = await finder(`keyword=${encodeURIComponent(keyword)},limit=25,offset=${offset}`);
+        const page = res?.items?.[0]?.requisitionList ?? [];
+        for (const r of page) if (wantedTitle(r.Title) && inUk(r.PrimaryLocation)) found.set(r.Id, r);
+        if (page.length < 25) break;
+        await sleep(300);
+      }
+    }
   }
-  if (!reachable) return null;
   const out: Listing[] = [];
   for (const r of found.values()) {
     const d = await json<{ items: { ExternalDescriptionStr?: string; ExternalQualificationsStr?: string; ExternalResponsibilitiesStr?: string }[] }>(
@@ -282,45 +337,133 @@ async function amazon(feed: Feed): Promise<Listing[] | null> {
   );
 }
 
+// What a morning's run shares between feeds: job ids already stored, pages to leave alone for now,
+// and (filled in by the sitemap reader) ids still listed and pages ruled out.
+export type FeedRun = {
+  known: Set<string>;
+  skip: Set<string>;
+  stillListed: Set<string>;
+  ruledOut: Map<string, string>;
+  // Employer job pages left to read this run, so one big site can't use up the whole morning.
+  pagesLeft: number;
+};
+export const newFeedRun = (known = new Set<string>(), skip = new Set<string>(), pagesLeft = 2500): FeedRun => ({ known, skip, stillListed: new Set(), ruledOut: new Map(), pagesLeft });
+
+const PAGES_PER_SITE = 100;
+const safeDecode = (u: string) => {
+  try {
+    return decodeURIComponent(u);
+  } catch {
+    return u;
+  }
+};
+// The readable part of a job page's address, without language folders ("/en-gb/", "/uk/en/").
+function urlWords(u: string): string {
+  let path = u;
+  try {
+    path = new URL(u).pathname;
+  } catch {
+    // keep what we were given
+  }
+  return safeDecode(safeDecode(path)).split("/").filter((seg) => seg && !/^[a-z]{2}([-_][a-z]{2})?$/i.test(seg)).join(" ").replace(/[-_+]+/g, " ");
+}
+// A title from the address when the page gives none: the longest part that isn't an id.
+function titleFromUrl(u: string): string {
+  const segs = safeDecode(safeDecode(u.split(/[?#]/)[0])).split("/").filter((seg) => seg && !/^\d+$/.test(seg) && !/^(job|jobs|details?|vacancy|vacancies|careers?|en|[a-z]{2}[-_][a-z]{2})$/i.test(seg));
+  const best = segs.slice(1).sort((x, y) => y.length - x.length)[0] ?? "";
+  return best.replace(/^\d+[-_]/, "").replace(/[-_]+/g, " ").replace(/\s+[A-Z]?\d{4,}.*$/, "").replace(/\b[a-z]/g, (c) => c.toUpperCase()).trim();
+}
+
+const NOT_JOBS = /image|video|news|blog|press|product|store|shop|categor|tag|author|article|event|insight|location|page-sitemap/i;
+const JOBS_FIRST = /job|vacanc|career|position|requisition|opening|posting/i;
+
+async function sitemapText(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, { headers: { "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(25_000) });
+    if (!res.ok) return null;
+    if (/\.gz(\?|$)/i.test(url)) return gunzipSync(Buffer.from(await res.arrayBuffer())).toString("utf8");
+    return await res.text();
+  } catch {
+    return null;
+  }
+}
+
 // A careers site without one of the systems above: its sitemap lists every job page, and each
-// page carries structured job data. Only pages whose address looks early-career are read.
-async function sitemap(feed: Feed, known: Set<string>): Promise<Listing[] | null> {
+// page carries structured job data. Pages whose address looks early-career are read, UK places
+// first; each page's own data then decides the title, the place and whether it's in the UK.
+async function sitemap(feed: Feed, run: FeedRun): Promise<Listing[] | null> {
   const urls: string[] = [];
   const queue = [feed.ats_id];
+  let missedPart = false;
   for (let i = 0; i < queue.length && i < 25; i++) {
-    let xml = "";
-    try {
-      const res = await fetch(queue[i], { headers: { "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(25_000) });
-      if (!res.ok) continue;
-      xml = await res.text();
-    } catch {
+    const xml = await sitemapText(queue[i]);
+    if (xml === null) {
+      if (i === 0) return null;
+      missedPart = true;
       continue;
     }
-    for (const m of xml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/g)) {
-      const u = m[1].replace(/&amp;/g, "&");
-      if (/sitemap[^/]*\.xml/i.test(u) && /job|vacanc|career|post/i.test(u)) queue.push(u);
-      else if (!/\.xml$/i.test(u)) urls.push(u);
+    for (const m of xml.matchAll(/<loc>\s*(?:<!\[CDATA\[)?\s*([^<\s\]]+)/g)) {
+      let u: string;
+      try {
+        u = new URL(m[1].replace(/&amp;/g, "&"), queue[i]).href;
+      } catch {
+        continue;
+      }
+      if (!/\.xml(\.gz)?(\?|$)/i.test(u) && !/\/sitemap[^/]*$/i.test(u)) urls.push(u);
+      else if (/\/[a-z]{2}_[A-Z]{2}\//.test(u) && !/\/en_[A-Z]{2}\//.test(u)) continue; // the same jobs in another language
+      else if (JOBS_FIRST.test(u.replace(/^https?:\/\/[^/]+/, ""))) queue.splice(i + 1, 0, u);
+      else if (!NOT_JOBS.test(u.replace(/^https?:\/\/[^/]+/, ""))) queue.push(u);
     }
   }
-  if (urls.length === 0 && queue.length === 1) return null;
-  const slugWanted = (u: string) => {
-    const slug = decodeURIComponent(u.split("?")[0]).replace(/[-_/]+/g, " ");
-    return /\/(job|jobs|vacanc|position|opportunit|role)/i.test(u) && wantedTitle(slug);
-  };
+  // Nothing listed at all is a failed read, not an employer with no jobs.
+  if (urls.length === 0) return null;
+
+  const idOf = (u: string) => `sitemap:${feed.ats_id}:${u}`;
+  for (const u of urls) if (run.known.has(idOf(u))) run.stillListed.add(idOf(u));
+  // Part of the sitemap couldn't be read: everything stored stays open today.
+  if (missedPart) for (const id of run.known) if (id.startsWith(`sitemap:${feed.ats_id}:`)) run.stillListed.add(id);
+
+  const JOB_PATH = /\/(job|vacanc|position|opportunit|role|career|opening|posting|requisition)/i;
+  const pathOf = (u: string) => u.replace(/^https?:\/\/[^/]+/, "");
+  // Listing and search pages on careers sites have early-career words too, but no one job.
+  const LISTING_PAGE = /\/(category|location|business|employment|search-jobs|search|our-stories|stories|blog|news|article|events?|talent-community|job-search)(\/|$)/i;
+  const looksWanted = (u: string) => JOB_PATH.test(u) && !LISTING_PAGE.test(pathOf(u)) && wantedTitle(urlWords(u));
+  const fresh = [...new Set(urls)].filter((u) => looksWanted(u) && !run.known.has(idOf(u)) && !run.skip.has(idOf(u)));
+  // Job pages naming a UK place first, then other job pages, then anything else on the site.
+  const order = (u: string) => (JOB_PATH.test(pathOf(u)) ? 0 : 2) + (inUk(urlWords(u)) ? 0 : 1);
+  const todo: string[] = [];
+  for (const u of fresh.sort((x, y) => order(x) - order(y))) {
+    if (!inUk(urlWords(u)) && isOutsideUk(urlWords(u), null)) run.ruledOut.set(idOf(u), "outside the UK");
+    else todo.push(u);
+  }
+
   const out: Listing[] = [];
-  for (const u of urls.filter(slugWanted).slice(0, 60)) {
-    if (known.has(`sitemap:${feed.ats_id}:${u}`)) continue;
+  for (const u of todo.slice(0, PAGES_PER_SITE)) {
+    if (run.pagesLeft <= 0) break;
+    run.pagesLeft--;
     const page = await readJobPage(u);
-    if (!page) continue;
-    const title = decodeURIComponent(u.split("?")[0].split("/").filter(Boolean).pop() ?? "").replace(/[-_]+/g, " ").replace(/\b[a-z]/g, (c) => c.toUpperCase());
-    const firstLine = page.description.split("\n").find((l) => /job title:/i.test(l))?.replace(/.*job title:\s*/i, "").trim();
-    const location = page.description.split("\n").find((l) => /^\s*location:/i.test(l))?.replace(/.*location:\s*/i, "").split(".")[0].trim() ?? null;
-    out.push(listing(feed, u, { title: firstLine || title.replace(/\s+[A-Z]?\d{4,}.*$/, ""), url: u, location, description: page.description, salaryMin: page.salaryMin, salaryMax: page.salaryMax, expiresAt: page.deadline, contractType: page.employmentType }));
+    if (!page) {
+      run.ruledOut.set(idOf(u), "no job data on page");
+      continue;
+    }
+    const words = urlWords(u);
+    const title = page.title ?? page.description.split("\n").find((l) => /job title:/i.test(l))?.replace(/.*job title:\s*/i, "").trim() ?? titleFromUrl(u);
+    const location = page.location ?? page.description.split("\n").find((l) => /^\s*location:/i.test(l))?.replace(/.*location:\s*/i, "").split(".")[0].trim() ?? null;
+    const uk = page.inUk ?? (location ? inUk(location) : inUk(words) || inUk(page.description.slice(0, 1500)));
+    if (!uk) {
+      run.ruledOut.set(idOf(u), "outside the UK");
+      continue;
+    }
+    if (!title || !wantedTitle(title)) {
+      run.ruledOut.set(idOf(u), "not early-career");
+      continue;
+    }
+    out.push(listing(feed, u, { title, url: u, location: location ?? (inUk(words) ? null : "United Kingdom"), description: page.description, salaryMin: page.salaryMin, salaryMax: page.salaryMax, expiresAt: page.deadline, contractType: page.employmentType }));
   }
   return out;
 }
 
-export async function readFeed(feed: Feed, known: Set<string>): Promise<Listing[] | null> {
+export async function readFeed(feed: Feed, run: FeedRun = newFeedRun()): Promise<Listing[] | null> {
   switch (feed.ats) {
     case "greenhouse": return greenhouse(feed);
     case "lever": return lever(feed);
@@ -331,7 +474,7 @@ export async function readFeed(feed: Feed, known: Set<string>): Promise<Listing[
     case "oracle": return oracle(feed);
     case "eightfold": return eightfold(feed);
     case "amazon": return amazon(feed);
-    case "sitemap": return sitemap(feed, known);
+    case "sitemap": return sitemap(feed, run);
     default: return null;
   }
 }
@@ -367,8 +510,9 @@ export function feedFromUrl(url: string): { ats: string; ats_id: string } | null
   }
   const wd = host.match(/^([a-z0-9-]+)\.(wd\d+)\.myworkdayjobs\.com$/);
   if (wd) {
-    const rest = parts[0] && /^[a-z]{2}-[A-Z]{2}$/.test(parts[0]) ? parts.slice(1) : parts;
-    const site = rest[0];
+    const rest = parts[0] && /^[a-z]{2}-[a-z]{2}$/i.test(parts[0]) ? parts.slice(1) : parts;
+    // A link copied from a page's source can end in stray characters ("Careers&quot;").
+    const site = rest[0]?.replace(/[^A-Za-z0-9_.-].*$/, "");
     return site && site !== "wday" ? { ats: "workday", ats_id: `${host}/${wd[1]}/${site}` } : null;
   }
   return null;
@@ -411,6 +555,25 @@ export async function probe(name: string): Promise<{ ats: string; ats_id: string
 
 // ---- an employer's own website: find the hiring system its careers pages link to ----
 
+// Which sitemap to read when robots.txt lists several: a careers site often has one per country
+// and language ("/ca/fr/", "/es/es/"), so UK English first, then global English, foreign last.
+export function pickSitemap(maps: string[], origin: string): string | null {
+  const score = (m: string) => {
+    const path = m.replace(/^https?:\/\/[^/]+/, "");
+    const place = /\/(gb|uk)\/en\b|\ben[-_]gb\b|\/uk\b|\/gb\b/i.test(path) ? 4 : /\/global\/en\b|\/en\/|\/en[-_]/i.test(path) ? 3 : /\/[a-z]{2}\/[a-z]{2}\/|\/[a-z]{2}[-_][a-z]{2}\/|\/[a-z]{2}\//i.test(path) ? 0 : 2;
+    return place * 2 + (JOBS_FIRST.test(path) ? 1 : 0);
+  };
+  const absolute: string[] = [];
+  for (const m of maps) {
+    try {
+      absolute.push(new URL(m, origin).href);
+    } catch {
+      // not a usable address
+    }
+  }
+  return absolute.sort((a, b) => score(b) - score(a))[0] ?? null;
+}
+
 const ATS_LINK = /https?:\/\/[^"'\s<>]*(myworkdayjobs\.com|greenhouse\.io|jobs\.lever\.co|jobs\.ashbyhq\.com|smartrecruiters\.com|apply\.workable\.com|oraclecloud\.com\/hcmUI|eightfold\.ai)[^"'\s<>]*/gi;
 
 async function page(url: string): Promise<{ html: string; finalUrl: string } | null> {
@@ -428,7 +591,7 @@ async function page(url: string): Promise<{ html: string; finalUrl: string } | n
 // own sitemap. Returns what it found (possibly nothing).
 export async function discoverFromWebsite(domain: string): Promise<{ ats: string; ats_id: string }[]> {
   const bare = domain.replace(/^www\./, "");
-  const starts = [`https://careers.${bare}`, `https://jobs.${bare}`, `https://www.${bare}/careers`, `https://www.${bare}/en/careers`, `https://${bare}`];
+  const starts = [`https://careers.${bare}`, `https://jobs.${bare}`, `https://search.jobs.${bare}`, `https://www.${bare}/careers`, `https://www.${bare}/en-gb/careers`, `https://www.${bare}/en/careers`, `https://${bare}`];
   const seen = new Set<string>();
   const hits = new Map<string, { ats: string; ats_id: string }>();
   const careerHosts = new Set<string>();
@@ -464,7 +627,7 @@ export async function discoverFromWebsite(domain: string): Promise<{ ats: string
       const res = await fetch(`${origin}/robots.txt`, { headers: { "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(8000) });
       const text = res.ok ? await res.text() : "";
       const maps = [...text.matchAll(/^\s*sitemap:\s*(\S+)/gim)].map((m) => m[1]);
-      const pick = maps.find((m) => /job|vacanc|career|position/i.test(m)) ?? maps[0];
+      const pick = pickSitemap(maps.length ? maps : ["/sitemap.xml"], origin);
       if (pick) return [{ ats: "sitemap", ats_id: pick }];
     } catch {
       // try the next one

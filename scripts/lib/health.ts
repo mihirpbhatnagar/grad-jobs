@@ -68,7 +68,7 @@ export async function healthCheck(db: SupabaseClient) {
     const reason = roles
       ? ""
       : f.some((x) => x.ats !== "none" && x.last_status === "ok")
-        ? "careers site read: no open 2027 UK roles found"
+        ? "careers site checked, no open 2027 UK roles found there"
         : f.some((x) => x.ats !== "none")
           ? "careers site found but couldn't be read"
           : "careers system not found yet";
