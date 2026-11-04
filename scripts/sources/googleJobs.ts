@@ -54,6 +54,16 @@ export const SWEEP_QUERIES_2 = [
   ...["marketing", "finance", "events", "sports", "data", "HR", "sales", "media"].map((w) => `${w} internship`),
 ];
 
+// A third sweep: 2027 intakes first, then the fields on the profile page, then the main cities.
+export const SWEEP_QUERIES_3 = [
+  "graduate scheme 2027", "graduate programme 2027", "2027 graduate intake", "september 2027 graduate", "graduate jobs", "graduate trainee", "management trainee graduate", "graduate rotational programme",
+  "sports business graduate", "sports marketing graduate", "sports partnerships graduate", "graduate marketing 2027", "brand graduate scheme", "graduate sales 2027", "business development graduate",
+  "graduate consulting 2027", "graduate finance 2027", "graduate accounting 2027", "investment banking graduate 2027", "graduate operations 2027", "supply chain graduate scheme",
+  "graduate project management 2027", "HR graduate scheme", "graduate data analyst 2027", "graduate technology 2027", "communications graduate scheme", "media graduate scheme", "PR graduate",
+  "events graduate", "hospitality graduate scheme", "retail graduate scheme", "FMCG graduate scheme", "public sector graduate scheme", "civil service graduate",
+  "graduate scheme London", "graduate scheme Manchester", "graduate scheme Birmingham", "graduate scheme Edinburgh", "graduate scheme Leeds", "graduate scheme Bristol",
+];
+
 type Task = { id: string; status_code: number; status_message: string; cost: number };
 type JobItem = {
   type: string;
