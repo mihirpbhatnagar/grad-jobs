@@ -23,7 +23,6 @@ const SEARCHES: Record<string, string>[] = [
   { keywords: "management trainee" },
   { keywords: "training contract" },
   { keywords: "early careers" },
-  { keywords: "degree apprenticeship" },
   // Internships and short work experience (their own section, not the main list).
   { keywords: "internship" },
   { keywords: "work experience" },

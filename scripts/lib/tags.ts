@@ -134,12 +134,20 @@ function findLengthMonths(text: string): number | null {
 // Scope rule: does this listing read as a graduate / early-career role at all? Reed's own
 // graduate flag also returns senior roles, so every listing passes through this first.
 const SENIOR_TITLE = /\b(senior|snr|sr|principal|head of|director|vp|chief|partner)\b|\b(team|tech|technical|project|engineering|design|mechanical|electrical|site|shift)\s+lead\b/i;
-const EARLY_TITLE = /\b(graduate|grad|trainee|junior|entry[- ]level|early careers?|apprentice|intern|internship|placement|assistant|associate|analyst|coordinator|executive|administrator|advisor|adviser)\b/i;
+const EARLY_TITLE = /\b(graduate|grad|trainee|junior|entry[- ]level|early careers?|intern|internship|assistant|associate|analyst|coordinator|executive|administrator|advisor|adviser)\b/i;
 const EARLY_TEXT = /\b(graduates?|grad (scheme|programme)|entry[- ]level|trainee|recent(ly)? graduated?|final[- ]year (students?|undergraduates?)|no (prior |previous )?experience (is )?(required|needed|necessary)|full training (is )?(given|provided)|early careers?|first (step|role) in your career|class of 2027|2027 (start|intake|cohort|graduates?))\b/i;
 const GRAD_IN_TITLE = /\b(graduate|grad|trainee|junior|entry[- ]level|early careers?|intern|internship|work experience)\b/i;
 
 // Titles that are early-career by definition even if the wording never says "graduate".
-const EARLY_ONLY_TITLE = /\b(apprentice|apprenticeship|placements?|summer analysts?|summer associates?|off[- ]cycle|spring week|spring insight|insight (day|week|programme|program)|year in industry|industrial placement|vacation scheme|training contract|early talent|early professionals?|emerging talent|(analyst|associate|leadership|rotational) program(me)?|20(27|28)\s+(analyst|associate)|(analyst|associate)\D{0,20}20(27|28))\b/i;
+const EARLY_ONLY_TITLE = /\b(summer analysts?|summer associates?|off[- ]cycle|spring week|spring insight|insight (day|week|programme|program)|vacation scheme|training contract|early talent|early professionals?|emerging talent|(analyst|associate|leadership|rotational) program(me)?|20(27|28)\s+(analyst|associate)|(analyst|associate)\D{0,20}20(27|28))\b/i;
+
+// Our users' rule: no placements or apprenticeships anywhere on the platform, whatever the start
+// date (they've already done their placement). A job about them ("Placement Officer") is different.
+const PLACEMENT_TITLE = /\b(apprentices?|apprenticeships?|placements?|year in industry|industrial year|sandwich year)\b/i;
+const ABOUT_PLACEMENTS = /\b(apprenticeships?|placements?)\s+(coordinator|co-ordinator|officer|consultant|recruiter|advisor|adviser|tutor|assessor|trainer|coach|lecturer|manager|administrator|lead|support)\b/i;
+export function isPlacementOrApprenticeship(title: string): boolean {
+  return PLACEMENT_TITLE.test(title) && !ABOUT_PLACEMENTS.test(title);
+}
 
 export function isSeniorTitle(title: string): boolean {
   // "Manager" / "Lead" on their own are experienced roles ("Marketing Lead", "Sales Manager");
@@ -188,12 +196,13 @@ export function employerFromTitle(title: string): string | null {
 }
 
 export function isEarlyCareer(title: string, description: string): boolean {
-  if (isSeniorTitle(title)) return false;
+  if (isSeniorTitle(title) || isPlacementOrApprenticeship(title)) return false;
   if (GRAD_IN_TITLE.test(title) || EARLY_ONLY_TITLE.test(title)) return true;
   return EARLY_TEXT.test(`${title}\n${description}`) && (EARLY_TITLE.test(title) || /\bgraduates?\b/i.test(description));
 }
 
-// Internships, placements and apprenticeships are stored but kept out of the main list.
+// Internships are stored but kept out of the main list (placements and apprenticeships aren't
+// stored at all; the matches below are a backstop for older rows).
 export function roleKind(title: string): "job" | "internship" | "apprenticeship" {
   if (/\b(intern|interns|internship|internships|placement|work experience|work placement|vacation scheme|insight (day|week|programme)|spring week|summer analyst)\b/i.test(title)) return "internship";
   if (/\bapprentice(ship)?\b/i.test(title)) return "apprenticeship";

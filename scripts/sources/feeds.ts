@@ -1,7 +1,7 @@
 import { gunzipSync } from "node:zlib";
 import { USER_AGENT, readJobPage } from "../lib/employerPages.ts";
 import { htmlToText, prettyLocation } from "../lib/normalise.ts";
-import { isOutsideUk } from "../lib/tags.ts";
+import { isOutsideUk, isPlacementOrApprenticeship } from "../lib/tags.ts";
 import type { Listing } from "./types.ts";
 
 // Employers' own hiring systems, read through their public job-board feeds (the same data
@@ -10,13 +10,13 @@ import type { Listing } from "./types.ts";
 
 export type Feed = { ats: string; ats_id: string; name: string };
 
-const EARLY = /\b(graduate|grad|graduates|trainee|entry[- ]level|early careers?|early talent|early professional|emerging talent|intern|interns|internship|placement|industrial placement|summer analyst|summer associate|off[- ]cycle|spring week|spring insight|insight|apprentice|apprenticeship|junior|new grad|campus|futures?|undergraduate|year in industry|vacation scheme|training contract|(analyst|associate|leadership|development|rotational|management) program(me)?)\b/i;
+const EARLY = /\b(graduate|grad|graduates|trainee|entry[- ]level|early careers?|early talent|early professional|emerging talent|intern|interns|internship|summer analyst|summer associate|off[- ]cycle|spring week|spring insight|insight|junior|new grad|campus|futures?|undergraduate|vacation scheme|training contract|(analyst|associate|leadership|development|rotational|management) program(me)?)\b/i;
 const SENIOR = /\b(senior|snr|sr\.?|principal|head of|director|vp|vice president|chief|lead|manager|partner|staff|experienced)\b/i;
 const UK = /\b(uk|u\.k\.|united kingdom|great britain|england|scotland|wales|northern ireland|surrey|kent|essex|sussex|hampshire|berkshire|hertfordshire|buckinghamshire|oxfordshire|cambridgeshire|bedfordshire|leicestershire|nottinghamshire|derbyshire|staffordshire|warwickshire|west midlands|east midlands|yorkshire|lancashire|cheshire|cumbria|merseyside|tyne and wear|county durham|somerset|devon|cornwall|dorset|wiltshire|gloucestershire|worcestershire|shropshire|norfolk|suffolk|lincolnshire|bedford|stoke|sunderland|middlesbrough|darlington|carlisle|bolton|stockport|solihull|harlow|chelmsford|colchester|maidstone|canterbury|woking|staines|harrogate|huddersfield|bradford|wakefield|doncaster|london|manchester|birmingham|leeds|glasgow|edinburgh|bristol|cardiff|belfast|liverpool|newcastle|sheffield|nottingham|leicester|cambridge|oxford|reading|milton keynes|southampton|aberdeen|coventry|derby|warrington|york|brighton|guildford|farnborough|bath|exeter|plymouth|norwich|ipswich|swindon|slough|stevenage|crawley|chester|preston|lancaster|loughborough|cheltenham|gloucester|barrow|warton|portsmouth|basingstoke|bracknell|uxbridge|watford|hatfield|luton|peterborough|northampton|telford|wolverhampton|hull|dundee|inverness|swansea|newport|remote - uk|gb)\b/i;
 
 // "2027" counts unless it's part of a date ("FTC until 01/06/2027").
 const YEAR_2027 = /(?<![\d/.-])2027\b/;
-export const wantedTitle = (title: string) => (EARLY.test(title) || YEAR_2027.test(title)) && !(SENIOR.test(title) && !/\b(graduate|grad|intern|trainee|placement|apprentice)\b/i.test(title));
+export const wantedTitle = (title: string) => !isPlacementOrApprenticeship(title) && (EARLY.test(title) || YEAR_2027.test(title)) && !(SENIOR.test(title) && !/\b(graduate|grad|intern|trainee)\b/i.test(title));
 // "New York" contains "York": anything that reads as abroad is not the UK.
 export const inUk = (location: string | null | undefined) => !!location && UK.test(location) && !isOutsideUk("", location);
 
@@ -195,9 +195,9 @@ async function workday(feed: Feed): Promise<Listing[] | null> {
       await sleep(400);
     }
   }
-  // Keywords as well: the filter can miss roles (BP's London apprenticeships aren't under it).
+  // Keywords as well: the filter can miss roles (some of BP's London roles aren't under it).
   const clearlyAbroad = (p: P) => (p.locationsText && !/locations?$/i.test(p.locationsText) ? !inUk(p.locationsText) : isOutsideUk(p.title, null) && !inUk(p.title));
-  for (const searchText of ["graduate", "intern", "placement", "trainee", "early careers", "apprentice", "2027"]) {
+  for (const searchText of ["graduate", "intern", "trainee", "early careers", "2027"]) {
     for (let offset = 0; offset < (uk ? 100 : 300); offset += 20) {
       const res = await search({ appliedFacets: {}, offset, searchText });
       if (!res) break;
@@ -250,7 +250,7 @@ async function oracle(feed: Feed): Promise<Listing[] | null> {
       await sleep(300);
     }
   } else {
-    for (const keyword of ["graduate", "intern", "placement", "trainee", "early careers", "apprentice"]) {
+    for (const keyword of ["graduate", "intern", "trainee", "early careers"]) {
       for (let offset = 0; offset < 300; offset += 25) {
         const res = await finder(`keyword=${encodeURIComponent(keyword)},limit=25,offset=${offset}`);
         const page = res?.items?.[0]?.requisitionList ?? [];
@@ -286,7 +286,7 @@ async function eightfold(feed: Feed): Promise<Listing[] | null> {
   type P = { id: number; name: string; location?: string; locations?: string[]; t_create?: number; canonicalPositionUrl?: string; job_description?: string };
   const found = new Map<number, P>();
   let reachable = false;
-  for (const query of ["graduate", "intern", "placement", "trainee", "early careers"]) {
+  for (const query of ["graduate", "intern", "trainee", "early careers"]) {
     const res = await json<{ positions: P[] }>(`https://${host}/api/apply/v2/jobs?domain=${domain}&query=${encodeURIComponent(query)}&location=United%20Kingdom&start=0&num=50`);
     if (!res) continue;
     reachable = true;
@@ -315,7 +315,7 @@ async function amazon(feed: Feed): Promise<Listing[] | null> {
   type J = { id_icims: string; title: string; country_code: string; city?: string; location?: string; job_path: string; description?: string; basic_qualifications?: string; preferred_qualifications?: string; posted_date?: string; job_schedule_type?: string };
   const found = new Map<string, J>();
   let reachable = false;
-  for (const q of ["graduate", "intern", "placement", "early careers", "2027"]) {
+  for (const q of ["graduate", "intern", "early careers", "2027"]) {
     for (let offset = 0; offset < 200; offset += 100) {
       const res = await json<{ hits: number; jobs: J[] }>(`https://www.amazon.jobs/en/search.json?base_query=${encodeURIComponent(q)}&country=GBR&result_limit=100&offset=${offset}`);
       if (!res) break;

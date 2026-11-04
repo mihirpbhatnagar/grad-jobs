@@ -15,7 +15,7 @@ import { isEmployerPage, readJobPage, USER_AGENT } from "./lib/employerPages.ts"
 import { discoverFromWebsite, feedFromUrl, newFeedRun, pickSitemap, probe, readFeed } from "./sources/feeds.ts";
 import { companyKey, dedupeKey, prettyLocation } from "./lib/normalise.ts";
 import { refreshSponsors, sponsorMatcher, type SponsorMatch } from "./lib/sponsors.ts";
-import { countryOf, employerFromTitle, findSalary, isBoardName, isEarlyCareer, isGraduateTitle, isSeniorTitle, roleKind, startStatus, tagListing, type RoleTags } from "./lib/tags.ts";
+import { countryOf, employerFromTitle, findSalary, isBoardName, isEarlyCareer, isGraduateTitle, isPlacementOrApprenticeship, isSeniorTitle, roleKind, startStatus, tagListing, type RoleTags } from "./lib/tags.ts";
 import { GOOGLE_JOBS_QUERIES, recoverGoogleJobs, searchGoogleJobs, SWEEP_QUERIES, SWEEP_QUERIES_2 } from "./sources/googleJobs.ts";
 import { reedDetails, searchReed, toListing } from "./sources/reed.ts";
 import type { Listing } from "./sources/types.ts";
@@ -222,7 +222,12 @@ async function saveCrossCheck(source: string, all: Listing[], match: Matcher, by
   const withText = new Map<number, Listing>();
   const newTowns = new Map<number, Set<string>>();
   const rolesById = new Map(roles.map((r) => [r.id, r]));
+  const notWanted: Listing[] = [];
   for (const l of listings) {
+    if (isPlacementOrApprenticeship(l.title)) {
+      notWanted.push(l);
+      continue;
+    }
     const roleId = findRole(l.employer, l.title);
     if (roleId) {
       links.push({ source: l.source, source_id: l.sourceId, role_id: roleId, url: l.sourceUrl, last_seen: now });
@@ -267,6 +272,7 @@ async function saveCrossCheck(source: string, all: Listing[], match: Matcher, by
   }
 
   await saveExcluded(senior, "senior title");
+  await saveExcluded(notWanted, "placement or apprenticeship");
   const saved = await saveListings(unmatched, match, byKey);
   return { found: listings.length, matchedExisting: links.length, described, newRoles: saved.newRoles, excluded: senior.length };
 }
@@ -340,7 +346,7 @@ async function retag(match: Matcher) {
     db.from("roles").select("id,title,employer,location,locations,description,tags,sponsor_status,sponsor_name,kind,start_status,company_key,quality,salary_min,salary_max,expires_at").eq("is_open", true).order("id").range(from, to),
   );
 
-  const outOfScope = roles.filter((r) => (r.description ? !isEarlyCareer(r.title, r.description) : isSeniorTitle(r.title)));
+  const outOfScope = roles.filter((r) => isPlacementOrApprenticeship(r.title) || (r.description ? !isEarlyCareer(r.title, r.description) : isSeniorTitle(r.title)));
   const removeIds = outOfScope.map((r) => r.id);
   for (const batch of chunks(removeIds, 200)) {
     const links = await must(() => db.from("role_sources").select("source,source_id").in("role_id", batch));
