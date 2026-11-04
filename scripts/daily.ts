@@ -20,6 +20,17 @@ import { GOOGLE_JOBS_QUERIES, recoverGoogleJobs, searchGoogleJobs, SWEEP_QUERIES
 import { reedDetails, searchReed, toListing } from "./sources/reed.ts";
 import type { Listing } from "./sources/types.ts";
 
+// A Node networking bug can throw outside any request when a website drops its connection mid-read
+// (the request itself then times out). One bad website must not end the whole run.
+process.on("uncaughtException", (err) => {
+  if (String(err?.stack).includes("undici")) {
+    console.warn(`  Ignored a dropped website connection: ${String(err?.message).slice(0, 120)}`);
+    return;
+  }
+  console.error(err);
+  process.exit(1);
+});
+
 loadEnv();
 const db = adminClient();
 // Re-check stored roles only: no source searches (so no API calls or Google Jobs cost).
