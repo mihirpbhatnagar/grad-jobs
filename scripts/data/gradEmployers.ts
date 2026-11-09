@@ -64,8 +64,12 @@ export const KNOWN_FEEDS: { name: string; ats: string; ats_id: string }[] = [
   { name: "NatWest Group", ats: "workday", ats_id: "rbs.wd3.myworkdayjobs.com/rbs/RBS" },
   { name: "Procter & Gamble", ats: "workday", ats_id: "pg.wd5.myworkdayjobs.com/pg/1000" },
   { name: "Lloyds Banking Group", ats: "workday", ats_id: "lbg.wd3.myworkdayjobs.com/lbg/lbg_Careers" },
-  // Sports agency hiring 2027 early-careers analysts; its Workable name didn't match "Two Circles" (9 Nov 2026).
+  // Sports agency with an early-careers programme (2027 round closed); the automatic search missed it (9 Nov 2026).
   { name: "Two Circles", ats: "workable", ats_id: "twocircles" },
+  // Sports and drinks employers with 2027 graduate schemes the automatic search missed (checked 9 Nov 2026).
+  { name: "adidas", ats: "sitemap", ats_id: "https://jobs.adidas-group.com/sitemap.xml" },
+  { name: "Carlsberg Britvic", ats: "sitemap", ats_id: "https://careers.carlsberg.com/sitemap.xml" },
+  { name: "Better", ats: "sitemap", ats_id: "https://jobs.better.org.uk/sitemap.xml" },
   // Careers-site sitemaps, tried one by one on 4 Nov 2026 (the automatic search had missed these,
   // or had picked another company's or another country's site).
   { name: "Softwire", ats: "sitemap", ats_id: "https://www.softwire.com/sitemap.xml" },
