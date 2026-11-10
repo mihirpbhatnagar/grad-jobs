@@ -138,7 +138,9 @@ export function findSalary(text: string): { min: number; max: number } | null {
     const aboutPay = /\b(salary|salaries|pay|per annum|p\.?a\.?|a year|per year|annual|starting|package|base|basic|doe|up to|circa|negotiable|£\d{2}k)\b/i.test(line);
     const bareRange = /£\s?\d{2,3}(?:,\d{3}|k)\s*(?:-|–|—|to)\s*£\s?\d{2,3}(?:,\d{3}|k)/i.test(line);
     // (a bare range about earnings in later years or commission isn't the starting salary)
-    if (!aboutPay && !(bareRange && !/\b(earn|earning|earnings|potential|ote|commission|year (one|two|three|\d)|revenue|turnover|funding|budget)\b/i.test(line))) continue;
+    // A scheme page that shows the figure on a line of its own ("£32,000", then "plus a £2,000 welcome bonus").
+    const alone = /^\s*£\s?\d{2,3},\d{3}\s*$/.test(line);
+    if (!aboutPay && !alone && !(bareRange && !/\b(earn|earning|earnings|potential|ote|commission|year (one|two|three|\d)|revenue|turnover|funding|budget)\b/i.test(line))) continue;
     const amounts: number[] = [];
     for (const m of line.matchAll(/£\s?(\d{1,3}(?:,\d{3})+|\d{2,3}(?:\.\d)?)\s?(k|K)?\b(?!\s*(?:[\w-]+\s+){0,2}(bonus|allowance|relocation|sign[- ]?on|golden hello|signing|ote)\b)/g)) {
       // (an amount is left out only when it is itself the bonus or the on-target figure: "£33,000 and
