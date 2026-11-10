@@ -23,7 +23,7 @@ type RoleForVisa = {
   salary_min: number | null;
   salary_max: number | null;
   sponsor_status: "likely" | "unclear" | "not_listed" | null;
-  tags: { lengthMonths: number | null; startDate?: string | null };
+  tags: { lengthMonths: number | null; startDate?: string | null; startText?: string | null };
 };
 
 // Month arithmetic that stays inside the month: 31 October + 18 months is 30 April, not 1 May.
@@ -40,9 +40,20 @@ export function addMonths(iso: string, months: number): Date {
 // For the flag on role cards: the listing states a length, and the role would still be running
 // when the Graduate visa ends. Such roles are flagged, never hidden. (Starting before the visa
 // does is fine; only the end date matters.)
-export function runsPastVisa(role: { tags: { lengthMonths: number | null; startDate?: string | null } }, s: VisaSettings): boolean {
+export function runsPastVisa(role: { tags: StartTags & { lengthMonths: number | null } }, s: VisaSettings): boolean {
   if (!role.tags.lengthMonths) return false;
-  return addMonths(role.tags.startDate ?? s.approvalDate, role.tags.lengthMonths) > addMonths(s.approvalDate, s.graduateMonths);
+  return addMonths(schemeStart(role.tags, s), role.tags.lengthMonths) > addMonths(s.approvalDate, s.graduateMonths);
+}
+
+// When the role starts, for working out when it ends. A listing that names only the year
+// ("2027 Graduate Programme") is stored as 1 January of that year; graduate intakes start in the
+// autumn, so September is used, as it is when no start is stated at all. Assuming January made
+// two-year schemes look as if they ended before the visa does.
+type StartTags = { startDate?: string | null; startText?: string | null };
+export function schemeStart(tags: StartTags, s: VisaSettings): string {
+  const yearOnly = /^\d{4}$/.test(tags.startText ?? "") || (!!tags.startDate && !tags.startText);
+  if (tags.startDate && !yearOnly) return tags.startDate;
+  return `${tags.startDate ? tags.startDate.slice(0, 4) : s.approvalDate.slice(0, 4)}-09-01`;
 }
 export const visaEndsLabel = (s: VisaSettings) =>
   addMonths(s.approvalDate, s.graduateMonths).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
@@ -50,7 +61,7 @@ export const visaEndsLabel = (s: VisaSettings) =>
 export function visaFit(role: RoleForVisa, s: VisaSettings): VisaFit {
   const visaEnds = addMonths(s.approvalDate, s.graduateMonths);
   const visaEndLabel = visaEnds.toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
-  const start = role.tags.startDate ?? s.approvalDate;
+  const start = schemeStart(role.tags, s);
   const fixedTerm = /contract|temp|fixed/i.test(role.contract_type ?? "");
 
   // A fixed-length scheme or contract that ends before the Graduate visa does.
