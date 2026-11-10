@@ -46,6 +46,16 @@ const NO_SPONSORSHIP = [
   /\bsponsorship\s+(is\s+)?(not|unavailable)\b/i,
   /\bwithout\s+(the\s+need\s+for\s+)?(visa\s+)?sponsorship\b/i,
   /\bdoes\s+not\s+offer\s+(visa\s+)?sponsorship\b/i,
+  // Wording that rules out a time-limited visa without using the word "no": Nestlé's "right to
+  // work in the UK that is not time limited and does not require sponsorship", "permanent right
+  // to work", "Graduate Route visa holders are not eligible".
+  /\bright to work\b[^.]{0,80}\b(not|isn['’]?t|without( being)?)\s+time[- ]limited\b/i,
+  /\b(permanent|indefinite|unrestricted|unlimited)\s+right to work\b/i,
+  /\bright to work\b[^.]{0,60}\b(permanently|indefinitely|on a permanent basis|without (any )?(time )?(limit|restriction)s?)\b/i,
+  /\b(does|do|that does|which does)\s+not\s+require\s+(visa\s+|skilled worker\s+)?sponsorship\b/i,
+  // (no brackets or colons in between: "Graduate visa (X) NOT eligible: Student visa" is a list where the Graduate visa is fine)
+  /\b(graduate (route|visa)|post[- ]study work|psw)( visa)?( holders?)?\b[^.:;()]{0,60}\b(not (be )?(eligible|accepted|considered)|cannot be (accepted|considered)|ineligible)\b/i,
+  /\b(do not|don['’]t|cannot|can['’]t|unable to)\s+(accept|consider)\b[^.]{0,60}\b(graduate (route|visa)|post[- ]study work|psw|student visa)/i,
 ];
 const OFFERS_SPONSORSHIP = [
   /\b(visa|work permit|relocation)\s+(support|assistance|package|sponsorship)\s+(is\s+)?(available|provided|offered|included)\b/i,

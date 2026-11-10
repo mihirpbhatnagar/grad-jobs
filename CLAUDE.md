@@ -11,7 +11,7 @@ This file is the project brief. Read it at the start of every session and follow
 
 ## What the platform is
 A private web app (installable on phone as a PWA) that finds UK graduate roles starting in 2027, for Mihir, his girlfriend (main users) and a few friends (max ~6-7 users).
-- All users hold foreign (e.g. Indian) passports. Assume every user is on the 18-month Graduate route visa from summer 2027. Do NOT ask users visa questions.
+- All users hold foreign (e.g. Indian) passports. Assume every user is on the 18-month Graduate route visa. Mihir's runs from 31 October 2027 to 30 April 2029 (Mihir, 10 Nov 2026): that is the period he needs no sponsorship. Do NOT ask users visa questions.
 - Goal: catch 95%+ of publicly advertised UK graduate roles, proven by a daily coverage score.
 
 ## Cost rule (important)
@@ -50,7 +50,8 @@ Source-first principle: almost every graduate role is first posted on the employ
 - Sponsor status is INFORMATION, not a filter. On the Graduate visa any employer can hire without sponsorship.
 - Sponsor match: employer name + town vs the register -> Likely / Unclear / Not listed.
 - Salary rules (GOV.UK, check before building): standard GBP 41,700 or the going rate; new entrant (under 26 / Student or Graduate visa) at least GBP 33,400 and 70% of going rate; new-entrant rates capped at 4 years total stay including Graduate visa time. Role must be degree level (RQF 6).
-- Graduate route: 18 months for applications from 1 Jan 2027, counted from approval (assume approval summer 2027).
+- Graduate route: 18 months for applications from 1 Jan 2027, counted from approval (assumed 31 October 2027, stored in the `visa.assumed_approval_date` setting).
+- Roles whose wording rules out a time-limited visa (e.g. "right to work that is not time limited", "permanent right to work") are never removed: they stay visible with the "Says no sponsorship" flag (Mihir, 10 Nov 2026).
 - Visa fit line per role: Fits easily (scheme ends before visa) / Switch possible (longer scheme, licensed sponsor, salary meets new-entrant rules) / Ask early (longer scheme, unclear or not listed). Never hide long schemes by default.
 
 ## Platform sections

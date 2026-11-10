@@ -26,9 +26,14 @@ type RoleForVisa = {
   tags: { lengthMonths: number | null; startDate?: string | null };
 };
 
-function addMonths(iso: string, months: number): Date {
+// Month arithmetic that stays inside the month: 31 October + 18 months is 30 April, not 1 May.
+export function addMonths(iso: string, months: number): Date {
   const d = new Date(iso);
-  d.setMonth(d.getMonth() + months);
+  const day = d.getUTCDate();
+  d.setUTCDate(1);
+  d.setUTCMonth(d.getUTCMonth() + months);
+  const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  d.setUTCDate(Math.min(day, lastDay));
   return d;
 }
 
