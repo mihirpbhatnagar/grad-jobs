@@ -37,9 +37,19 @@ export function addMonths(iso: string, months: number): Date {
   return d;
 }
 
+// For the flag on role cards: the listing states a length, and the role would still be running
+// when the Graduate visa ends. Such roles are flagged, never hidden. (Starting before the visa
+// does is fine; only the end date matters.)
+export function runsPastVisa(role: { tags: { lengthMonths: number | null; startDate?: string | null } }, s: VisaSettings): boolean {
+  if (!role.tags.lengthMonths) return false;
+  return addMonths(role.tags.startDate ?? s.approvalDate, role.tags.lengthMonths) > addMonths(s.approvalDate, s.graduateMonths);
+}
+export const visaEndsLabel = (s: VisaSettings) =>
+  addMonths(s.approvalDate, s.graduateMonths).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
+
 export function visaFit(role: RoleForVisa, s: VisaSettings): VisaFit {
   const visaEnds = addMonths(s.approvalDate, s.graduateMonths);
-  const visaEndLabel = visaEnds.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+  const visaEndLabel = visaEnds.toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
   const start = role.tags.startDate ?? s.approvalDate;
   const fixedTerm = /contract|temp|fixed/i.test(role.contract_type ?? "");
 

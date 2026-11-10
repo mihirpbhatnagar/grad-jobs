@@ -3,6 +3,7 @@ import { CompanyLogo } from "@/components/CompanyLogo";
 import { SaveButton } from "@/components/SaveButton";
 import type { Company } from "@/lib/companies";
 import type { Role } from "@/lib/roles";
+import { runsPastVisa, visaEndsLabel, type VisaSettings } from "@/lib/visa";
 import { dateShort, daysUntil, employerLabel, isBoardName, isCompetitive, placeName, postedAgo, salaryShort, startLabel } from "@/lib/format";
 
 export function Chip({ children, tone = "plain", title }: { children: React.ReactNode; tone?: "plain" | "accent" | "success" | "amber" | "rose"; title?: string }) {
@@ -34,12 +35,15 @@ export function RoleCard({
   saved = false,
   signedIn = false,
   matchTags,
+  visa,
 }: {
   role: Role;
   company?: Company | null;
   saved?: boolean;
   signedIn?: boolean;
   matchTags?: string[];
+  // The viewer's Graduate visa dates, for the "Runs past your visa" flag.
+  visa?: VisaSettings | null;
 }) {
   // A job board isn't the employer, so its company facts and logo aren't shown.
   const company = isBoardName(role.employer) ? null : companyInfo;
@@ -121,6 +125,11 @@ export function RoleCard({
         {(t.graduateScheme || t.programmeTitle) && <Chip>Graduate scheme</Chip>}
         {t.degree && <Chip>{t.degree}+</Chip>}
         {t.lengthMonths && <Chip>{t.lengthMonths} months</Chip>}
+        {visa && runsPastVisa(role, visa) && (
+          <Chip tone="amber" title={`This role would still be running when your Graduate visa ends (${visaEndsLabel(visa)}). Ask about sponsorship early.`}>
+            Runs past your visa
+          </Chip>
+        )}
         {t.drivingLicence && <Chip>Driving licence</Chip>}
         {t.sponsorship === "not_offered" && <Chip tone="rose">Says no sponsorship</Chip>}
       </div>

@@ -7,6 +7,7 @@ import { currentUser } from "@/lib/auth";
 import { withDefaults } from "@/lib/profile";
 import { activeFilterCount, fetchRoles, filtersToQuery, PAGE_SIZE, parseFilters, type RoleFilters, type RoleScope } from "@/lib/roles";
 import { publicClient } from "@/lib/supabase";
+import { visaSettings } from "@/lib/visa";
 
 function updatedLabel(iso: string | undefined): string {
   if (!iso) return "";
@@ -71,7 +72,7 @@ export async function RoleListing({
       fieldsDefault = true;
     }
   }
-  const [result, stats] = await Promise.all([fetchRoles(f, scope), scope === "main" ? mainStats() : null]);
+  const [result, stats, visa] = await Promise.all([fetchRoles(f, scope), scope === "main" ? mainStats() : null, visaSettings()]);
   const savedIds = new Set<number>();
   if (user && result?.roles.length) {
     const { data } = await db.from("saved_roles").select("role_id").in("role_id", result.roles.map((r) => r.id));
@@ -144,6 +145,7 @@ export async function RoleListing({
             company={role.company_key ? result.companies.get(role.company_key) : null}
             saved={savedIds.has(role.id)}
             signedIn={!!user}
+            visa={visa}
           />
         ))}
         {result && result.roles.length === 0 && (

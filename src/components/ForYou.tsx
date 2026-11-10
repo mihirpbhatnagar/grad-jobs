@@ -7,6 +7,7 @@ import { rankForYou } from "@/lib/matching";
 import { withDefaults } from "@/lib/profile";
 import { ROLE_COLUMNS, type Role } from "@/lib/roles";
 import { publicClient } from "@/lib/supabase";
+import { visaSettings } from "@/lib/visa";
 
 const SHOW = 30;
 
@@ -45,6 +46,7 @@ export async function ForYou() {
 
   const shown = matches.slice(0, SHOW);
   const companies = await companiesFor(shown.map((m) => m.role.company_key));
+  const visa = await visaSettings();
   const { data: saved } = await db.from("saved_roles").select("role_id");
   const savedIds = new Set((saved ?? []).map((s) => s.role_id));
 
@@ -65,6 +67,7 @@ export async function ForYou() {
           saved={savedIds.has(m.role.id)}
           signedIn
           matchTags={m.tags}
+          visa={visa}
         />
       ))}
     </div>
