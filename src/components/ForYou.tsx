@@ -49,7 +49,7 @@ export async function ForYou() {
   // Step 2: those few in full, ranked again with their descriptions.
   const pub = publicClient()!;
   const [{ data }, visa, { data: saved }] = await Promise.all([
-    shortlist.ids.length ? pub.from("roles").select(`${ROLE_COLUMNS},description,last_seen`).in("id", shortlist.ids).eq("is_open", true) : Promise.resolve({ data: [] }),
+    shortlist.ids.length ? pub.from("roles").select(`${ROLE_COLUMNS},description`).in("id", shortlist.ids).eq("is_open", true) : Promise.resolve({ data: [] }),
     visaSettings(),
     db.from("saved_roles").select("role_id"),
   ]);

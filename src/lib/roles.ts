@@ -37,11 +37,13 @@ export type Role = {
   sources: string[];
   start_status: "confirmed" | "likely" | "unknown" | "before";
   company_key: string | null;
+  // When a source last confirmed the listing was still up.
+  last_seen?: string | null;
   description_length?: number;
 };
 
 export const ROLE_COLUMNS =
-  "id,title,employer,location,locations,salary_min,salary_max,salary_text,apply_url,posted_at,expires_at,tags,sponsor_status,sponsor_name,sources,start_status,company_key";
+  "id,title,employer,location,locations,salary_min,salary_max,salary_text,apply_url,posted_at,expires_at,tags,sponsor_status,sponsor_name,sources,start_status,company_key,last_seen";
 
 export type RoleFilters = {
   q: string;

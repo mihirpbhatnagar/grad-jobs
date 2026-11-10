@@ -51,6 +51,9 @@ export function RoleCard({
   const pay = salaryShort(role.salary_min, role.salary_max);
   const closes = t.deadline ?? role.expires_at;
   const days = closes ? daysUntil(closes) : null;
+  // No source has confirmed the listing for over a week (for example, one found only by a
+  // search that hasn't run since): it may have closed, so the card says so instead of "apply early".
+  const unconfirmed = !!role.last_seen && daysUntil(role.last_seen) < -7;
   const extraLocations = role.locations.length - 1;
   const about = company?.description;
 
@@ -143,13 +146,15 @@ export function RoleCard({
           {role.posted_at ? postedAgo(role.posted_at) : "Posting date not stated"}
         </span>
         <span
-          className={`inline-flex items-center gap-1.5 ${days === null ? "text-muted" : days < 0 ? "text-muted" : days <= 7 ? "text-rose" : days <= 14 ? "text-amber" : "text-foreground"}`}
+          className={`inline-flex items-center gap-1.5 ${days === null ? (unconfirmed ? "text-amber" : "text-muted") : days < 0 ? "text-muted" : days <= 7 ? "text-rose" : days <= 14 ? "text-amber" : "text-foreground"}`}
         >
           <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
             <path d="M4 5h12v12H4zM4 9h12M8 3v4M12 3v4" strokeLinejoin="round" />
           </svg>
           {days === null
-            ? "No closing date: apply early"
+            ? unconfirmed
+              ? `Not re-checked since ${dateShort(role.last_seen!)}: may have closed`
+              : "No closing date: apply early"
             : days < 0
               ? "May have closed"
               : `Closes ${dateShort(closes!)} · ${days === 0 ? "today" : `${days} day${days === 1 ? "" : "s"} left`}`}
