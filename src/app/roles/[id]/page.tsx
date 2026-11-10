@@ -13,7 +13,7 @@ import { Chip, SponsorTick } from "@/components/RoleCard";
 import { SaveButton } from "@/components/SaveButton";
 import { currentUser } from "@/lib/auth";
 import { companyFor, sizeLabel, type Company } from "@/lib/companies";
-import { dateLong, daysUntil, decodeEntities, employerLabel, isBoardName, distinctPlaces, isCompetitive, isRepostOnly, money, startLabel } from "@/lib/format";
+import { dateLong, daysUntil, decodeEntities, employerLabel, isBoardName, contractLabel, distinctPlaces, isCompetitive, isRepostOnly, money, startLabel } from "@/lib/format";
 import type { RoleTags } from "@/lib/roles";
 import { fieldOf, salaryContext } from "@/lib/salary";
 import { publicClient } from "@/lib/supabase";
@@ -315,7 +315,7 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
           : "Not stated";
   // The listing's own "Contract Type" line beats the source's one-word field ("contract").
   const statedContract = blocks.flatMap((b) => (b.kind === "kv" ? b.lines : [])).map((l) => l.match(FACT)!).find((m) => /contract type|job type/i.test(m[1]))?.[2];
-  const contract = statedContract ?? (r.contract_type ? cap(r.contract_type) : t.graduateScheme || t.programmeTitle ? "Graduate scheme" : "Not stated");
+  const contract = statedContract ?? contractLabel(r.contract_type, r.title) ?? (t.graduateScheme || t.programmeTitle ? "Graduate scheme" : "Not stated");
 
   const salaryRows = [
     ...(pay ? [{ label: "This role", amount: pay, highlight: true }] : []),

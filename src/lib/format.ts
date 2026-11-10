@@ -58,6 +58,8 @@ export const placeName = (location: string | null | undefined) =>
 // "Glasgow, Scotland,GB" and "London, London" become "Manchester", "Basildon", "Glasgow", "London".
 export function tidyPlace(location: string): string {
   const parts = (placeName(location) ?? location)
+    // Notes in brackets ("3 days a week onsite", "PO Boxes") aren't part of the town.
+    .replace(/\s*\([^)]*\)/g, "")
     .replace(/^GB\s*-\s*/i, "")
     .replace(/\bUNAVAILABLE\b/g, "")
     .split(",")
@@ -66,6 +68,21 @@ export function tidyPlace(location: string): string {
   const seen = new Set<string>();
   const kept = parts.filter((p) => !seen.has(p.toLowerCase()) && seen.add(p.toLowerCase()));
   return kept.join(", ") || location.trim();
+}
+
+// The contract as the source gave it, tidied ("FULL_TIME" -> "Full-time"). Google Jobs files many
+// graduate jobs under "Internship"; that is dropped unless the title says internship.
+export function contractLabel(contractType: string | null | undefined, title: string): string | null {
+  if (!contractType) return null;
+  const internTitle = /\bintern(ship)?s?\b/i.test(title);
+  const parts = contractType
+    .replace(/["']/g, "")
+    .split(/,|\band\b/i)
+    .map((p) => p.replace(/_/g, " ").trim())
+    .filter((p) => p && !/^other$/i.test(p) && (internTitle || !/^intern(ship)?$/i.test(p)))
+    .map((p) => (/^full[\s–-]?time$/i.test(p) ? "Full-time" : /^part[\s–-]?time$/i.test(p) ? "Part-time" : p[0].toUpperCase() + p.slice(1).toLowerCase()));
+  const unique = [...new Set(parts)];
+  return unique.length ? unique.join(", ") : null;
 }
 
 // A role's towns, each once: sources write the same town in different ways ("Leeds (LS11 5AD)"
