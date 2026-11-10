@@ -2,6 +2,7 @@ import Link from "next/link";
 import { RoleCard } from "@/components/RoleCard";
 import { currentUser } from "@/lib/auth";
 import { companiesFor } from "@/lib/companies";
+import { forYouCandidates } from "@/lib/forYouRoles";
 import { rankForYou } from "@/lib/matching";
 import { withDefaults } from "@/lib/profile";
 import { ROLE_COLUMNS, type Role } from "@/lib/roles";
@@ -34,20 +35,13 @@ export async function ForYou() {
   }
 
   const pub = publicClient()!;
-  const { data } = await pub
-    .from("roles")
-    .select(`${ROLE_COLUMNS},description`)
-    .eq("is_open", true)
-    .eq("kind", "job")
-    .eq("part_time", false)
-    .in("start_status", ["confirmed", "likely"])
-    .limit(1000);
   const similarity = new Map<number, number>();
   if (profile?.goal_embedding) {
     const { data: close } = await pub.rpc("match_roles", { query: profile.goal_embedding, max_results: 1000 });
     for (const c of (close ?? []) as { id: number; similarity: number }[]) similarity.set(c.id, c.similarity);
   }
-  const matches = rankForYou((data ?? []) as (Role & { description: string | null })[], answers, similarity);
+  const data = await forYouCandidates(pub, `${ROLE_COLUMNS},description,last_seen`, answers, [...similarity.keys()]);
+  const matches = rankForYou(data as unknown as (Role & { description: string | null; last_seen: string | null })[], answers, similarity);
 
   const shown = matches.slice(0, SHOW);
   const companies = await companiesFor(shown.map((m) => m.role.company_key));

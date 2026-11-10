@@ -17,19 +17,65 @@ const REGIONS: Record<string, string[]> = {
 
 const MONTH = (iso: string | null | undefined) => (iso ? Number(iso.slice(5, 7)) : null);
 
+// The title counts too: some employers only name the city there ("Sales Graduates 2027 | Manchester").
 function inLocations(role: Role, wanted: string[]): string | null {
-  const places = [role.location, ...role.locations].filter(Boolean).join(" ").toLowerCase();
+  const places = [role.location, ...role.locations, role.title].filter(Boolean).join(" ").toLowerCase();
   return wanted.find((w) => places.includes(w.toLowerCase())) ?? null;
 }
+
+// A keyword counts only at the start of a word: "sport" finds "sports" but not "transport".
+// Keywords written with a trailing space ("it ", "pr ") must be the whole word.
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const wordStart = (k: string) => new RegExp(`(^|[^a-z])${escapeRe(k.trim())}${k.endsWith(" ") ? "(?![a-z])" : ""}`);
+
+// For ranking, the sports field means the business side of sport. These two keywords are too
+// broad to show that on their own (a bank's "Product and Partnerships" scheme isn't sport).
+const TOO_BROAD: Record<string, string[]> = { sports: ["partnership", "club"] };
+// School coaching and teaching jobs, sports science and recruiters asking for "sporty people"
+// mention sport but aren't sports business, so they don't count as a sports match.
+const NOT_SPORTS_BUSINESS =
+  /\b(coach(es|ing)?|teach(er|ers|ing)|ta|tutor|classroom|school|schools|education|mentor|cover supervisor|boarding|residential|resident|sports? science|sports? scientist|athletic development|strength and conditioning|recruitment consultant|recruitment|sports? people|sports? minded|sporty)\b/i;
+
+// Employers that are sport: a role there is a sports role even when its title doesn't say so
+// ("Brand Marketing Graduates 2027" at adidas). Matched at the start of the employer's name.
+export const SPORTS_EMPLOYER_STARTS = [
+  "adidas", "nike", "puma", "under armour", "new balance", "asics", "castore", "gymshark", "decathlon", "jd sports", "sports direct", "frasers group", "pentland brands", "fanatics",
+  "premier league", "football association", "english football league", "england and wales cricket", "rugby football union", "premiership rugby", "lawn tennis association",
+  "all england lawn tennis", "uk sport", "sport england", "british olympic", "team gb", "british cycling", "uk athletics", "england netball", "jockey club",
+  "ascot racecourse", "silverstone", "formula 1", "formula one", "mclaren racing", "williams racing", "mercedes-amg", "red bull racing", "red bull technology", "aston martin f1", "alpine f1",
+  "city football", "manchester united", "manchester city", "arsenal", "chelsea f", "liverpool f", "tottenham hotspur", "aston villa", "newcastle united", "west ham united", "everton",
+  "crystal palace", "brentford f", "nottingham forest", "wasserman", "two circles", "sportfive", "pitch international", "excel sports",
+  "sportradar", "genius sports", "stats perform", "hawk-eye", "catapult sports", "dazn", "tnt sports", "sky sports", "greenwich leisure", "david lloyd",
+  "puregym", "gym group", "everyone active", "places leisure", "topgolf",
+];
+// Short names that must be the whole name ("Better" the leisure operator, not "Better Placed Recruitment").
+export const SPORTS_EMPLOYER_EXACT = ["img", "tko", "better", "gll", "wimbledon", "aeltc", "the fa", "lta", "rfu", "efl"];
+export function isSportsEmployer(employer: string): boolean {
+  const name = employer.trim().toLowerCase();
+  const bare = name.replace(/^the /, "");
+  return SPORTS_EMPLOYER_EXACT.includes(name) || SPORTS_EMPLOYER_STARTS.some((p) => bare.startsWith(p));
+}
+
+// Recruiters, job boards and sites that repost other firms' jobs: the listing may be real, but
+// it isn't the employer's own, so it ranks below one that is.
+const INTERMEDIARY =
+  /\b(recruitment|recruiters?|resourcing|staffing|personnel|headhunt\w*|talent solutions|search consultancy|joinrs|studysmarter|brighterbox|jobs in fitness|the graduate|client network|setsales|united media|hrtechx|cfo ?insights|retail insights|firstmind)\b|\bsearch$|^(targetjobs|efinancialcareers|graduate talent|bright network|gradcracker|milkround|prospects|ratemyplacement|trackr|jobteaser|higherin|inspiring interns|give a grad a go|grb|graduate recruitment bureau|jobleads|jooble|totaljobs|cv-library|indeed|linkedin|glassdoor)\b/i;
+
+// Roles no source has confirmed for this long may have closed, so they rank lower.
+const STALE_AFTER_DAYS = 7;
 
 // `similarity` (optional): how close each role is in meaning to the user's goals, 0–1, from
 // the free embedding model. It boosts close matches and can stand in for a keyword match.
 export function rankForYou(
-  roles: (Role & { description?: string | null })[],
+  roles: (Role & { description?: string | null; last_seen?: string | null })[],
   a: ProfileAnswers,
   similarity: Map<number, number> = new Map(),
 ): Match[] {
-  const fields = a.fields.forYou ? FIELDS.filter((f) => a.fields.value.includes(f.id)) : [];
+  const fields = (a.fields.forYou ? FIELDS.filter((f) => a.fields.value.includes(f.id)) : []).map((f) => ({
+    ...f,
+    tests: f.keywords.filter((k) => !TOO_BROAD[f.id]?.includes(k)).map(wordStart),
+  }));
+  const staleBefore = new Date(Date.now() - STALE_AFTER_DAYS * 86_400_000).toISOString();
   const goalWords = a.goals.forYou
     ? a.goals.value.toLowerCase().split(/[^a-z]+/).filter((w) => w.length > 4)
     : [];
@@ -55,13 +101,20 @@ export function rankForYou(
     if (d.otherLocations && wantedPlaces.length && !inLocations(role, wantedPlaces)) continue;
 
     const title = ` ${role.title.toLowerCase()} `;
+    // The employer's name counts with the title: "Commercial Executive" at a football club is sport.
+    const heading = `${title}| ${role.employer.toLowerCase()} `;
     const body = ` ${(role.description ?? "").toLowerCase().slice(0, 3000)} `;
     let score = 0;
     const tags: string[] = [];
 
+    let notSportsBusiness = false;
     for (const f of fields) {
-      const inTitle = f.keywords.some((k) => title.includes(k));
-      const inBody = f.keywords.filter((k) => body.includes(k)).length;
+      if (f.id === "sports" && NOT_SPORTS_BUSINESS.test(heading)) {
+        notSportsBusiness = true;
+        continue;
+      }
+      const inTitle = f.tests.some((re) => re.test(heading)) || (f.id === "sports" && isSportsEmployer(role.employer));
+      const inBody = f.tests.filter((re) => re.test(body)).length;
       if (inTitle || inBody >= 2) {
         score += inTitle ? 10 : 4;
         tags.push(f.label.split(" ")[0]);
@@ -69,7 +122,9 @@ export function rankForYou(
     }
     const sim = similarity.get(role.id) ?? 0;
     if (fields.length && score === 0) {
-      if (sim < 0.4) continue; // must match a chosen field, by keyword or by meaning
+      // Must match a chosen field, by keyword or by meaning (a coaching job is close in meaning
+      // to "sport" but was ruled out above, so it doesn't come back in this way).
+      if (notSportsBusiness || sim < 0.4) continue;
       tags.push("Close match");
     }
     score += Math.max(0, sim - 0.2) * 40;
@@ -95,6 +150,8 @@ export function rankForYou(
     const month = MONTH(start);
     if (month === 7) score += 1;
     if (t.startText) tags.push(`${t.startText} start`);
+    if (role.last_seen && role.last_seen < staleBefore) score -= 6;
+    if (INTERMEDIARY.test(role.employer.trim())) score -= 8;
 
     matches.push({ role, score, tags: [...new Set(tags)] });
   }
