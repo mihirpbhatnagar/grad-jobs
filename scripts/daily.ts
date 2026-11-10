@@ -43,6 +43,9 @@ const googleSweep = process.argv.includes("--google-sweep");
 const CLOSE_AFTER_DAYS = 2;
 // GitHub stops the job at 330 minutes; the saving, closing and tagging steps need the rest.
 const FEEDS_STOP_AFTER_MINUTES = 240;
+// With --feeds-only: read just the employers whose name or link matches (FEEDS_MATCH="adidas|carlsberg"),
+// to bring a newly added employer in straight away instead of waiting for the morning run.
+const FEEDS_MATCH = process.env.FEEDS_MATCH ? new RegExp(process.env.FEEDS_MATCH, "i") : null;
 // New Reed listings are fetched and saved this many at a time, so progress is never lost.
 const REED_BATCH = 250;
 // Earliest start users can take; read from settings in main(). Roles starting earlier are
@@ -631,7 +634,7 @@ async function pullEmployerFeeds(match: Matcher, byKey: Map<string, ExistingRole
   let ok = 0;
   let failed = 0;
   let notReached = 0;
-  for (const f of feeds) {
+  for (const f of FEEDS_MATCH ? feeds.filter((x) => FEEDS_MATCH.test(`${x.name} ${x.ats_id}`)) : feeds) {
     // Out of time: stop reading so what's been read gets saved and the closing steps still run.
     // Feeds not reached keep their roles open, the same as one that couldn't be read.
     if (process.uptime() / 60 > FEEDS_STOP_AFTER_MINUTES) {
@@ -739,7 +742,7 @@ async function googleJobs(stats: Record<string, unknown>, match: Matcher, byKey:
 // run carries on (closing stale roles, tagging, company facts, embeddings).
 async function watchList(stats: Record<string, unknown>, match: Matcher, byKey: Map<string, ExistingRole>) {
   try {
-    stats.discovered = await discoverFeeds();
+    stats.discovered = FEEDS_MATCH ? await discoverFeeds(0, 0) : await discoverFeeds();
     console.log("Watch list:", JSON.stringify(stats.discovered));
     stats.employerFeeds = await pullEmployerFeeds(match, byKey);
     ranSources.add("employer");
