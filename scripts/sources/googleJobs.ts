@@ -31,6 +31,9 @@ export const GOOGLE_JOBS_QUERIES = [
   "graduate communications",
   "graduate events",
   "graduate sports",
+  "sports business graduate",
+  "sports marketing graduate",
+  "sports management graduate",
   "events internship",
   "internship",
 ];
@@ -62,6 +65,13 @@ export const SWEEP_QUERIES_3 = [
   "graduate project management 2027", "HR graduate scheme", "graduate data analyst 2027", "graduate technology 2027", "communications graduate scheme", "media graduate scheme", "PR graduate",
   "events graduate", "hospitality graduate scheme", "retail graduate scheme", "FMCG graduate scheme", "public sector graduate scheme", "civil service graduate",
   "graduate scheme London", "graduate scheme Manchester", "graduate scheme Birmingham", "graduate scheme Edinburgh", "graduate scheme Leeds", "graduate scheme Bristol",
+];
+
+// Sport only: the sports job boards (Global Sports Jobs, Jobs in Football, UK Sport) show up in
+// Google Jobs, so this reaches their listings without reading those boards directly.
+export const SWEEP_QUERIES_4 = [
+  "sports management graduate", "sports graduate scheme 2027", "football club graduate", "sponsorship graduate", "sports commercial executive graduate",
+  "sports events graduate", "sports media graduate", "sports agency graduate", "motorsport commercial graduate",
 ];
 
 type Task = { id: string; status_code: number; status_message: string; cost: number };

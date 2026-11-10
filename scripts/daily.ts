@@ -16,7 +16,7 @@ import { discoverFromWebsite, feedFromUrl, newFeedRun, pickSitemap, probe, readF
 import { companyKey, dedupeKey, prettyLocation } from "./lib/normalise.ts";
 import { refreshSponsors, sponsorMatcher, type SponsorMatch } from "./lib/sponsors.ts";
 import { countryOf, employerFromTitle, findSalary, isBoardName, isEarlyCareer, isGraduateTitle, isPartTime, isPlacementOrApprenticeship, isSeniorTitle, roleKind, startStatus, tagListing, type RoleTags } from "./lib/tags.ts";
-import { GOOGLE_JOBS_QUERIES, recoverGoogleJobs, searchGoogleJobs, SWEEP_QUERIES, SWEEP_QUERIES_2, SWEEP_QUERIES_3 } from "./sources/googleJobs.ts";
+import { GOOGLE_JOBS_QUERIES, recoverGoogleJobs, searchGoogleJobs, SWEEP_QUERIES, SWEEP_QUERIES_2, SWEEP_QUERIES_3, SWEEP_QUERIES_4 } from "./sources/googleJobs.ts";
 import { reedDetails, searchReed, toListing } from "./sources/reed.ts";
 import type { Listing } from "./sources/types.ts";
 
@@ -789,7 +789,7 @@ async function main() {
     }
 
     if (googleSweep) {
-      await googleJobs(stats, match, byKey, (process.env.SWEEP_SET === "3" ? SWEEP_QUERIES_3 : process.env.SWEEP_SET === "2" ? SWEEP_QUERIES_2 : SWEEP_QUERIES).slice(Number(process.env.SWEEP_SKIP ?? 0)), { depth: 100, maxCost: Number(process.env.SWEEP_MAX_USD ?? 0.78) });
+      await googleJobs(stats, match, byKey, (process.env.SWEEP_SET === "4" ? SWEEP_QUERIES_4 : process.env.SWEEP_SET === "3" ? SWEEP_QUERIES_3 : process.env.SWEEP_SET === "2" ? SWEEP_QUERIES_2 : SWEEP_QUERIES).slice(Number(process.env.SWEEP_SKIP ?? 0)), { depth: 100, maxCost: Number(process.env.SWEEP_MAX_USD ?? 0.78) });
       // Paused until the top-up is approved: the morning run skips Google Jobs at a zero cap.
       await must(() => db.from("settings").update({ value: 0 }).eq("key", "google_jobs.max_cost_usd_per_run"));
       stats.retagged = await retag(match);

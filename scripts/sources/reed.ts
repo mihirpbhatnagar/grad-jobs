@@ -23,6 +23,15 @@ const SEARCHES: Record<string, string>[] = [
   { keywords: "management trainee" },
   { keywords: "training contract" },
   { keywords: "early careers" },
+  // Sport: few employers run graduate schemes, so their junior roles are searched by field
+  // (the early-career and start-date checks still decide what reaches the main list).
+  { keywords: "sports graduate" },
+  { keywords: "sports marketing" },
+  { keywords: "sports partnerships" },
+  { keywords: "sponsorship executive" },
+  { keywords: "sports business" },
+  { keywords: "football club" },
+  { keywords: "sports events" },
   // Internships and short work experience (their own section, not the main list).
   { keywords: "internship" },
   { keywords: "work experience" },
