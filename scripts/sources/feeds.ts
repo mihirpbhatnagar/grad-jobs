@@ -12,13 +12,27 @@ export type Feed = { ats: string; ats_id: string; name: string };
 
 const EARLY = /\b(graduate|grad|graduates|trainee|entry[- ]level|early careers?|early talent|early professional|emerging talent|intern|interns|internship|summer analyst|summer associate|off[- ]cycle|spring week|spring insight|insight|junior|new grad|campus|futures?|undergraduate|vacation scheme|training contract|(analyst|associate|leadership|development|rotational|management) program(me)?)\b/i;
 const SENIOR = /\b(senior|snr|sr\.?|principal|head of|director|vp|vice president|chief|lead|manager|partner|staff|experienced)\b/i;
-const UK = /\b(uk|u\.k\.|united kingdom|great britain|england|scotland|wales|northern ireland|surrey|kent|essex|sussex|hampshire|berkshire|hertfordshire|buckinghamshire|oxfordshire|cambridgeshire|bedfordshire|leicestershire|nottinghamshire|derbyshire|staffordshire|warwickshire|west midlands|east midlands|yorkshire|lancashire|cheshire|cumbria|merseyside|tyne and wear|county durham|somerset|devon|cornwall|dorset|wiltshire|gloucestershire|worcestershire|shropshire|norfolk|suffolk|lincolnshire|bedford|stoke|sunderland|middlesbrough|darlington|carlisle|bolton|stockport|solihull|harlow|chelmsford|colchester|maidstone|canterbury|woking|staines|harrogate|huddersfield|bradford|wakefield|doncaster|london|manchester|birmingham|leeds|glasgow|edinburgh|bristol|cardiff|belfast|liverpool|newcastle|sheffield|nottingham|leicester|cambridge|oxford|reading|milton keynes|southampton|aberdeen|coventry|derby|warrington|york|brighton|guildford|farnborough|bath|exeter|plymouth|norwich|ipswich|swindon|slough|stevenage|crawley|chester|preston|lancaster|loughborough|cheltenham|gloucester|barrow|warton|portsmouth|basingstoke|bracknell|uxbridge|watford|hatfield|luton|peterborough|northampton|telford|wolverhampton|hull|dundee|inverness|swansea|newport|remote - uk|gb)\b/i;
+const UK = /\b(uk|u\.k\.|united kingdom|great britain|england|scotland|wales|northern ireland|surrey|kent|essex|sussex|hampshire|berkshire|hertfordshire|buckinghamshire|oxfordshire|cambridgeshire|bedfordshire|leicestershire|nottinghamshire|derbyshire|staffordshire|warwickshire|west midlands|east midlands|yorkshire|lancashire|cheshire|cumbria|merseyside|tyne and wear|county durham|somerset|devon|cornwall|dorset|wiltshire|gloucestershire|worcestershire|shropshire|norfolk|suffolk|lincolnshire|bedford|stoke|sunderland|middlesbrough|darlington|carlisle|bolton|stockport|solihull|harlow|chelmsford|colchester|maidstone|canterbury|woking|staines|harrogate|huddersfield|bradford|wakefield|doncaster|london|manchester|birmingham|leeds|glasgow|edinburgh|bristol|cardiff|belfast|liverpool|newcastle|sheffield|nottingham|leicester|cambridge|oxford|reading|milton keynes|southampton|aberdeen|coventry|derby|warrington|york|brighton|guildford|farnborough|bath|exeter|plymouth|norwich|ipswich|swindon|slough|stevenage|crawley|chester|preston|lancaster|loughborough|cheltenham|gloucester|barrow|warton|portsmouth|basingstoke|bracknell|uxbridge|watford|hatfield|luton|peterborough|northampton|telford|wolverhampton|hull|dundee|inverness|swansea|newport|hemel hempstead|high wycombe|wrexham|knutsford|brighouse|welwyn|maidenhead|basildon|wigan|salford|rochdale|oldham|blackburn|burnley|blackpool|barnsley|rotherham|scunthorpe|grimsby|corby|nuneaton|lichfield|kidderminster|redditch|walsall|west bromwich|leamington|crewe|macclesfield|altrincham|runcorn|widnes|st helens|falkirk|kilmarnock|bridgend|llanelli|lisburn|londonderry|newry|county down|county antrim|aldershot|camberley|eastbourne|worthing|chichester|dartford|sevenoaks|tunbridge wells|tonbridge|folkestone|southend|romford|croydon|bromley|twickenham|hounslow|wembley|banbury|bicester|didcot|aylesbury|bournemouth|poole|yeovil|weybridge|leatherhead|redhill|reigate|daventry|wellingborough|burton upon trent|burton-on-trent|remote - uk|gb)\b/i;
 
 // "2027" counts unless it's part of a date ("FTC until 01/06/2027").
 const YEAR_2027 = /(?<![\d/.-])2027\b/;
 export const wantedTitle = (title: string) => !isPlacementOrApprenticeship(title) && (EARLY.test(title) || YEAR_2027.test(title)) && !(SENIOR.test(title) && !/\b(graduate|grad|intern|trainee)\b/i.test(title));
 // "New York" contains "York": anything that reads as abroad is not the UK.
-export const inUk = (location: string | null | undefined) => !!location && UK.test(location) && !isOutsideUk("", location);
+// A US or Canadian state after the town ("Bristol, PA", "Cambridge, MA", "London, ON") isn't the UK.
+const STATE_SUFFIX = /,\s*(A[LKZR]|C[AOT]|FL|GA|I[ADL]|K[SY]|M[ADINOST]|N[CDEHJMVY]|OH|PA|RI|S[CD]|T[NX]|UT|V[AT]|W[AIVY]|DC|ON|BC|QC|AB)\b/;
+const namesAbroad = (place: string) => isOutsideUk("", place) || (place.length < 120 && STATE_SUFFIX.test(place));
+export const inUk = (location: string | null | undefined) => !!location && UK.test(location) && !namesAbroad(location);
+
+// A town we don't recognise isn't abroad by default: the list above can't hold every UK town
+// (Carlsberg Britvic's Hemel Hempstead scheme was being thrown out). Such a page counts as the
+// UK when it pays in pounds and no other currency, sits on a UK careers site, or its opening
+// text names the UK and nowhere abroad.
+export function ukByOtherSigns(url: string, words: string, text: string): boolean {
+  const host = url.split("/")[2] ?? "";
+  const top = text.slice(0, 1500);
+  const pounds = /£\s?\d/.test(text) && !/[€$]\s?\d|\b(EUR|USD|CAD|AUD)\b/.test(text);
+  return inUk(words) || /\.uk$|(^|[.-])uk[.-]/i.test(host) || pounds || (UK.test(top) && !isOutsideUk(top, null));
+}
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -455,7 +469,7 @@ async function sitemap(feed: Feed, run: FeedRun): Promise<Listing[] | null> {
     const words = urlWords(u);
     const title = page.title ?? page.description.split("\n").find((l) => /job title:/i.test(l))?.replace(/.*job title:\s*/i, "").trim() ?? titleFromUrl(u);
     const location = page.location ?? page.description.split("\n").find((l) => /^\s*location:/i.test(l))?.replace(/.*location:\s*/i, "").split(".")[0].trim() ?? null;
-    const uk = page.inUk ?? (location ? inUk(location) : inUk(words) || inUk(page.description.slice(0, 1500)));
+    const uk = page.inUk ?? (location ? inUk(location) || (!namesAbroad(location) && ukByOtherSigns(u, words, page.description)) : inUk(words) || inUk(page.description.slice(0, 1500)) || ukByOtherSigns(u, words, page.description));
     if (!uk) {
       run.ruledOut.set(idOf(u), "outside the UK");
       continue;

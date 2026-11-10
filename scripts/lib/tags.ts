@@ -246,12 +246,12 @@ export function isSeniorTitle(title: string): boolean {
 }
 
 // Roles outside the UK that slip in through broad searches (e.g. "On site, Berlin").
-const ABROAD = /\b(malaysia|kuala lumpur|cyberjaya|taiwan|taipei|germany|berlin|munich|frankfurt|hamburg|france|paris|lyon|spain|madrid|barcelona|netherlands|amsterdam|rotterdam|republic of ireland|dublin|cork|galway|usa|u\.s\.|united states|new york|california|texas|chicago|boston|pennsylvania|villanova|canada|toronto|india|bangalore|bengaluru|mumbai|singapore|australia|sydney|melbourne|dubai|uae|hong kong|switzerland|zurich|geneva|sweden|stockholm|denmark|copenhagen|norway|oslo|poland|warsaw|krakow|italy|milan|rome|belgium|brussels|portugal|lisbon|austria|vienna|czech|prague|luxembourg|south africa|philippines|china|shanghai|japan|tokyo)\b/i;
+const ABROAD = /\b(malaysia|kuala lumpur|cyberjaya|taiwan|taipei|germany|berlin|munich|frankfurt|hamburg|france|paris|lyon|spain|madrid|barcelona|netherlands|amsterdam|rotterdam|republic of ireland|dublin|cork|galway|limerick|waterford|kilkenny|sligo|athlone|dundalk|drogheda|letterkenny|maynooth|usa|u\.s\.|united states|new york|california|texas|chicago|boston|pennsylvania|villanova|canada|toronto|india|bangalore|bengaluru|mumbai|singapore|australia|sydney|melbourne|dubai|uae|hong kong|switzerland|zurich|geneva|sweden|stockholm|denmark|copenhagen|norway|oslo|poland|warsaw|krakow|italy|milan|rome|belgium|brussels|portugal|lisbon|austria|vienna|czech|prague|luxembourg|south africa|philippines|china|shanghai|japan|tokyo)\b/i;
 
 const COUNTRY: [RegExp, string][] = [
   [/\b(germany|berlin|munich|frankfurt|hamburg)\b/i, "Germany"], [/\b(france|paris|lyon)\b/i, "France"],
   [/\b(spain|madrid|barcelona)\b/i, "Spain"], [/\b(netherlands|amsterdam|rotterdam)\b/i, "Netherlands"],
-  [/\b(republic of ireland|dublin|cork|galway)\b/i, "Ireland"], [/\b(usa|u\.s\.|united states|new york|california|texas|chicago|boston|pennsylvania|villanova)\b/i, "United States"],
+  [/\b(republic of ireland|dublin|cork|galway|limerick|waterford|kilkenny|sligo|athlone|dundalk|drogheda|letterkenny|maynooth)\b/i, "Ireland"], [/\b(usa|u\.s\.|united states|new york|california|texas|chicago|boston|pennsylvania|villanova)\b/i, "United States"],
   [/\b(canada|toronto)\b/i, "Canada"], [/\b(india|bangalore|bengaluru|mumbai)\b/i, "India"], [/\b(singapore)\b/i, "Singapore"],
   [/\b(australia|sydney|melbourne)\b/i, "Australia"], [/\b(dubai|uae)\b/i, "UAE"], [/\b(hong kong)\b/i, "Hong Kong"],
   [/\b(switzerland|zurich|geneva)\b/i, "Switzerland"], [/\b(sweden|stockholm)\b/i, "Sweden"], [/\b(denmark|copenhagen)\b/i, "Denmark"],
