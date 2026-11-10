@@ -2,7 +2,6 @@ import { Suspense } from "react";
 import { ForYou } from "@/components/ForYou";
 import { GmailQuestion } from "@/components/GmailLink";
 import { PeopleToReachOut } from "@/components/Networking";
-import { StoryBankSection } from "@/components/StoryBankSection";
 import { Tracker } from "@/components/Tracker";
 
 // Desktop and iPad: For you alongside the application tracker. On phones the tracker
@@ -29,7 +28,6 @@ export default function MyJobsPage() {
             <div className="space-y-4">
               <Tracker />
               <PeopleToReachOut />
-              <StoryBankSection />
             </div>
           </Suspense>
         </div>

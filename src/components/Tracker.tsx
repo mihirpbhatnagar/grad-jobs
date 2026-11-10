@@ -18,6 +18,14 @@ type Row = {
 // In progress first, then still to apply, then outcomes.
 const ORDER: Record<Stage, number> = { applied: 0, test: 0, interview: 0, assessment_centre: 0, saved: 1, applying: 1, offer: 2, rejected: 2 };
 
+// The closing date we hold for a saved role: the listing's own, or the one typed in by hand.
+const closingDate = (row: Row): string | null => (row.role ? (row.role.tags.deadline ?? row.role.expires_at) : row.closes_on);
+
+// Whole days from today to a date (0 = today, negative = passed).
+const daysUntil = (iso: string) => Math.round((Date.parse(`${iso.slice(0, 10)}T00:00:00Z`) - Date.parse(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`)) / 86_400_000);
+
+const closesIn = (days: number) => (days < 0 ? "May have closed" : days === 0 ? "Closes today" : days === 1 ? "Closes tomorrow" : `Closes in ${days} days`);
+
 // A short warning under the role: deadline close, listing gone, or no reply for a while.
 function warning(row: Row, noReplyWeeks: number): string | null {
   if (row.stage === "applied") {
@@ -26,12 +34,45 @@ function warning(row: Row, noReplyWeeks: number): string | null {
   }
   if (row.stage !== "saved" && row.stage !== "applying") return null;
   if (row.role && !row.role.is_open) return "Listing may have closed";
-  const iso = row.role ? (row.role.tags.deadline ?? row.role.expires_at) : row.closes_on;
+  const iso = closingDate(row);
   if (!iso) return null;
-  const days = Math.ceil((new Date(iso).getTime() - Date.now()) / 86_400_000);
-  if (days < 0) return "May have closed";
-  if (days === 0) return "Closes today";
-  return days <= 7 ? `Closes in ${days} day${days === 1 ? "" : "s"}` : null;
+  const days = daysUntil(iso);
+  return days <= 7 ? closesIn(days) : null;
+}
+
+// Roles saved but not yet applied for whose closing date is within two weeks, soonest first.
+const CLOSING_WITHIN_DAYS = 14;
+function ClosingSoon({ rows }: { rows: Row[] }) {
+  const closing = rows
+    .filter((r) => r.stage === "saved" || r.stage === "applying")
+    .map((row) => ({ row, iso: closingDate(row) }))
+    .filter((c): c is { row: Row; iso: string } => !!c.iso && (!c.row.role || c.row.role.is_open))
+    .map((c) => ({ ...c, days: daysUntil(c.iso) }))
+    .filter((c) => c.days >= 0 && c.days <= CLOSING_WITHIN_DAYS)
+    .sort((a, b) => a.days - b.days);
+  if (!closing.length) return null;
+  return (
+    <div className="rounded-2xl border border-rose/30 bg-surface p-5">
+      <h2 className="font-semibold tracking-tight">Closing soon</h2>
+      <p className="mt-1 text-xs text-muted">Saved roles you haven&apos;t applied for yet, closing in the next two weeks.</p>
+      <ul className="mt-3 space-y-1">
+        {closing.map(({ row, iso, days }) => (
+          <li key={row.id}>
+            <Link href={row.role ? `/roles/${row.role.id}` : `/applications/${row.id}`} className="flex items-start justify-between gap-3 rounded-xl px-2 py-2 hover:bg-chip">
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-medium">{row.role ? employerLabel(row.role.employer) : row.company}</span>
+                <span className="line-clamp-2 text-xs text-muted">{row.role?.title ?? row.title}</span>
+              </span>
+              <span className="shrink-0 text-right">
+                <span className={`block text-sm font-semibold ${days <= 3 ? "text-rose" : "text-foreground"}`}>{days === 0 ? "Today" : days === 1 ? "Tomorrow" : `${days} days`}</span>
+                <span className="block text-xs text-muted">{new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })}</span>
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 function Stat({ label, value }: { label: string; value: string | number }) {
@@ -74,6 +115,8 @@ export async function Tracker() {
   const rate = applied.length ? `${Math.round((responded.length / applied.length) * 100)}%` : "–";
 
   return (
+    <>
+    <ClosingSoon rows={rows} />
     <div className="space-y-4 rounded-2xl border border-border bg-surface p-5">
       <div className="flex items-center justify-between gap-3">
         <h2 className="font-semibold tracking-tight">Your applications</h2>
@@ -125,5 +168,6 @@ export async function Tracker() {
         </table>
       )}
     </div>
+    </>
   );
 }

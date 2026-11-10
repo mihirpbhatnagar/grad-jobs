@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { GmailSection } from "@/components/GmailLink";
+import { StoryBankSection } from "@/components/StoryBankSection";
 import { currentUser, requireUser } from "@/lib/auth";
 import { withDefaults } from "@/lib/profile";
 import { signOut } from "../sign-in/actions";
@@ -58,6 +59,7 @@ async function Profile({ searchParams }: { searchParams: PageProps<"/profile">["
           linkCode={data.telegram_link_code}
         />
       )}
+      <StoryBankSection />
       <GmailSection result={typeof gmail === "string" ? gmail : undefined} />
       <AiSpend />
       <Link href="/admin" className="card-lift flex items-center justify-between rounded-2xl border border-border bg-surface p-5">
