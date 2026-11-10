@@ -54,6 +54,36 @@ export const decodeEntities = (text: string) =>
 export const placeName = (location: string | null | undefined) =>
   location ? location.replace(/\s*\(?\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b\)?/g, "").replace(/\s*,\s*$/, "").trim() || location : null;
 
+// One town as the sources wrote it, tidied: "Manchester, , United Kingdom", "GB - Basildon",
+// "Glasgow, Scotland,GB" and "London, London" become "Manchester", "Basildon", "Glasgow", "London".
+export function tidyPlace(location: string): string {
+  const parts = (placeName(location) ?? location)
+    .replace(/^GB\s*-\s*/i, "")
+    .replace(/\bUNAVAILABLE\b/g, "")
+    .split(",")
+    .map((p) => p.trim())
+    .filter((p) => p && !/^(gb|uk|united kingdom|england|scotland|wales|northern ireland)\.?$/i.test(p));
+  const seen = new Set<string>();
+  const kept = parts.filter((p) => !seen.has(p.toLowerCase()) && seen.add(p.toLowerCase()));
+  return kept.join(", ") || location.trim();
+}
+
+// A role's towns, each once: sources write the same town in different ways ("Leeds (LS11 5AD)"
+// and "Leeds, West Yorkshire"), which used to show as "Leeds +1".
+export function distinctPlaces(location: string | null | undefined, locations: string[] | null | undefined): string[] {
+  const out: string[] = [];
+  const towns = new Set<string>();
+  for (const raw of [location, ...(locations ?? [])]) {
+    if (!raw?.trim()) continue;
+    const place = tidyPlace(raw);
+    const parts = place.toLowerCase().split(",").map((p) => p.trim());
+    if (parts.some((p) => towns.has(p))) continue;
+    towns.add(parts[0]);
+    out.push(place);
+  }
+  return out;
+}
+
 // Job boards sometimes appear as the "employer" (Google Jobs lists the board that posted it).
 const BOARDS = /^(targetjobs|efinancialcareers|graduate talent|brighterbox|bright network|gradcracker|milkround|prospects|ratemyplacement|trackr|jobteaser|higherin|inspiring interns|give a grad a go|grb|graduate recruitment bureau|jobleads|jooble|totaljobs|cv-library|indeed|linkedin|glassdoor)\b/i;
 export function isBoardName(employer: string): boolean {

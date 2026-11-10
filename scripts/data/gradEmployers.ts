@@ -106,6 +106,12 @@ export const KNOWN_FEEDS: { name: string; ats: string; ats_id: string }[] = [
   { name: "Nuffield Health", ats: "sitemap", ats_id: "https://www.nuffieldhealthcareers.com/sitemap.xml" },
   { name: "Hollywood Bowl", ats: "sitemap", ats_id: "https://careers.hollywoodbowlgroup.co.uk/sitemap.xml" },
   { name: "Topgolf", ats: "workday", ats_id: "topgolf.wd501.myworkdayjobs.com/topgolf/TopgolfCareers" },
+  // Sports employers on Pinpoint (10 Nov 2026).
+  { name: "Premier League", ats: "pinpoint", ats_id: "premierleague" },
+  { name: "Silverstone", ats: "pinpoint", ats_id: "silverstone" },
+  { name: "Aston Martin Aramco Formula One Team", ats: "pinpoint", ats_id: "astonmartinf1" },
+  { name: "Surrey County Cricket Club", ats: "pinpoint", ats_id: "surreycricket" },
+  { name: "DAZN", ats: "pinpoint", ats_id: "dazn" },
   // Careers-site sitemaps, tried one by one on 4 Nov 2026 (the automatic search had missed these,
   // or had picked another company's or another country's site).
   { name: "Softwire", ats: "sitemap", ats_id: "https://www.softwire.com/sitemap.xml" },

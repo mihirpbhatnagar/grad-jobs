@@ -4,7 +4,7 @@ import { SaveButton } from "@/components/SaveButton";
 import type { Company } from "@/lib/companies";
 import type { Role } from "@/lib/roles";
 import { runsPastVisa, visaEndsLabel, type VisaSettings } from "@/lib/visa";
-import { dateShort, daysUntil, employerLabel, isBoardName, isCompetitive, placeName, postedAgo, salaryShort, startLabel } from "@/lib/format";
+import { dateShort, daysUntil, employerLabel, isBoardName, distinctPlaces, isCompetitive, postedAgo, salaryShort, startLabel } from "@/lib/format";
 
 export function Chip({ children, tone = "plain", title }: { children: React.ReactNode; tone?: "plain" | "accent" | "success" | "amber" | "rose"; title?: string }) {
   const tones = {
@@ -54,7 +54,7 @@ export function RoleCard({
   // No source has confirmed the listing for over a week (for example, one found only by a
   // search that hasn't run since): it may have closed, so the card says so instead of "apply early".
   const unconfirmed = !!role.last_seen && daysUntil(role.last_seen) < -7;
-  const extraLocations = role.locations.length - 1;
+  const places = distinctPlaces(role.location, role.locations);
   const about = company?.description;
 
   return (
@@ -78,14 +78,14 @@ export function RoleCard({
             {about && <span className="text-muted"> · {about[0].toUpperCase() + about.slice(1)}</span>}
           </p>
           <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
-            {role.location && (
+            {places.length > 0 && (
               <span className="inline-flex items-center gap-1">
                 <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
                   <path d="M10 18s6-5.3 6-10a6 6 0 1 0-12 0c0 4.7 6 10 6 10z" />
                   <circle cx="10" cy="8" r="2" />
                 </svg>
-                {placeName(role.location)}
-                {extraLocations > 0 && ` +${extraLocations}`}
+                {places[0]}
+                {places.length > 1 && ` +${places.length - 1}`}
               </span>
             )}
           </p>

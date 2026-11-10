@@ -12,7 +12,7 @@ export type Feed = { ats: string; ats_id: string; name: string };
 
 const EARLY = /\b(graduate|grad|graduates|trainee|entry[- ]level|early careers?|early talent|early professional|emerging talent|intern|interns|internship|summer analyst|summer associate|off[- ]cycle|spring week|spring insight|insight|junior|new grad|campus|futures?|undergraduate|vacation scheme|training contract|(analyst|associate|leadership|development|rotational|management) program(me)?)\b/i;
 const SENIOR = /\b(senior|snr|sr\.?|principal|head of|director|vp|vice president|chief|lead|manager|partner|staff|experienced)\b/i;
-const UK = /\b(uk|u\.k\.|united kingdom|great britain|england|scotland|wales|northern ireland|surrey|kent|essex|sussex|hampshire|berkshire|hertfordshire|buckinghamshire|oxfordshire|cambridgeshire|bedfordshire|leicestershire|nottinghamshire|derbyshire|staffordshire|warwickshire|west midlands|east midlands|yorkshire|lancashire|cheshire|cumbria|merseyside|tyne and wear|county durham|somerset|devon|cornwall|dorset|wiltshire|gloucestershire|worcestershire|shropshire|norfolk|suffolk|lincolnshire|bedford|stoke|sunderland|middlesbrough|darlington|carlisle|bolton|stockport|solihull|harlow|chelmsford|colchester|maidstone|canterbury|woking|staines|harrogate|huddersfield|bradford|wakefield|doncaster|london|manchester|birmingham|leeds|glasgow|edinburgh|bristol|cardiff|belfast|liverpool|newcastle|sheffield|nottingham|leicester|cambridge|oxford|reading|milton keynes|southampton|aberdeen|coventry|derby|warrington|york|brighton|guildford|farnborough|bath|exeter|plymouth|norwich|ipswich|swindon|slough|stevenage|crawley|chester|preston|lancaster|loughborough|cheltenham|gloucester|barrow|warton|portsmouth|basingstoke|bracknell|uxbridge|watford|hatfield|luton|peterborough|northampton|telford|wolverhampton|hull|dundee|inverness|swansea|newport|hemel hempstead|high wycombe|wrexham|knutsford|brighouse|welwyn|maidenhead|basildon|wigan|salford|rochdale|oldham|blackburn|burnley|blackpool|barnsley|rotherham|scunthorpe|grimsby|corby|nuneaton|lichfield|kidderminster|redditch|walsall|west bromwich|leamington|crewe|macclesfield|altrincham|runcorn|widnes|st helens|falkirk|kilmarnock|bridgend|llanelli|lisburn|londonderry|newry|county down|county antrim|aldershot|camberley|eastbourne|worthing|chichester|dartford|sevenoaks|tunbridge wells|tonbridge|folkestone|southend|romford|croydon|bromley|twickenham|hounslow|wembley|banbury|bicester|didcot|aylesbury|bournemouth|poole|yeovil|weybridge|leatherhead|redhill|reigate|daventry|wellingborough|burton upon trent|burton-on-trent|remote - uk|gb)\b/i;
+const UK = /\b(uk|u\.k\.|united kingdom|great britain|england|scotland|wales|northern ireland|surrey|kent|essex|sussex|hampshire|berkshire|hertfordshire|buckinghamshire|oxfordshire|cambridgeshire|bedfordshire|leicestershire|nottinghamshire|derbyshire|staffordshire|warwickshire|west midlands|east midlands|yorkshire|lancashire|cheshire|cumbria|merseyside|tyne and wear|county durham|somerset|devon|cornwall|dorset|wiltshire|gloucestershire|worcestershire|shropshire|norfolk|suffolk|lincolnshire|bedford|stoke|sunderland|middlesbrough|darlington|carlisle|bolton|stockport|solihull|harlow|chelmsford|colchester|maidstone|canterbury|woking|staines|harrogate|huddersfield|bradford|wakefield|doncaster|london|manchester|birmingham|leeds|glasgow|edinburgh|bristol|cardiff|belfast|liverpool|newcastle|sheffield|nottingham|leicester|cambridge|oxford|reading|milton keynes|southampton|aberdeen|coventry|derby|warrington|york|brighton|guildford|farnborough|bath|exeter|plymouth|norwich|ipswich|swindon|slough|stevenage|crawley|chester|preston|lancaster|loughborough|cheltenham|gloucester|barrow|warton|portsmouth|basingstoke|bracknell|uxbridge|watford|hatfield|luton|peterborough|northampton|telford|wolverhampton|hull|dundee|inverness|swansea|newport|northamptonshire|silverstone|hemel hempstead|high wycombe|wrexham|knutsford|brighouse|welwyn|maidenhead|basildon|wigan|salford|rochdale|oldham|blackburn|burnley|blackpool|barnsley|rotherham|scunthorpe|grimsby|corby|nuneaton|lichfield|kidderminster|redditch|walsall|west bromwich|leamington|crewe|macclesfield|altrincham|runcorn|widnes|st helens|falkirk|kilmarnock|bridgend|llanelli|lisburn|londonderry|newry|county down|county antrim|aldershot|camberley|eastbourne|worthing|chichester|dartford|sevenoaks|tunbridge wells|tonbridge|folkestone|southend|romford|croydon|bromley|twickenham|hounslow|wembley|banbury|bicester|didcot|aylesbury|bournemouth|poole|yeovil|weybridge|leatherhead|redhill|reigate|daventry|wellingborough|burton upon trent|burton-on-trent|remote - uk|gb)\b/i;
 
 // "2027" counts unless it's part of a date ("FTC until 01/06/2027").
 const YEAR_2027 = /(?<![\d/.-])2027\b/;
@@ -115,6 +115,36 @@ async function lever(feed: Feed): Promise<Listing[] | null> {
         postedAt: j.createdAt ? new Date(j.createdAt).toISOString() : null,
       }),
     );
+}
+
+// Pinpoint (the Premier League, Silverstone, Aston Martin F1, Surrey Cricket, DAZN): one public
+// list per employer, with the full advert and the closing date.
+async function pinpoint(feed: Feed): Promise<Listing[] | null> {
+  type J = {
+    id: string; title: string; url: string; description?: string | null; key_responsibilities?: string | null; key_responsibilities_header?: string | null;
+    skills_knowledge_expertise?: string | null; skills_knowledge_expertise_header?: string | null; benefits?: string | null; benefits_header?: string | null;
+    deadline_at?: string | null; employment_type_text?: string | null; compensation_visible?: boolean; compensation_minimum?: number | null; compensation_maximum?: number | null;
+    compensation_currency?: string | null; compensation_frequency?: string | null; location?: { city?: string | null; province?: string | null; name?: string | null } | null;
+  };
+  const res = await json<{ data: J[] }>(`https://${feed.ats_id}.pinpointhq.com/postings.json`);
+  if (!res || !Array.isArray(res.data)) return null;
+  const place = (j: J) => [j.location?.name, j.location?.city, j.location?.province].map((p) => p?.trim()).filter(Boolean).join(", ");
+  const part = (header: string | null | undefined, html: string | null | undefined) => (html ? `${header ?? ""}\n${htmlToText(html)}`.trim() : "");
+  return res.data
+    .filter((j) => wantedTitle(j.title) && inUk(place(j)))
+    .map((j) => {
+      const yearlyPounds = j.compensation_visible && j.compensation_currency === "GBP" && /year|annual/i.test(j.compensation_frequency ?? "");
+      return listing(feed, j.id, {
+        title: j.title,
+        url: j.url,
+        location: j.location?.city?.replace(/[,\s]+$/, "") || j.location?.name || null,
+        contractType: j.employment_type_text ?? null,
+        description: [htmlToText(j.description ?? ""), part(j.key_responsibilities_header, j.key_responsibilities), part(j.skills_knowledge_expertise_header, j.skills_knowledge_expertise), part(j.benefits_header, j.benefits)].filter(Boolean).join("\n\n"),
+        salaryMin: yearlyPounds ? (j.compensation_minimum ?? null) : null,
+        salaryMax: yearlyPounds ? (j.compensation_maximum ?? j.compensation_minimum ?? null) : null,
+        expiresAt: j.deadline_at?.slice(0, 10) ?? null,
+      });
+    });
 }
 
 async function ashby(feed: Feed): Promise<Listing[] | null> {
@@ -488,6 +518,7 @@ export async function readFeed(feed: Feed, run: FeedRun = newFeedRun()): Promise
     case "greenhouse": return greenhouse(feed);
     case "lever": return lever(feed);
     case "ashby": return ashby(feed);
+    case "pinpoint": return pinpoint(feed);
     case "smartrecruiters": return smartrecruiters(feed);
     case "workable": return workable(feed);
     case "workday": return workday(feed);
@@ -517,6 +548,7 @@ export function feedFromUrl(url: string): { ats: string; ats_id: string } | null
   }
   if (host === "jobs.lever.co" || host === "jobs.eu.lever.co") return parts[0] ? { ats: "lever", ats_id: parts[0].toLowerCase() } : null;
   if (host === "jobs.ashbyhq.com") return parts[0] ? { ats: "ashby", ats_id: parts[0] } : null;
+  if (host.endsWith(".pinpointhq.com")) return { ats: "pinpoint", ats_id: host.split(".")[0] };
   if (host === "jobs.smartrecruiters.com" || host === "careers.smartrecruiters.com") return parts[0] ? { ats: "smartrecruiters", ats_id: parts[0] } : null;
   if (host === "apply.workable.com") return parts[0] && parts[0] !== "j" ? { ats: "workable", ats_id: parts[0].toLowerCase() } : null;
   const oc = host.match(/^[a-z0-9-]+\.fa\.[a-z0-9]+\.oraclecloud\.com$/);
