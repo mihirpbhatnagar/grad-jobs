@@ -124,6 +124,15 @@ export async function readPlainPage(url: string): Promise<{ title: string | null
   return { title: htmlToText(heading ?? "") || htmlToText(metaContent(html, "og:title") ?? "") || null, description: description.slice(0, 12_000) };
 }
 
+// A page's hidden "valid through" date, used as the closing date only when it is a real one:
+// some sites fill it with a placeholder years away (one said 2126).
+function realDeadline(until: string | null | undefined): string | null {
+  if (!until || !/^\d{4}-\d{2}-\d{2}/.test(until)) return null;
+  const day = until.slice(0, 10);
+  const limit = new Date(Date.now() + 550 * 86_400_000).toISOString().slice(0, 10);
+  return day <= limit ? day : null;
+}
+
 export type PageJob = {
   title: string | null;
   location: string | null;
@@ -191,7 +200,7 @@ function jobFromMarkup(html: string): { title: string | null; description: strin
     const country = prop("addressCountry");
     const place = [prop("addressLocality"), prop("addressRegion")].filter(Boolean).join(", ") || null;
     const until = prop("validThrough");
-    return { title: prop("title") ?? ogTitle, description: micro, location: place, inUk: country ? UK_COUNTRY.test(country) : null, deadline: until && /^\d{4}-\d{2}-\d{2}/.test(until) ? until.slice(0, 10) : null };
+    return { title: prop("title") ?? ogTitle, description: micro, location: place, inUk: country ? UK_COUNTRY.test(country) : null, deadline: realDeadline(until) };
   }
 
   if (html.includes("article__content__view__field")) {
@@ -289,7 +298,7 @@ export async function readJobPage(url: string): Promise<PageJob | null> {
       title: htmlToText(str(p.title) ?? str(p.name) ?? "") || null,
       ...placeOf(p),
       description,
-      deadline: until && /^\d{4}-\d{2}-\d{2}/.test(until) ? until.slice(0, 10) : null,
+      deadline: realDeadline(until),
       salaryMin: yearly ? num(salary.minValue) ?? num(salary.value) : null,
       salaryMax: yearly ? num(salary.maxValue) ?? num(salary.value) : null,
       employmentType: Array.isArray(type) ? type.join(", ") : str(type),

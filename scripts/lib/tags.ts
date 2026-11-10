@@ -46,6 +46,8 @@ const NO_SPONSORSHIP = [
   /\bsponsorship\s+(is\s+)?(not|unavailable)\b/i,
   /\bwithout\s+(the\s+need\s+for\s+)?(visa\s+)?sponsorship\b/i,
   /\bdoes\s+not\s+offer\s+(visa\s+)?sponsorship\b/i,
+  /\b(do|does|will)\s+not\s+qualify\s+for\s+(visa\s+)?sponsorship\b/i,
+  /\bwithout\s+(requiring|needing)\s+(any\s+|current or future\s+)?(visa\s+)?sponsorship\b/i,
   // Wording that rules out a time-limited visa without using the word "no": Nestlé's "right to
   // work in the UK that is not time limited and does not require sponsorship", "permanent right
   // to work", "Graduate Route visa holders are not eligible".
@@ -101,9 +103,13 @@ function findStart(text: string): { startText: string | null; startDate: string 
     new RegExp(`\\b(${MONTH_RE}|spring|summer|autumn|winter)\\s+(202[6-9])\\s+(starts?|intakes?|cohorts?|entry)\\b`, "i"),
     new RegExp(`\\((${MONTH_RE})\\s+(202[6-9])(?:\\s+(?:start|intake))?\\)`, "i"),
     new RegExp(`\\b(?:start(?:ing|s)?|commenc\\w*|join(?:ing)?|intake)\\b[^.\\n]{0,40}?\\b(${MONTH_RE}|spring|summer|autumn|winter)\\s+(202[6-9])`, "i"),
+    // "Start date: September 2027", "Start date: Monday, 28 June 2027", label and value on separate lines
+    new RegExp(`\\bstart(?:ing)? dates?\\b\\s*[:\\-–]?\\s*(?:[a-z]+day,?\\s+)?(?:\\d{1,2}(?:st|nd|rd|th)?\\s+)?(${MONTH_RE})\\s+(202[6-9])`, "i"),
     // "available to work full-time from September 2027 to September 2028" (adidas)
     new RegExp(`\\bfrom\\s+(${MONTH_RE})\\s+(202[6-9])\\s+(?:to|until|till|through|[-–—])\\s+(?:${MONTH_RE})\\s+202[6-9]`, "i"),
-    new RegExp(`\\b(?:available|availability)\\b[^.\\n]{0,50}?\\b(?:from|in)\\s+(${MONTH_RE})\\s+(202[6-9])`, "i"),
+    // the applicant's availability ("be available to work from...", "availability to join in..."), not
+    // something else being available ("teacher training routes available from September 2027")
+    new RegExp(`\\bavailab(?:le|ility)\\s+to\\s+(?:work|start|join|commence)\\b[^.\\n]{0,50}?\\b(?:from|in)\\s+(${MONTH_RE})\\s+(202[6-9])`, "i"),
     /\b(202[6-9])\s+(?:graduate\s+)?(?:intake|start|cohort|programme|scheme)\b/i,
   ];
   for (const re of patterns) {
@@ -128,10 +134,16 @@ export function findSalary(text: string): { min: number; max: number } | null {
   for (const raw of text.split(/\n|(?<=\.)\s+/)) {
     const line = raw.replace(/\s+/g, " ");
     if (!/£/.test(line) || /\b(per hour|an hour|p\/h|hourly|per day|a day|daily rate)\b/i.test(line)) continue;
-    if (!/\b(salary|salaries|pay|per annum|p\.?a\.?|a year|per year|annual|starting|package|£\d{2}k)\b/i.test(line)) continue;
+    // A line about pay: a pay word, or simply a range of two yearly amounts ("£28,000 - £35,000").
+    const aboutPay = /\b(salary|salaries|pay|per annum|p\.?a\.?|a year|per year|annual|starting|package|base|basic|doe|up to|circa|negotiable|£\d{2}k)\b/i.test(line);
+    const bareRange = /£\s?\d{2,3}(?:,\d{3}|k)\s*(?:-|–|—|to)\s*£\s?\d{2,3}(?:,\d{3}|k)/i.test(line);
+    // (a bare range about earnings in later years or commission isn't the starting salary)
+    if (!aboutPay && !(bareRange && !/\b(earn|earning|earnings|potential|ote|commission|year (one|two|three|\d)|revenue|turnover|funding|budget)\b/i.test(line))) continue;
     const amounts: number[] = [];
-    for (const m of line.matchAll(/£\s?(\d{1,3}(?:,\d{3})+|\d{2,3}(?:\.\d)?)\s?(k|K)?\b(?![^.]{0,25}\b(bonus|allowance|relocation|sign[- ]?on|golden hello|signing)\b)/g)) {
-      if (/\b(bonus|allowance|relocation|sign[- ]?on|golden hello|signing)\b[^£]{0,8}$/i.test(line.slice(0, m.index))) continue;
+    for (const m of line.matchAll(/£\s?(\d{1,3}(?:,\d{3})+|\d{2,3}(?:\.\d)?)\s?(k|K)?\b(?!\s*(?:[\w-]+\s+){0,2}(bonus|allowance|relocation|sign[- ]?on|golden hello|signing|ote)\b)/g)) {
+      // (an amount is left out only when it is itself the bonus or the on-target figure: "£33,000 and
+      // a joining bonus of £2,000" keeps the £33,000)
+      if (/\b(bonus|allowance|relocation|sign[- ]?on|golden hello|signing|ote)\b[^£]{0,8}$/i.test(line.slice(0, m.index))) continue;
       const n = toNumber(m[1], m[2]);
       if (n >= 16000 && n <= 120000) amounts.push(n);
     }
@@ -142,7 +154,7 @@ export function findSalary(text: string): { min: number; max: number } | null {
 
 function findDeadline(text: string): string | null {
   const re = new RegExp(
-    `\\b(?:closing date|deadline|applications? close|close[sd]? on|apply by|applications? (?:must be|should be) (?:received|submitted) by)\\b[^.]{0,30}?\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(${MONTH_RE})\\s*,?\\s*(202[6-9])?`,
+    `\\b(?:closing date|deadline|applications? close|close[sd]? on|closes|apply by|applications? (?:must be|should be) (?:received|submitted) by)\\b[^.]{0,30}?\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(${MONTH_RE})\\s*,?\\s*(202[6-9])?`,
     "i",
   );
   const m = text.match(re);
@@ -182,6 +194,19 @@ function findLengthMonths(text: string): number | null {
     const n = months(m[1], m[2]);
     if (n && n <= 48) return n;
   }
+  // "taking you on a 23 month learning journey"
+  const journey = text.match(/\b(\d{1,2})[- ](year|month)s?\s+(?:[\w-]+\s+){0,2}journey\b/i);
+  if (journey) return months(journey[1], journey[2]);
+  // "Over two years, you will develop..." on a scheme's own page
+  const over = text.match(/\bover\s+(?:the\s+(?:next|course of)\s+)?(\d|one|two|three|four)\s+(year)s?,?\s+(?:you|our graduates|graduates)\b/i);
+  if (over) return months(over[1], over[2]);
+  // "three 12-month placements": the parts add up to the whole
+  const parts = text.match(/\b(two|three|four|five|six|[2-6])\s+(?:(?!(?:or|to|and)\b)[\w-]+,?\s+){0,2}(\d{1,2}|six|twelve|eighteen)[- ](month)s?\s+(?:[\w-]+\s+){0,1}(placements|rotations)\b/i);
+  if (parts && !/\bup to\s*$/i.test(text.slice(Math.max(0, parts.index! - 8), parts.index))) {
+    const count = Number(parts[1]) || NUMBER_WORDS[parts[1].toLowerCase()];
+    const each = months(parts[2], parts[3]);
+    if (count && each && count * each <= 48) return count * each;
+  }
   // "Duration: 6 months"
   const stated = text.match(/\bduration\s*(?:is|of|:|-|–)?\s*(\d{1,2})\s*(year|month)s?\b/i);
   if (stated) return months(stated[1], stated[2]);
@@ -219,7 +244,7 @@ export function isSeniorTitle(title: string): boolean {
 }
 
 // Roles outside the UK that slip in through broad searches (e.g. "On site, Berlin").
-const ABROAD = /\b(germany|berlin|munich|frankfurt|hamburg|france|paris|lyon|spain|madrid|barcelona|netherlands|amsterdam|rotterdam|republic of ireland|dublin|cork|galway|usa|u\.s\.|united states|new york|california|texas|chicago|boston|pennsylvania|villanova|canada|toronto|india|bangalore|bengaluru|mumbai|singapore|australia|sydney|melbourne|dubai|uae|hong kong|switzerland|zurich|geneva|sweden|stockholm|denmark|copenhagen|norway|oslo|poland|warsaw|krakow|italy|milan|rome|belgium|brussels|portugal|lisbon|austria|vienna|czech|prague|luxembourg|south africa|philippines|china|shanghai|japan|tokyo)\b/i;
+const ABROAD = /\b(malaysia|kuala lumpur|cyberjaya|taiwan|taipei|germany|berlin|munich|frankfurt|hamburg|france|paris|lyon|spain|madrid|barcelona|netherlands|amsterdam|rotterdam|republic of ireland|dublin|cork|galway|usa|u\.s\.|united states|new york|california|texas|chicago|boston|pennsylvania|villanova|canada|toronto|india|bangalore|bengaluru|mumbai|singapore|australia|sydney|melbourne|dubai|uae|hong kong|switzerland|zurich|geneva|sweden|stockholm|denmark|copenhagen|norway|oslo|poland|warsaw|krakow|italy|milan|rome|belgium|brussels|portugal|lisbon|austria|vienna|czech|prague|luxembourg|south africa|philippines|china|shanghai|japan|tokyo)\b/i;
 
 const COUNTRY: [RegExp, string][] = [
   [/\b(germany|berlin|munich|frankfurt|hamburg)\b/i, "Germany"], [/\b(france|paris|lyon)\b/i, "France"],
@@ -232,6 +257,7 @@ const COUNTRY: [RegExp, string][] = [
   [/\b(belgium|brussels)\b/i, "Belgium"], [/\b(portugal|lisbon)\b/i, "Portugal"], [/\b(austria|vienna)\b/i, "Austria"],
   [/\b(czech|prague)\b/i, "Czechia"], [/\b(luxembourg)\b/i, "Luxembourg"], [/\b(south africa)\b/i, "South Africa"],
   [/\b(philippines)\b/i, "Philippines"], [/\b(china|shanghai)\b/i, "China"], [/\b(japan|tokyo)\b/i, "Japan"], [/\b(qatar)\b/i, "Qatar"],
+  [/\b(malaysia|kuala lumpur|cyberjaya)\b/i, "Malaysia"], [/\b(taiwan|taipei)\b/i, "Taiwan"],
 ];
 
 // The country of a role outside the UK, or null for a UK role.
@@ -310,6 +336,24 @@ export function startStatus(tags: RoleTags, earliestStart: string): StartStatus 
   return "unknown";
 }
 
+// "You must have a full manual UK or EU driving licence", "Driving licence and access to transport".
+// Not when the listing says a licence is only desirable.
+const LICENCE_NEEDED = [
+  /\b(full|valid|clean|current|manual)\s+(?:[\w/]+\s+){0,4}(driving\s+)?licen[cs]e\b/i,
+  /\bdriving\s+licen[cs]e\s+(is\s+)?(required|essential|needed|necessary)\b/i,
+  /\b(must|need to|required to|will need to)\s+(hold|have|possess)\s+(a\s+|an\s+)?(?:[\w/]+\s+){0,4}driving\s+licen[cs]e\b/i,
+  /\bdriving\s+licen[cs]e\s+(and|&|with|plus)\s+(access to|own|use of|your own)\s+(a\s+)?(car|vehicle|transport)\b/i,
+];
+const LICENCE_OPTIONAL = /\b(desirable|preferred|preferable|advantage|advantageous|beneficial|ideally|nice to have|not (essential|required|necessary)|or willing(ness)? to|working towards)\b/i;
+function needsDrivingLicence(text: string): boolean {
+  for (const sentence of text.split(/\n|(?<=[.!?])\s+|•/)) {
+    if (!/licen[cs]e/i.test(sentence)) continue;
+    if (!/driving|drive|manual|uk licen/i.test(sentence) && !/\bfull\s+(uk\s+)?licen[cs]e\b/i.test(sentence)) continue;
+    if (LICENCE_NEEDED.some((re) => re.test(sentence)) && !LICENCE_OPTIONAL.test(sentence)) return true;
+  }
+  return false;
+}
+
 export function tagListing(title: string, description: string): RoleTags {
   const text = `${title}\n${description}`;
 
@@ -332,7 +376,7 @@ export function tagListing(title: string, description: string): RoleTags {
     degree,
     sponsorship,
     stages: STAGES.filter(([, re]) => re.test(text)).map(([label]) => label),
-    drivingLicence: /\b(full\s+(uk\s+)?(driving\s+)?licen[cs]e|driving\s+licen[cs]e\s+(is\s+)?(required|essential)|must\s+(hold|have)\s+a\s+(valid\s+|full\s+)*(uk\s+)?driving\s+licen[cs]e)\b/i.test(text),
+    drivingLicence: needsDrivingLicence(text),
     startText,
     startDate,
     deadline: findDeadline(text),

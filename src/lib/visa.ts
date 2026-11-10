@@ -66,7 +66,7 @@ export function visaFit(role: RoleForVisa, s: VisaSettings): VisaFit {
 
   // A fixed-length scheme or contract that ends before the Graduate visa does.
   if (role.tags.lengthMonths && (fixedTerm || role.contract_type == null) && addMonths(start, role.tags.lengthMonths) <= visaEnds) {
-    return { level: "fits", label: "Fits easily", detail: `The role ends before your Graduate visa does (${visaEndLabel}). No sponsorship needed.` };
+    return { level: "fits", label: "Fits easily", detail: `The scheme ends before your Graduate visa does (${visaEndLabel}), so it needs no sponsorship. Staying on afterwards would.` };
   }
 
   const pay = Math.max(role.salary_min ?? 0, role.salary_max ?? 0);
