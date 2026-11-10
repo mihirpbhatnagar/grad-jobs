@@ -11,6 +11,7 @@ import { GRAD_EMPLOYERS, KNOWN_FEEDS } from "./data/gradEmployers.ts";
 import { lookupCompanies } from "./lib/companies.ts";
 import { healthCheck } from "./lib/health.ts";
 import { closeReposts } from "./lib/reposts.ts";
+import { closeGonePages, GONE_REASON } from "./lib/closedPages.ts";
 import { isEmployerPage, readJobPage, USER_AGENT } from "./lib/employerPages.ts";
 import { discoverFromWebsite, feedFromUrl, newFeedRun, pickSitemap, probe, readFeed } from "./sources/feeds.ts";
 import { companyKey, dedupeKey, prettyLocation } from "./lib/normalise.ts";
@@ -632,7 +633,12 @@ async function pullEmployerFeeds(match: Matcher, byKey: Map<string, ExistingRole
   const skip = new Set(
     (await selectAll<{ source_id: string }>((from, to) => db.from("excluded_listings").select("source_id").eq("source", "employer").like("source_id", "sitemap:%").neq("reason", "recheck").gte("last_seen", monthAgo).order("source_id").range(from, to))).map((r) => r.source_id),
   );
-  const run = newFeedRun(known, skip);
+  // Stored pages that have since gone (404): their sitemap entry no longer keeps the role open.
+  const closed = new Set(
+    (await selectAll<{ source_id: string }>((from, to) => db.from("excluded_listings").select("source_id").eq("source", "employer").eq("reason", GONE_REASON).order("source_id").range(from, to))).map((r) => r.source_id),
+  );
+  const run = newFeedRun(known, skip, 2500, closed, 1500);
+  const alive = (id: string) => !closed.has(id) && !run.gone.has(id);
   const listings: Listing[] = [];
   let ok = 0;
   let failed = 0;
@@ -643,7 +649,7 @@ async function pullEmployerFeeds(match: Matcher, byKey: Map<string, ExistingRole
     if (process.uptime() / 60 > FEEDS_STOP_AFTER_MINUTES) {
       notReached++;
       const prefix = `${f.ats}:${f.ats_id}:`;
-      await markSeen("employer", [...known].filter((id) => id.startsWith(prefix)));
+      await markSeen("employer", [...known].filter((id) => id.startsWith(prefix) && alive(id)));
       continue;
     }
     // One employer's site answering with something unexpected mustn't stop the other feeds.
@@ -660,7 +666,7 @@ async function pullEmployerFeeds(match: Matcher, byKey: Map<string, ExistingRole
       failed++;
       // A feed that couldn't be read today keeps its roles open rather than closing them.
       const prefix = `${f.ats}:${f.ats_id}:`;
-      await markSeen("employer", [...known].filter((id) => id.startsWith(prefix)));
+      await markSeen("employer", [...known].filter((id) => id.startsWith(prefix) && alive(id)));
       continue;
     }
     ok++;
@@ -672,6 +678,8 @@ async function pullEmployerFeeds(match: Matcher, byKey: Map<string, ExistingRole
   }
   // Sitemap feeds only return pages not stored yet; stored ones stay open while still listed.
   await markSeen("employer", [...run.stillListed]);
+  const closedGone = await closeGonePages(db, [...run.gone]);
+  if (run.gone.size) console.log(`Employer pages gone (404): ${run.gone.size}; roles closed: ${closedGone}`);
   const now = new Date().toISOString();
   const ruledOut = [...run.ruledOut].map(([source_id, reason]) => ({ source: "employer", source_id, reason, last_seen: now }));
   for (const batch of chunks(ruledOut, 200)) await must(() => db.from("excluded_listings").upsert(batch, { onConflict: "source,source_id" }));

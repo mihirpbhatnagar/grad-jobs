@@ -1,6 +1,7 @@
 import { gunzipSync } from "node:zlib";
 import { USER_AGENT, readJobPage, readPlainPage } from "../lib/employerPages.ts";
 import { htmlToText, prettyLocation } from "../lib/normalise.ts";
+import { dueForCheck, pageGone } from "../lib/closedPages.ts";
 import { isOutsideUk, isPlacementOrApprenticeship } from "../lib/tags.ts";
 import type { Listing } from "./types.ts";
 
@@ -390,8 +391,17 @@ export type FeedRun = {
   ruledOut: Map<string, string>;
   // Employer job pages left to read this run, so one big site can't use up the whole morning.
   pagesLeft: number;
+  // Stored pages found gone earlier (a sitemap listing them no longer keeps their role open),
+  // those found gone this run, and how many more stored pages may be looked at this run.
+  closed: Set<string>;
+  gone: Set<string>;
+  checksLeft: number;
 };
-export const newFeedRun = (known = new Set<string>(), skip = new Set<string>(), pagesLeft = 2500): FeedRun => ({ known, skip, stillListed: new Set(), ruledOut: new Map(), pagesLeft });
+export const newFeedRun = (known = new Set<string>(), skip = new Set<string>(), pagesLeft = 2500, closed = new Set<string>(), checksLeft = 0): FeedRun => ({
+  known, skip, stillListed: new Set(), ruledOut: new Map(), pagesLeft, closed, gone: new Set(), checksLeft,
+});
+
+const CHECKS_PER_SITE = 60;
 
 const PAGES_PER_SITE = 100;
 const safeDecode = (u: string) => {
@@ -463,9 +473,22 @@ async function sitemap(feed: Feed, run: FeedRun): Promise<Listing[] | null> {
   if (urls.length === 0) return null;
 
   const idOf = (u: string) => `sitemap:${feed.ats_id}:${u}`;
-  for (const u of urls) if (run.known.has(idOf(u))) run.stillListed.add(idOf(u));
+  const stored = [...new Set(urls)].filter((u) => run.known.has(idOf(u)) && !run.closed.has(idOf(u)));
+  // A sitemap can go on listing a job after it has closed, so every few days each stored page is
+  // opened to see it still exists. If most of a site's pages suddenly look gone, the site is
+  // having trouble and nothing is closed.
+  const due = stored.filter((u) => dueForCheck(u)).slice(0, Math.min(CHECKS_PER_SITE, Math.max(0, run.checksLeft)));
+  const goneNow: string[] = [];
+  for (const u of due) {
+    run.checksLeft--;
+    if (await pageGone(u)) goneNow.push(u);
+    await sleep(300);
+  }
+  const trust = goneNow.length > 0 && (due.length < 5 || goneNow.length <= due.length / 2);
+  if (trust) for (const u of goneNow) run.gone.add(idOf(u));
+  for (const u of stored) if (!run.gone.has(idOf(u))) run.stillListed.add(idOf(u));
   // Part of the sitemap couldn't be read: everything stored stays open today.
-  if (missedPart) for (const id of run.known) if (id.startsWith(`sitemap:${feed.ats_id}:`)) run.stillListed.add(id);
+  if (missedPart) for (const id of run.known) if (id.startsWith(`sitemap:${feed.ats_id}:`) && !run.closed.has(id) && !run.gone.has(id)) run.stillListed.add(id);
 
   const JOB_PATH = /\/(job|vacanc|position|opportunit|role|career|opening|posting|requisition|scheme|programme)/i;
   // Folders that hold one role or scheme per page, so a plain page there is a real role.
