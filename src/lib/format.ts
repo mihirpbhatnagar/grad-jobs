@@ -84,6 +84,22 @@ export function distinctPlaces(location: string | null | undefined, locations: s
   return out;
 }
 
+// Sites that copy other firms' adverts, often with a reworded title and a guessed pay range
+// (over a third of Google Jobs results link to one). Not the employer's own words.
+const REPOST_HOSTS =
+  /(^|\.)(studysmarter\.co\.uk|jobleads\.com|jobrapido\.com|jooble\.org|learn4good\.com|mummyjobs\.co\.uk|jobijoba\.co\.uk|bebee\.com|simplyhired\.co\.uk|adzuna\.co\.uk|jobs24\.co\.uk|royalbotania\.com|thesun\.co\.uk|huntukvisasponsors\.com|sponsorseal\.com|whatjobs\.com|justlondonjobs\.com|definitejobs\.co\.uk|fotografiska\.com|studenttimes\.org|salutemyjob\.com|ukcareersfair\.com|jobilize\.com|lucidtrack\.dev|womenforhire\.com|geckojobs\.co\.uk|talent\.com|trovit\.co\.uk|careerjet\.co\.uk|jobsora\.com|recruit\.net)$/i;
+
+// True when the only place a role was found is a repost site: its title and pay are that site's,
+// not confirmed against the employer, so cards say so and For you ranks it lower.
+export function isRepostOnly(role: { apply_url: string | null; sources: string[] }): boolean {
+  if (!role.apply_url || role.sources.some((s) => s !== "google_jobs")) return false;
+  try {
+    return REPOST_HOSTS.test(new URL(role.apply_url).hostname);
+  } catch {
+    return false;
+  }
+}
+
 // Job boards sometimes appear as the "employer" (Google Jobs lists the board that posted it).
 const BOARDS = /^(targetjobs|efinancialcareers|graduate talent|brighterbox|bright network|gradcracker|milkround|prospects|ratemyplacement|trackr|jobteaser|higherin|inspiring interns|give a grad a go|grb|graduate recruitment bureau|jobleads|jooble|totaljobs|cv-library|indeed|linkedin|glassdoor)\b/i;
 export function isBoardName(employer: string): boolean {

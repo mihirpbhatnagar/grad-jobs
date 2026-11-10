@@ -40,8 +40,8 @@ function warning(row: Row, noReplyWeeks: number): string | null {
   return days <= 7 ? closesIn(days) : null;
 }
 
-// Roles saved but not yet applied for whose closing date is within two weeks, soonest first.
-const CLOSING_WITHIN_DAYS = 14;
+// Roles saved but not yet applied for whose closing date is within three weeks, soonest first.
+const CLOSING_WITHIN_DAYS = 21;
 function ClosingSoon({ rows }: { rows: Row[] }) {
   const closing = rows
     .filter((r) => r.stage === "saved" || r.stage === "applying")
@@ -54,7 +54,7 @@ function ClosingSoon({ rows }: { rows: Row[] }) {
   return (
     <div className="rounded-2xl border border-rose/30 bg-surface p-5">
       <h2 className="font-semibold tracking-tight">Closing soon</h2>
-      <p className="mt-1 text-xs text-muted">Saved roles you haven&apos;t applied for yet, closing in the next two weeks.</p>
+      <p className="mt-1 text-xs text-muted">Saved roles you haven&apos;t applied for yet, closing in the next three weeks.</p>
       <ul className="mt-3 space-y-1">
         {closing.map(({ row, iso, days }) => (
           <li key={row.id}>

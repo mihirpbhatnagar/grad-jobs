@@ -1,3 +1,4 @@
+import { isRepostOnly } from "./format.ts";
 import { FIELDS, type ProfileAnswers } from "./profile.ts";
 import type { Role } from "./roles.ts";
 
@@ -31,10 +32,13 @@ const wordStart = (k: string) => new RegExp(`(^|[^a-z])${escapeRe(k.trim())}${k.
 // For ranking, the sports field means the business side of sport. These two keywords are too
 // broad to show that on their own (a bank's "Product and Partnerships" scheme isn't sport).
 const TOO_BROAD: Record<string, string[]> = { sports: ["partnership", "club"] };
+// Words that count in a title but not in a description: there "sponsorship" is nearly always
+// about visas and "fitness" a gym benefit (Network Rail's scheme was tagged Sports this way).
+const TITLE_ONLY: Record<string, string[]> = { sports: ["sponsorship", "fitness"] };
 // School coaching and teaching jobs, sports science and recruiters asking for "sporty people"
 // mention sport but aren't sports business, so they don't count as a sports match.
 const NOT_SPORTS_BUSINESS =
-  /\b(coach(es|ing)?|teach(er|ers|ing)|ta|tutor|classroom|school|schools|education|mentor|cover supervisor|boarding|residential|resident|sports? science|sports? scientist|athletic development|strength and conditioning|recruitment consultant|recruitment|sports? people|sports? minded|sporty)\b/i;
+  /\b(coach(es|ing)?|teach(er|ers|ing)|ta|tutor|classroom|school|schools|education|mentor|cover supervisor|boarding|residential|resident|sports? science|sports? scientist|athletic development|strength and conditioning|recruitment consultant|recruitment|sports? people|sports? minded|sporty|academics|prospero|protocol education|ribbons (&|and) reeves|edex|veritas education|engage education|teaching personnel|teacheroo|aspire people|supply desk|smart teachers|career teachers|empowering learning|tradewind)\b/i;
 
 // Employers that are sport: a role there is a sports role even when its title doesn't say so
 // ("Brand Marketing Graduates 2027" at adidas). Matched at the start of the employer's name.
@@ -59,7 +63,7 @@ export function isSportsEmployer(employer: string): boolean {
 // Recruiters, job boards and sites that repost other firms' jobs: the listing may be real, but
 // it isn't the employer's own, so it ranks below one that is.
 const INTERMEDIARY =
-  /\b(recruitment|recruiters?|resourcing|staffing|personnel|headhunt\w*|talent solutions|search consultancy|joinrs|studysmarter|brighterbox|jobs in fitness|the graduate|client network|setsales|united media|hrtechx|cfo ?insights|retail insights|firstmind)\b|\bsearch$|^(targetjobs|efinancialcareers|graduate talent|bright network|gradcracker|milkround|prospects|ratemyplacement|trackr|jobteaser|higherin|inspiring interns|give a grad a go|grb|graduate recruitment bureau|jobleads|jooble|totaljobs|cv-library|indeed|linkedin|glassdoor)\b/i;
+  /\b(recruitment|recruiters?|resourcing|staffing|personnel|headhunt\w*|talent solutions|search consultancy|pareto|bms performance|bridgewater resources|office angels|randstad|hays|michael page|page personnel|adecco|manpower|robert walters|robert half|celsius graduate|ernest gordon|timberseed|this is prime|career change|it career switch|itol recruit|joinrs|studysmarter|brighterbox|jobs in fitness|the graduate|client network|setsales|united media|hrtechx|cfo ?insights|retail insights|firstmind)\b|\bsearch$|^(targetjobs|efinancialcareers|graduate talent|bright network|gradcracker|milkround|prospects|ratemyplacement|trackr|jobteaser|higherin|inspiring interns|give a grad a go|grb|graduate recruitment bureau|jobleads|jooble|totaljobs|cv-library|indeed|linkedin|glassdoor)\b/i;
 
 // Roles no source has confirmed for this long may have closed, so they rank lower.
 const STALE_AFTER_DAYS = 7;
@@ -71,10 +75,13 @@ export function rankForYou(
   a: ProfileAnswers,
   similarity: Map<number, number> = new Map(),
 ): Match[] {
-  const fields = (a.fields.forYou ? FIELDS.filter((f) => a.fields.value.includes(f.id)) : []).map((f) => ({
-    ...f,
-    tests: f.keywords.filter((k) => !TOO_BROAD[f.id]?.includes(k)).map(wordStart),
-  }));
+  const fields = (a.fields.forYou ? FIELDS.filter((f) => a.fields.value.includes(f.id)) : []).map((f) => {
+    const keywords = f.keywords.filter((k) => !TOO_BROAD[f.id]?.includes(k));
+    // In the description, a field needs two different keywords. A keyword that contains another
+    // ("sports" contains "sport", "digital marketing" contains "marketing") isn't a second one.
+    const distinct = keywords.filter((k) => !TITLE_ONLY[f.id]?.includes(k) && !keywords.some((o) => o !== k && k.includes(o.trim())));
+    return { ...f, tests: keywords.map(wordStart), bodyTests: distinct.map(wordStart) };
+  });
   const staleBefore = new Date(Date.now() - STALE_AFTER_DAYS * 86_400_000).toISOString();
   const goalWords = a.goals.forYou
     ? a.goals.value.toLowerCase().split(/[^a-z]+/).filter((w) => w.length > 4)
@@ -100,6 +107,7 @@ export function rankForYou(
     if (d.afterSept && start && start > "2027-09-30") continue;
     if (d.otherLocations && wantedPlaces.length && !inLocations(role, wantedPlaces)) continue;
 
+    const repost = isRepostOnly(role);
     const title = ` ${role.title.toLowerCase()} `;
     // The employer's name counts with the title: "Commercial Executive" at a football club is sport.
     const heading = `${title}| ${role.employer.toLowerCase()} `;
@@ -114,9 +122,11 @@ export function rankForYou(
         continue;
       }
       const inTitle = f.tests.some((re) => re.test(heading)) || (f.id === "sports" && isSportsEmployer(role.employer));
-      const inBody = f.tests.filter((re) => re.test(body)).length;
+      const inBody = f.bodyTests.filter((re) => re.test(body)).length;
       if (inTitle || inBody >= 2) {
-        score += inTitle ? 10 : 4;
+        // A repost site's title is its own wording, often stuffed with keywords, so it counts
+        // no more than a description match.
+        score += inTitle && !repost ? 10 : 4;
         tags.push(f.label.split(" ")[0]);
       }
     }
@@ -151,7 +161,7 @@ export function rankForYou(
     if (month === 7) score += 1;
     if (t.startText) tags.push(`${t.startText} start`);
     if (role.last_seen && role.last_seen < staleBefore) score -= 6;
-    if (INTERMEDIARY.test(role.employer.trim())) score -= 8;
+    if (INTERMEDIARY.test(role.employer.trim()) || repost) score -= 8;
 
     matches.push({ role, score, tags: [...new Set(tags)] });
   }

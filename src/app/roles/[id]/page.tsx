@@ -13,7 +13,7 @@ import { Chip, SponsorTick } from "@/components/RoleCard";
 import { SaveButton } from "@/components/SaveButton";
 import { currentUser } from "@/lib/auth";
 import { companyFor, sizeLabel, type Company } from "@/lib/companies";
-import { dateLong, daysUntil, decodeEntities, employerLabel, isBoardName, distinctPlaces, isCompetitive, money, startLabel } from "@/lib/format";
+import { dateLong, daysUntil, decodeEntities, employerLabel, isBoardName, distinctPlaces, isCompetitive, isRepostOnly, money, startLabel } from "@/lib/format";
 import type { RoleTags } from "@/lib/roles";
 import { fieldOf, salaryContext } from "@/lib/salary";
 import { publicClient } from "@/lib/supabase";
@@ -370,7 +370,7 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
       </section>
 
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-        <Fact label="Salary" value={salaryValue} />
+        <Fact label="Salary" value={salaryValue} sub={(r.salary_min || r.salary_max) && isRepostOnly(r) ? "Estimate from a site that copies adverts, not the employer" : undefined} />
         <Fact label="Location" value={places[0] ?? "Not stated"} sub={places.length > 1 ? `Also ${places.slice(1, 7).join("; ")}${places.length > 7 ? ` and ${places.length - 7} more` : ""}` : undefined} />
         <Fact label="Starts" value={r.start_status === "confirmed" && t.startText ? t.startText : r.start_status === "likely" ? "Not mentioned" : "Not stated"} sub={r.start_status === "likely" ? "Exact date not mentioned in the listing" : undefined} />
         <Fact

@@ -4,7 +4,7 @@ import { SaveButton } from "@/components/SaveButton";
 import type { Company } from "@/lib/companies";
 import type { Role } from "@/lib/roles";
 import { runsPastVisa, visaEndsLabel, type VisaSettings } from "@/lib/visa";
-import { dateShort, daysUntil, employerLabel, isBoardName, distinctPlaces, isCompetitive, postedAgo, salaryShort, startLabel } from "@/lib/format";
+import { dateShort, daysUntil, employerLabel, isBoardName, distinctPlaces, isCompetitive, isRepostOnly, postedAgo, salaryShort, startLabel } from "@/lib/format";
 
 export function Chip({ children, tone = "plain", title }: { children: React.ReactNode; tone?: "plain" | "accent" | "success" | "amber" | "rose"; title?: string }) {
   const tones = {
@@ -55,6 +55,7 @@ export function RoleCard({
   // search that hasn't run since): it may have closed, so the card says so instead of "apply early".
   const unconfirmed = !!role.last_seen && daysUntil(role.last_seen) < -7;
   const places = distinctPlaces(role.location, role.locations);
+  const repost = isRepostOnly(role);
   const about = company?.description;
 
   return (
@@ -95,7 +96,7 @@ export function RoleCard({
           {pay ? (
             <span className="text-right">
               <span className="block text-lg font-bold leading-none tracking-tight text-foreground tabular-nums">{pay}</span>
-              <span className="text-[11px] font-medium text-muted">a year</span>
+              <span className="text-[11px] font-medium text-muted">{repost ? "estimate" : "a year"}</span>
             </span>
           ) : isCompetitive(role.salary_text, t) ? (
             <span className="text-right">
@@ -135,6 +136,11 @@ export function RoleCard({
         )}
         {t.drivingLicence && <Chip>Driving licence</Chip>}
         {t.sponsorship === "not_offered" && <Chip tone="rose">Says no sponsorship</Chip>}
+        {repost && (
+          <Chip tone="amber" title="Found only on a site that copies adverts. The title and pay are that site's and may differ from the employer's own advert.">
+            Repost: check the employer&apos;s site
+          </Chip>
+        )}
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border pt-3 text-sm font-semibold sm:ml-[68px]">
