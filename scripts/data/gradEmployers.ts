@@ -70,6 +70,19 @@ export const KNOWN_FEEDS: { name: string; ats: string; ats_id: string }[] = [
   { name: "adidas", ats: "sitemap", ats_id: "https://jobs.adidas-group.com/sitemap.xml" },
   { name: "Carlsberg Britvic", ats: "sitemap", ats_id: "https://careers.carlsberg.com/sitemap.xml" },
   { name: "Better", ats: "sitemap", ats_id: "https://jobs.better.org.uk/sitemap.xml" },
+  // Sports bodies and clubs: careers systems found and test-read one by one on 10 Nov 2026 (the
+  // automatic search had linked several to the wrong site, e.g. the LTA to a US tennis association).
+  { name: "The Football Association", ats: "sitemap", ats_id: "https://careers.thefa.com/jobs/sitemap.xml" },
+  { name: "Lawn Tennis Association", ats: "sitemap", ats_id: "https://careers.lta.org.uk/sitemap.xml" },
+  { name: "AELTC", ats: "sitemap", ats_id: "https://jobs.wimbledon.com/sitemap.xml" },
+  { name: "Rugby Football Union", ats: "oracle", ats_id: "ecer.fa.em2.oraclecloud.com/CX_1" },
+  { name: "Red Bull Racing", ats: "oracle", ats_id: "iagtme.fa.ocs.oraclecloud.com/CX_2" },
+  { name: "Alpine F1", ats: "workday", ats_id: "alliancewd.wd3.myworkdayjobs.com/alliancewd/alpine-racing-careers" },
+  { name: "City Football Group", ats: "sitemap", ats_id: "https://careers.cityfootballgroup.com/sitemap.xml" },
+  { name: "Crystal Palace", ats: "sitemap", ats_id: "https://careers.cpfc.co.uk/sitemap.xml" },
+  { name: "Nottingham Forest", ats: "sitemap", ats_id: "https://careers.nottinghamforest.co.uk/sitemap.xml" },
+  { name: "Aston Villa", ats: "workday", ats_id: "avfc.wd502.myworkdayjobs.com/avfc/avfc_careers" },
+  { name: "Brentford", ats: "workday", ats_id: "brentfordfootballclub.wd107.myworkdayjobs.com/brentfordfootballclub/BrentfordFC" },
   // Careers-site sitemaps, tried one by one on 4 Nov 2026 (the automatic search had missed these,
   // or had picked another company's or another country's site).
   { name: "Softwire", ats: "sitemap", ats_id: "https://www.softwire.com/sitemap.xml" },
