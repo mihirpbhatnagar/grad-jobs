@@ -269,9 +269,13 @@ export function tagListing(title: string, description: string): RoleTags {
   else if (/\b2[:.]1\b|\bupper second\b/i.test(text)) degree = "2:1";
   else if (/\bfirst[- ]class\b/i.test(text)) degree = "First";
 
+  // Application forms list answers for the applicant to pick ("I'm a UK citizen with an indefinite
+  // right to work and no sponsorship requirement"). Those are options, not the employer's rule,
+  // so first-person lines are left out (L'Oréal's graduate scheme was flagged this way).
+  const employerWords = text.replace(/(^|[•\n.?:;])\s*I(['’]m| am| hold| have| will| do| require| need)\b[^•\n.?;]*/gi, "$1 ");
   let sponsorship: RoleTags["sponsorship"] = null;
-  if (NO_SPONSORSHIP.some((re) => re.test(text))) sponsorship = "not_offered";
-  else if (OFFERS_SPONSORSHIP.some((re) => re.test(text))) sponsorship = "offered";
+  if (NO_SPONSORSHIP.some((re) => re.test(employerWords))) sponsorship = "not_offered";
+  else if (OFFERS_SPONSORSHIP.some((re) => re.test(employerWords))) sponsorship = "offered";
 
   const { startText, startDate } = findStart(text);
 
