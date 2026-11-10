@@ -79,7 +79,7 @@ if (cmd === "pull") {
 } else if (cmd === "profile-cv") {
   const file = rest[0];
   const dest = `${uid}/cv-${Date.now()}-${safe(path.basename(file))}`;
-  const old = await must(() => db.from("profiles").select("cv_path").eq("user_id", uid).maybeSingle());
+  const old = (await must(() => db.from("profiles").select("cv_path").eq("user_id", uid).maybeSingle())) as { cv_path: string | null } | null;
   await upload(file, dest);
   const cvText = (await textOf(file)).slice(0, 50000);
   await must(() =>
@@ -93,7 +93,7 @@ if (cmd === "pull") {
   const row = await must(() =>
     db.from("saved_roles").insert({ user_id: uid, company, title, url: url || null }).select("id").single(),
   );
-  console.log(`Application added: id ${(row as { id: number }).id}`);
+  console.log(`Application added: id ${(row as unknown as { id: number }).id}`);
 } else if (cmd === "attach") {
   const [appId, kind, file] = rest;
   if (kind !== "cv" && kind !== "cover") throw new Error("Kind must be cv or cover");
