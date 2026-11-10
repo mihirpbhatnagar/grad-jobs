@@ -53,7 +53,7 @@ async function entities(ids: string[], props: string): Promise<Record<string, En
   for (let i = 0; i < ids.length; i += 50) {
     const batch = ids.slice(i, i + 50).join("|");
     const res = await getJson<{ entities: Record<string, Entity> }>(
-      `${WIKIDATA}?action=wbgetentities&ids=${batch}&props=${props}&languages=en&sitefilter=enwiki&format=json`,
+      `${WIKIDATA}?action=wbgetentities&ids=${batch}&props=${props}&languages=en|mul&sitefilter=enwiki&format=json`,
     );
     Object.assign(out, res?.entities ?? {});
   }
@@ -74,12 +74,38 @@ export const NOT_EMPLOYER = /(football club|association football|rugby (union |
 const richness = (e: Entity) =>
   (e.sitelinks?.enwiki ? 3 : 0) + ["P452", "P1128", "P159", "P154", "P856", "P571"].filter((p) => values(e, p).length > 0).length;
 
-function nameMatches(e: Entity, key: string): boolean {
-  const names = [e.labels?.en?.value, ...(e.aliases?.en ?? []).map((a) => a.value)].filter(Boolean) as string[];
-  return names.some((n) => {
-    const k = companyKey(n);
-    return k === key || k === `${key} uk` || `${k} uk` === key || k === `${key} group` || `${k} group` === key;
-  });
+// Words at the end of a name that don't change which company it means: legal forms ("Adidas AG",
+// "Aon plc"), "Group", "UK", and the labels employers put on their careers accounts ("Stantec UK
+// Careers", "Graphcore Early Careers", "WSP in the UK & Ireland"). adidas had no profile because
+// its entry is called "Adidas AG".
+const NAME_NOISE = new Set(["ag", "se", "sa", "nv", "bv", "gmbh", "plc", "inc", "corp", "corporation", "group", "holdings", "uk", "ireland", "gb", "careers", "career", "early", "graduates", "graduate", "recruitment", "team", "in", "and"]);
+export function bareName(key: string): string {
+  const words = key.split(" ");
+  while (words.length > 1 && NAME_NOISE.has(words[words.length - 1])) words.pop();
+  return words.join(" ");
+}
+
+// Wikidata stores some names once for all languages ("mul") instead of in English.
+const labelOf = (e: Entity | undefined) => e?.labels?.en?.value ?? e?.labels?.mul?.value ?? null;
+
+// "exact": the same name (allowing a trailing "UK" or "Group"), as before. "loose": the same once
+// legal forms and careers-account labels are dropped; only trusted when the website agrees too.
+function nameMatch(e: Entity, key: string): "exact" | "loose" | null {
+  const names = [labelOf(e), ...(e.aliases?.en ?? []).map((a) => a.value), ...(e.aliases?.mul ?? []).map((a) => a.value)].filter(Boolean) as string[];
+  const keys = names.map((n) => companyKey(n));
+  if (keys.some((k) => k === key || k === `${key} uk` || `${k} uk` === key || k === `${key} group` || `${k} group` === key)) return "exact";
+  const wanted = bareName(key);
+  return keys.some((k) => bareName(k) === wanted) ? "loose" : null;
+}
+
+// "adidas-group.com" and "www.adidas-group.com/en" are the same site; so are "pwc.co.uk" and "pwc.com".
+function siteName(urlOrDomain: string | null | undefined): string | null {
+  if (!urlOrDomain) return null;
+  const host = urlOrDomain.replace(/^https?:\/\//i, "").split("/")[0].toLowerCase().replace(/^www\./, "");
+  const parts = host.split(".");
+  if (parts.length < 2) return null;
+  const twoPartEnding = /^(co|com|org|ac|gov|net)$/.test(parts[parts.length - 2]) && parts[parts.length - 1].length === 2;
+  return parts[parts.length - (twoPartEnding ? 3 : 2)] ?? null;
 }
 
 function latestEmployees(e: Entity): number | null {
@@ -105,11 +131,11 @@ const domainOf = (url: string | null) => {
 // A company's website from its name (Clearbit's free name search, no account), for firms
 // that aren't on Wikidata. Only an exact name match is taken; UK sites win a tie.
 export async function domainFor(name: string): Promise<string | null> {
-  const key = companyKey(name);
+  const key = bareName(companyKey(name));
   if (key.length < 3) return null;
   const res = await getJson<{ name: string; domain: string }[]>(`https://autocomplete.clearbit.com/v1/companies/suggest?query=${encodeURIComponent(key)}`);
   const same = (res ?? []).filter((c) => {
-    const k = companyKey(c.name);
+    const k = bareName(companyKey(c.name));
     return k === key || k === `${key} uk` || `${k} uk` === key || k === `${key} group` || `${k} group` === key;
   });
   const pick = same.find((c) => /\.(co\.)?uk$/.test(c.domain)) ?? same[0];
@@ -123,15 +149,27 @@ export async function lookupCompanies(names: Map<string, string>): Promise<Compa
   for (const key of names.keys()) {
     await sleep(150);
     const res = await getJson<{ search: { id: string }[] }>(
-      `${WIKIDATA}?action=wbsearchentities&search=${encodeURIComponent(key)}&language=en&uselang=en&type=item&limit=5&format=json`,
+      // (ten results, not five: for short names like "Aon" the company comes after surnames and species)
+      `${WIKIDATA}?action=wbsearchentities&search=${encodeURIComponent(bareName(key))}&language=en&uselang=en&type=item&limit=10&format=json`,
     );
     const ids = (res?.search ?? []).map((s) => s.id);
     if (!ids.length) continue;
     const cands = await entities(ids, "labels|aliases|descriptions|claims|sitelinks");
-    const hit = ids
+    const usable = ids
       .map((id) => cands[id])
-      .filter((e) => e && nameMatches(e, key) && isOrganisation(e) && !(NOT_EMPLOYER.test(e.descriptions?.en?.value ?? "") && !/(fc|club|united|city)/i.test(key)))
-      .sort((a, b) => richness(b) - richness(a))[0];
+      .filter((e) => e && isOrganisation(e) && !(NOT_EMPLOYER.test(e.descriptions?.en?.value ?? "") && !/(fc|club|united|city)/i.test(key)));
+    const named = usable.map((e) => ({ e, kind: nameMatch(e, key) })).filter((m) => m.kind);
+    let hit: Entity | undefined;
+    if (named.length) {
+      // Two companies can share a name (GHD the engineers and GHD the hair brand), so the website
+      // decides where it can. A looser name match counts only when its website is the employer's.
+      // An exact match is passed over when the name is a short one (an acronym) and its website
+      // is a different site from the employer's.
+      const site = siteName(await domainFor(names.get(key)!));
+      const siteOf = (e: Entity) => siteName(firstValue(e, "P856") as string | undefined);
+      const trusted = named.filter((m) => (m.kind === "exact" ? !(key.length <= 4 && site && siteOf(m.e) && siteOf(m.e) !== site) : !!site && siteOf(m.e) === site));
+      hit = trusted.sort((a, b) => Number(b.kind === "exact") - Number(a.kind === "exact") || richness(b.e) - richness(a.e))[0]?.e;
+    }
     if (hit) found.set(key, hit.id);
   }
 
@@ -145,7 +183,7 @@ export async function lookupCompanies(names: Map<string, string>): Promise<Compa
     }
   }
   const labels = await entities([...linked], "labels");
-  const label = (id: string | null) => (id ? labels[id]?.labels?.en?.value ?? null : null);
+  const label = (id: string | null) => (id ? labelOf(labels[id]) : null);
 
   const rows: Company[] = [];
   for (const [key, name] of names) {
@@ -168,7 +206,7 @@ export async function lookupCompanies(names: Map<string, string>): Promise<Compa
     }
     rows.push({
       key,
-      name: e.labels?.en?.value ?? name,
+      name: labelOf(e) ?? name,
       wikidata_id: e.id,
       description: e.descriptions?.en?.value ?? null,
       summary,

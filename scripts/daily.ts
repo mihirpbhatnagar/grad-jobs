@@ -15,7 +15,7 @@ import { isEmployerPage, readJobPage, USER_AGENT } from "./lib/employerPages.ts"
 import { discoverFromWebsite, feedFromUrl, newFeedRun, pickSitemap, probe, readFeed } from "./sources/feeds.ts";
 import { companyKey, dedupeKey, prettyLocation } from "./lib/normalise.ts";
 import { refreshSponsors, sponsorMatcher, type SponsorMatch } from "./lib/sponsors.ts";
-import { countryOf, employerFromTitle, findSalary, isBoardName, isEarlyCareer, isGraduateTitle, isPartTime, isPlacementOrApprenticeship, isSeniorTitle, roleKind, startStatus, tagListing, type RoleTags } from "./lib/tags.ts";
+import { countryOf, employerFromTitle, findSalary, isBoardName, isEarlyCareer, isGraduateTitle, isPartTime, isPlacementOrApprenticeship, isSeniorTitle, placesInTitle, roleKind, startStatus, tagListing, type RoleTags } from "./lib/tags.ts";
 import { GOOGLE_JOBS_QUERIES, recoverGoogleJobs, searchGoogleJobs, SWEEP_QUERIES, SWEEP_QUERIES_2, SWEEP_QUERIES_3, SWEEP_QUERIES_4 } from "./sources/googleJobs.ts";
 import { reedDetails, searchReed, toListing } from "./sources/reed.ts";
 import type { Listing } from "./sources/types.ts";
@@ -384,6 +384,7 @@ async function retag(match: Matcher) {
     const written = r.salary_min || r.salary_max ? null : findSalary(r.description ?? "");
     const salary_min = r.salary_min ?? written?.min ?? null;
     const salary_max = r.salary_max ?? written?.max ?? null;
+    const titlePlaces = r.location || r.locations.length ? [] : placesInTitle(r.title);
     const next = {
       tags,
       salary_min,
@@ -392,8 +393,9 @@ async function retag(match: Matcher) {
       sponsor_name: m.name,
       kind: roleKind(r.title),
       start_status,
-      location: prettyLocation(r.location),
-      locations: [...new Set(r.locations.map((l) => prettyLocation(l) ?? l))],
+      // No place from any source: take the cities the title names ("... | Manchester & London").
+      location: prettyLocation(r.location) ?? titlePlaces[0] ?? null,
+      locations: [...new Set([...r.locations.map((l) => prettyLocation(l) ?? l), ...titlePlaces])],
       company_key: companyKey(employer),
       employer,
       quality: roleQuality({ ...r, tags, start_status, salary_min, salary_max, sponsor_status: m.status }),

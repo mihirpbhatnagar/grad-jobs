@@ -73,6 +73,22 @@ const STAGES: [string, RegExp][] = [
   ["Interview", /\b(final|face[- ]to[- ]face|in[- ]person|panel|telephone|phone)\s+interview/i],
 ];
 
+// Some employers name the place only in the title ("Sales Graduates 2027 | Manchester"). Used when a
+// listing has no location of its own. Only city names that can't be read as ordinary words or
+// surnames are here (so not Reading, Bath, York, Hull, Lincoln, Chester, Derby...).
+const TITLE_CITIES = [
+  "London", "Manchester", "Birmingham", "Leeds", "Glasgow", "Edinburgh", "Bristol", "Cardiff", "Belfast", "Liverpool", "Newcastle", "Sheffield", "Nottingham",
+  "Leicester", "Coventry", "Cambridge", "Oxford", "Southampton", "Portsmouth", "Brighton", "Milton Keynes", "Aberdeen", "Dundee", "Swansea", "Exeter", "Plymouth",
+  "Norwich", "Stoke-on-Trent", "Wolverhampton", "Sunderland", "Middlesbrough", "Swindon", "Warrington", "Stockport", "Slough", "Guildford", "Crawley", "Ipswich",
+  "Peterborough", "Northampton", "Cheltenham", "Gloucester", "Basingstoke", "Watford", "Croydon", "Maidenhead", "Solihull", "Doncaster", "Huddersfield", "Bournemouth",
+  "Chelmsford", "Inverness",
+];
+const TITLE_CITY_RE = new RegExp(`(?<![\\w-])(${TITLE_CITIES.join("|")})(?![\\w-])`, "gi");
+export function placesInTitle(title: string): string[] {
+  const found = [...title.matchAll(TITLE_CITY_RE)].map((m) => TITLE_CITIES.find((c) => c.toLowerCase() === m[1].toLowerCase())!);
+  return [...new Set(found)];
+}
+
 function parseMonthYear(month: string, year: string): string {
   const key = month.toLowerCase();
   const m = MONTHS.findIndex((full) => full.startsWith(key.slice(0, 3))) + 1 || SEASON_MONTH[key] || 1;
@@ -81,9 +97,13 @@ function parseMonthYear(month: string, year: string): string {
 
 function findStart(text: string): { startText: string | null; startDate: string | null } {
   const patterns = [
-    new RegExp(`\\b(${MONTH_RE}|spring|summer|autumn|winter)\\s+(202[6-9])\\s+(start|intake|cohort|entry)`, "i"),
+    // (whole words only: "January 2028 Starting salary: £36,500" is not a January 2028 start)
+    new RegExp(`\\b(${MONTH_RE}|spring|summer|autumn|winter)\\s+(202[6-9])\\s+(starts?|intakes?|cohorts?|entry)\\b`, "i"),
     new RegExp(`\\((${MONTH_RE})\\s+(202[6-9])(?:\\s+(?:start|intake))?\\)`, "i"),
     new RegExp(`\\b(?:start(?:ing|s)?|commenc\\w*|join(?:ing)?|intake)\\b[^.\\n]{0,40}?\\b(${MONTH_RE}|spring|summer|autumn|winter)\\s+(202[6-9])`, "i"),
+    // "available to work full-time from September 2027 to September 2028" (adidas)
+    new RegExp(`\\bfrom\\s+(${MONTH_RE})\\s+(202[6-9])\\s+(?:to|until|till|through|[-–—])\\s+(?:${MONTH_RE})\\s+202[6-9]`, "i"),
+    new RegExp(`\\b(?:available|availability)\\b[^.\\n]{0,50}?\\b(?:from|in)\\s+(${MONTH_RE})\\s+(202[6-9])`, "i"),
     /\b(202[6-9])\s+(?:graduate\s+)?(?:intake|start|cohort|programme|scheme)\b/i,
   ];
   for (const re of patterns) {
@@ -136,13 +156,42 @@ function findDeadline(text: string): string | null {
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === iso ? iso : null;
 }
 
+// The length of the whole scheme or contract: "two-year Engineering Graduate Development Programme",
+// "18-month rotational programme", "Graduate Program - 24 Month Rotation". Up to three describing
+// words may sit between the length and the noun, but not joining words, so "a 6-month review of
+// the programme" doesn't count. Placements inside a scheme never count.
+const LENGTH_FILLER = "(?:(?!(?:of|the|in|to|for|and|with|on|a|an|at|after|before|into|from|per|or)\\b)[\\w&-]+\\s+){0,3}";
+const LENGTH_RE = new RegExp(
+  `\\b(\\d{1,2}|one|two|three|four|five|six|twelve|eighteen|twenty-four)[- ](year|month)s?(?:[- ]long)?\\s+${LENGTH_FILLER}(programmes?|programs?|schemes?|contracts?|fixed[- ]term|apprenticeships?|rotations?|rotational)\\b`,
+  "gi",
+);
+const NOT_THE_JOB = /\b(degree|undergraduate|postgraduate|masters?|msc|phd|doctoral|course|university|capital|delivery|investment|framework|infrastructure|construction|research|study|studies|experience|probation|probationary)\b/i;
+// "four hands-on, six-month rotations", "two 18-month rotations": the length of one part, not of the scheme.
+const COUNTED_PARTS = /\b(two|three|four|five|six|\d)\s+(?:[\w-]+,?\s+){0,2}$/i;
+
 function findLengthMonths(text: string): number | null {
-  const re = /\b(\d{1,2}|one|two|three|four|five|six|twelve|eighteen|twenty-four)[- ](year|month)s?(?:[- ]long)?\s+(?:graduate\s+|rotational\s+|training\s+|development\s+)*(programme|program|scheme|rotation|contract|fixed[- ]term|placement|apprenticeship)/i;
-  const m = text.match(re);
-  if (!m) return null;
-  const n = Number(m[1]) || NUMBER_WORDS[m[1].toLowerCase()];
-  if (!n) return null;
-  return m[2].toLowerCase() === "year" ? n * 12 : n;
+  const months = (amount: string, unit: string) => {
+    const n = Number(amount) || NUMBER_WORDS[amount.toLowerCase()];
+    return n ? (unit.toLowerCase() === "year" ? n * 12 : n) : null;
+  };
+  for (const m of text.matchAll(LENGTH_RE)) {
+    if (/^rotation/i.test(m[3]) && COUNTED_PARTS.test(text.slice(Math.max(0, m.index - 30), m.index))) continue;
+    // Not the job's length: a degree ("3-year undergraduate degree program") or a client's
+    // project ("a major 5-year capital delivery programme").
+    if (NOT_THE_JOB.test(m[0])) continue;
+    const n = months(m[1], m[2]);
+    if (n && n <= 48) return n;
+  }
+  // "Duration: 6 months"
+  const stated = text.match(/\bduration\s*(?:is|of|:|-|–)?\s*(\d{1,2})\s*(year|month)s?\b/i);
+  if (stated) return months(stated[1], stated[2]);
+  // Stated as dates: "from September 2027 to September 2028" is 12 months. Not when it is a
+  // window of possible start dates ("flexible start date from January 2027 to September 2027").
+  const range = text.match(new RegExp(`\\bfrom\\s+(${MONTH_RE})\\s+(202[6-9])\\s+(?:to|until|till|through|[-–—])\\s+(${MONTH_RE})\\s+(202[6-9])`, "i"));
+  if (!range || /\bstart(ing)? dates?\b[^.\n]{0,40}$/i.test(text.slice(Math.max(0, range.index! - 60), range.index))) return null;
+  const [from, to] = [new Date(parseMonthYear(range[1], range[2])), new Date(parseMonthYear(range[3], range[4]))];
+  const span = (to.getUTCFullYear() - from.getUTCFullYear()) * 12 + to.getUTCMonth() - from.getUTCMonth();
+  return span >= 3 && span <= 48 ? span : null;
 }
 
 // Scope rule: does this listing read as a graduate / early-career role at all? Reed's own
