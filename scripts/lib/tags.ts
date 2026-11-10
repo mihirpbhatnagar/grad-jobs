@@ -224,7 +224,7 @@ export type StartStatus = "confirmed" | "likely" | "before" | "unknown";
 // "Graduate Accountant", "Finance Graduate", "Graduate - Marketing" are graduate jobs; titles
 // that only say the job suits graduates ("...ideal for graduates", "graduates welcome") aren't.
 export function isGraduateTitle(title: string): boolean {
-  if (!/\b(graduate|grad)\b/i.test(title)) return false;
+  if (!/\b(graduates?|grads?)\b/i.test(title)) return false;
   if (/\b(for|ideal for|suit(s|able for)?|welcome|recent|attention|calling all|open to|including|and)\s+(recent\s+)?graduates?\b|\bgraduates?\s+(welcome|wanted|considered|encouraged)\b|\bnon[- ]graduate\b|\bgraduate (calibre|level|caliber)\b/i.test(title)) return false;
   return true;
 }
