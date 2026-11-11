@@ -58,7 +58,7 @@ export function ApplyTools({ roleId, initial, enabled, signedIn, kinds }: { role
   if (!enabled) {
     return (
       <p className="rounded-xl border border-dashed border-border px-3 py-2 text-sm text-muted">
-        <span className="font-medium text-foreground">AI help is switched off:</span> {buttons.map((b) => b.label.toLowerCase()).join(", ")}. The free tools above work now.
+        <span className="font-medium text-foreground">Built, waiting to be switched on:</span> {buttons.map((b) => `${b.label.toLowerCase()} (about ${ESTIMATE_PENCE[b.kind]}p a go)`).join(", ")}. It uses paid AI, so it stays off until you say so.
       </p>
     );
   }

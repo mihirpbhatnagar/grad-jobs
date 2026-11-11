@@ -139,7 +139,7 @@ export async function saveStoryBank(text: string): Promise<void> {
     story_bank_updated_at: new Date().toISOString(),
   });
   if (error) throw error;
-  revalidatePath("/apply");
+  revalidatePath("/", "layout");
   revalidatePath("/my-jobs");
 }
 

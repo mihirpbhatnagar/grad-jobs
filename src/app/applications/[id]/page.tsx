@@ -7,6 +7,8 @@ import { CompanyLogo } from "@/components/CompanyLogo";
 import { FreeTools } from "@/components/FreeTools";
 import { RoleContacts } from "@/components/Networking";
 import { Chip } from "@/components/RoleCard";
+import { StoryBank } from "@/components/StoryBank";
+import { CvUpload } from "@/app/profile/CvUpload";
 import { aiAvailable } from "@/lib/ai";
 import { requireUser } from "@/lib/auth";
 import { companyFor, sizeLabel } from "@/lib/companies";
@@ -58,7 +60,7 @@ async function Workspace({ params }: { params: PageProps<"/applications/[id]">["
     app.role_id
       ? db.from("roles").select("id,title,employer,company_key,location,locations,expires_at,is_open,apply_url,salary_min,salary_max,tags,start_status,description").eq("id", app.role_id).maybeSingle()
       : Promise.resolve({ data: null }),
-    db.from("profiles").select("cv_text,story_bank").maybeSingle(),
+    db.from("profiles").select("cv_text,story_bank,cv_name,cv_uploaded_at").maybeSingle(),
     app.role_id
       ? db.from("ai_outputs").select("kind,content,created_at").eq("role_id", app.role_id).in("kind", ["brief", "cv", "rewrite", "cover"]).order("created_at", { ascending: false }).limit(20)
       : Promise.resolve({ data: [] }),
@@ -157,6 +159,26 @@ async function Workspace({ params }: { params: PageProps<"/applications/[id]">["
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="min-w-0 space-y-4">
+          <section className={`rounded-2xl border bg-surface p-5 sm:p-6 ${cvText && storyBank ? "border-border" : "border-2 border-accent/40"}`}>
+            <h2 className="text-lg font-semibold tracking-tight">{cvText && storyBank ? "Your CV and story bank" : "Start here: your CV and story bank"}</h2>
+            <p className="mt-1 text-sm text-muted">
+              Every step below works from these two. Your CV is what the employer sees; the story bank is rough notes on things you&apos;ve really done, which the
+              tools draw on and never add to.
+            </p>
+            <div className="mt-4 space-y-3">
+              <div className="rounded-xl bg-chip px-4 py-3">
+                <p className="mb-2 text-sm font-medium">{cvText ? "Your CV" : "1. Upload your CV (PDF or Word)"}</p>
+                <CvUpload
+                  url={process.env.SUPABASE_URL!}
+                  publishableKey={process.env.SUPABASE_PUBLISHABLE_KEY!}
+                  userId={user.id}
+                  current={profile?.cv_name && profile.cv_uploaded_at ? { name: profile.cv_name, uploadedAt: profile.cv_uploaded_at } : null}
+                />
+              </div>
+              <StoryBank initial={storyBank} />
+            </div>
+          </section>
+
           <Step n={1} id="company" title="Know the company" lead="What they do and what they look for, so your application sounds like you chose them.">
             {company?.summary || company?.description ? (
               <p className="text-sm leading-6 text-foreground/85">{company.summary ?? company.description}</p>
@@ -178,15 +200,7 @@ async function Workspace({ params }: { params: PageProps<"/applications/[id]">["
           </Step>
 
           <Step n={2} id="cv" title="Tailor your CV" lead="See which of the listing's skills your CV already shows, and which of your real experiences to lead with.">
-            {!cvText && (
-              <p className="mb-3 rounded-xl bg-amber-soft px-3 py-2 text-sm text-amber">
-                No CV uploaded yet.{" "}
-                <Link href="/profile" className="font-semibold underline underline-offset-2">
-                  Add it on your profile
-                </Link>{" "}
-                and this step fills in.
-              </p>
-            )}
+            {!cvText && <p className="mb-3 rounded-xl bg-amber-soft px-3 py-2 text-sm text-amber">Upload your CV at the top of this page and this step fills in.</p>}
             <FreeTools {...tools} tabs={["keywords", "stories", "bullets"]} />
             {role && (
               <div className="mt-5 border-t border-border pt-4">
