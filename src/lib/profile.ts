@@ -38,6 +38,7 @@ export const DONT_SHOW = [
   { id: "nonSponsors", label: "Companies not on the sponsor register" },
   { id: "drivingLicence", label: "Roles needing a driving licence" },
   { id: "longSchemes", label: "Schemes longer than 18 months" },
+  { id: "pastVisa", label: "Roles that run past my Graduate visa" },
   { id: "beforeJune", label: "Starting before June 2027" },
   { id: "afterSept", label: "Starting after September 2027" },
   { id: "otherLocations", label: "Locations I haven't ticked" },
@@ -60,7 +61,7 @@ export const DEFAULT_ANSWERS: ProfileAnswers = {
   sponsors: { value: true, forYou: false },
   locations: { value: [], other: "", forYou: false },
   salary: { value: 0, forYou: false },
-  dontShow: { nonSponsors: false, drivingLicence: false, longSchemes: false, beforeJune: false, afterSept: false, otherLocations: false },
+  dontShow: { nonSponsors: false, drivingLicence: false, longSchemes: false, pastVisa: false, beforeJune: false, afterSept: false, otherLocations: false },
 };
 
 // Fills in any answers a stored profile is missing (e.g. questions added later).

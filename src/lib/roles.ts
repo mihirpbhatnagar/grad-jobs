@@ -2,6 +2,7 @@ import { ukToday, weekAhead } from "./format";
 import { companiesFor, type Company } from "./companies";
 import { FIELDS } from "./profile";
 import { publicClient } from "./supabase";
+import { addMonths, visaSettings } from "./visa";
 
 export type RoleTags = {
   degree: "First" | "2:1" | "2:2" | null;
@@ -19,6 +20,8 @@ export type RoleTags = {
   startDate?: string | null;
   // How well known the employer is: 2 major, 1 established, 0 other.
   prominence?: number;
+  // When the scheme ends (start + stated length); absent when no length is stated.
+  endDate?: string;
 };
 
 export type Role = {
@@ -62,6 +65,8 @@ export type RoleFilters = {
   start: "" | "summer" | "sept" | "later";
   closingSoon: boolean;
   source: "" | "reed" | "google_jobs";
+  // Hide roles that would still be running when the Graduate visa ends.
+  withinVisa: boolean;
 };
 
 export const PAGE_SIZE = 30;
@@ -70,7 +75,7 @@ export type { Company };
 
 // Number of filters switched on (shown on the Filters button).
 export function activeFilterCount(f: RoleFilters): number {
-  return f.sectors.length + f.locs.length + (f.salary ? 1 : 0) + (f.start ? 1 : 0) + (f.source ? 1 : 0) + (f.sponsor ? 1 : 0) + (f.schemes ? 1 : 0) + (f.closingSoon ? 1 : 0);
+  return f.sectors.length + f.locs.length + (f.salary ? 1 : 0) + (f.start ? 1 : 0) + (f.source ? 1 : 0) + (f.sponsor ? 1 : 0) + (f.schemes ? 1 : 0) + (f.closingSoon ? 1 : 0) + (f.withinVisa ? 1 : 0);
 }
 
 export function parseFilters(params: Record<string, string | string[] | undefined>): RoleFilters {
@@ -91,6 +96,7 @@ export function parseFilters(params: Record<string, string | string[] | undefine
     start: start === "summer" || start === "sept" || start === "later" ? start : "",
     closingSoon: one("closing") === "1",
     source: source === "reed" || source === "google_jobs" ? source : "",
+    withinVisa: one("visa") === "1",
   };
 }
 
@@ -108,6 +114,7 @@ export function filtersToQuery(f: RoleFilters, changes: Partial<RoleFilters> = {
   if (n.start) p.set("start", n.start);
   if (n.closingSoon) p.set("closing", "1");
   if (n.source) p.set("source", n.source);
+  if (n.withinVisa) p.set("visa", "1");
   if (n.page > 1) p.set("page", String(n.page));
   const qs = p.toString();
   return qs ? `${path}?${qs}` : path;
@@ -179,6 +186,12 @@ export async function fetchRoles(f: RoleFilters, scope: RoleScope = "main") {
     query = query.or(`expires_at.lte.${week},tags->>deadline.lte.${week}`);
   }
   if (f.source) query = query.contains("sources", [f.source]);
+  if (f.withinVisa) {
+    // Roles that state no length can't be said to run past the visa, so they stay.
+    const visa = await visaSettings();
+    const visaEnds = addMonths(visa.approvalDate, visa.graduateMonths).toISOString().slice(0, 10);
+    query = query.or(`tags->>endDate.is.null,tags->>endDate.lte.${visaEnds}`);
+  }
   if (f.sort === "closing") query = query.order("expires_at", { ascending: true, nullsFirst: false });
   // Newest = most recently found by the app (many listings give no posting date).
   else if (f.sort === "newest") query = query.order("first_seen", { ascending: false }).order("quality", { ascending: false });

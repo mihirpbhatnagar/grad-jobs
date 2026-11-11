@@ -17,7 +17,7 @@ import { isEmployerPage, readJobPage, USER_AGENT } from "./lib/employerPages.ts"
 import { discoverFromWebsite, feedFromUrl, newFeedRun, pickSitemap, probe, readFeed } from "./sources/feeds.ts";
 import { companyKey, dedupeKey, prettyLocation } from "./lib/normalise.ts";
 import { refreshSponsors, sponsorMatcher, type SponsorMatch } from "./lib/sponsors.ts";
-import { countryOf, employerFromTitle, findSalary, isBoardName, isEarlyCareer, isGraduateTitle, isPartTime, isPlacementOrApprenticeship, isSeniorTitle, placesInTitle, roleKind, startStatus, tagListing, type RoleTags } from "./lib/tags.ts";
+import { countryOf, employerFromTitle, findSalary, isBoardName, isEarlyCareer, isGraduateTitle, isPartTime, isPlacementOrApprenticeship, isSeniorTitle, placesInTitle, roleKind, schemeEnd, startStatus, tagListing, type RoleTags } from "./lib/tags.ts";
 import { GOOGLE_JOBS_QUERIES, recoverGoogleJobs, searchGoogleJobs, SWEEP_QUERIES, SWEEP_QUERIES_2, SWEEP_QUERIES_3, SWEEP_QUERIES_4 } from "./sources/googleJobs.ts";
 import { reedDetails, searchReed, toListing } from "./sources/reed.ts";
 import type { Listing } from "./sources/types.ts";
@@ -64,6 +64,13 @@ type QualityInput = { last_seen?: string | null; tags: RoleTags; start_status: s
 // Well-known employers rank higher in All roles: +5 major, +2 established (tags.prominence).
 const PROMINENCE_BONUS = [0, 2, 5];
 let prominenceOf: (employer: string) => number = () => 0;
+// The year a scheme is taken to start when its listing doesn't say (the assumed visa year).
+let defaultStartYear = 2027;
+// Tags worked out from more than the listing's text: employer prominence and the scheme's end date.
+function withExtras<T extends RoleTags>(tags: T, employer: string) {
+  const endDate = schemeEnd(tags, defaultStartYear);
+  return { ...tags, prominence: prominenceOf(employer), ...(endDate ? { endDate } : {}) };
+}
 function roleQuality(r: QualityInput): number {
   return (
     (PROMINENCE_BONUS[r.tags.prominence ?? 0] ?? 0) -
@@ -79,7 +86,7 @@ function roleQuality(r: QualityInput): number {
 }
 
 function roleRow(l: Listing, match: SponsorMatch, existing: ExistingRole | undefined, now: string) {
-  const tags = { ...tagListing(l.title, l.description), abroad: countryOf(l.title, l.location), prominence: prominenceOf(l.employer) };
+  const tags = withExtras({ ...tagListing(l.title, l.description), abroad: countryOf(l.title, l.location) }, l.employer);
   const locations = [...new Set([...(existing?.locations ?? []), ...(l.location ? [l.location] : [])])];
   const start_status = startStatus(tags, earliestStart);
   // The source's salary fields, else a salary written in the description ("£35,000 per annum").
@@ -405,7 +412,7 @@ async function retag(match: Matcher) {
     if (removed.has(r.id)) continue;
     // A job board listed as the employer: use the real employer named in the title, if any.
     const employer = isBoardName(r.employer) ? (employerFromTitle(r.title) ?? r.employer) : r.employer;
-    const tags = { ...tagListing(r.title, r.description ?? ""), abroad: countryOf(r.title, r.location), prominence: prominenceOf(employer) };
+    const tags = withExtras({ ...tagListing(r.title, r.description ?? ""), abroad: countryOf(r.title, r.location) }, employer);
     const m = match(employer, r.location);
     const start_status = startStatus(tags, earliestStart);
     const written = r.salary_min || r.salary_max ? null : findSalary(r.description ?? "");
@@ -444,12 +451,15 @@ async function retag(match: Matcher) {
   }
 
   let changed = 0;
+  const writes: { id: number; next: Record<string, unknown> }[] = [];
   for (const { r, next } of pending) {
     const current = { part_time: r.part_time, salary_min: r.salary_min, salary_max: r.salary_max, employer: r.employer, tags: r.tags, sponsor_status: r.sponsor_status, sponsor_name: r.sponsor_name, kind: r.kind, start_status: r.start_status, location: r.location, locations: r.locations, company_key: r.company_key, quality: r.quality };
     if (sameJson(next, current)) continue;
-    await must(() => db.from("roles").update(next).eq("id", r.id));
+    writes.push({ id: r.id, next });
     changed++;
   }
+  // Eight at a time: one by one, a rule change that touches every role took over an hour.
+  for (const batch of chunks(writes, 8)) await Promise.all(batch.map((w) => must(() => db.from("roles").update(w.next).eq("id", w.id))));
   return { removedOutOfScope: removeIds.length, updated: changed };
 }
 
@@ -458,7 +468,7 @@ type Details = { description: string; salaryMin: number | null; salaryMax: numbe
 
 // Gives a role its full description (from an employer page or feed) and re-tags it.
 async function applyDescription(r: DescribeRow, d: Details) {
-  const tags = { ...tagListing(r.title, d.description), abroad: countryOf(r.title, r.location ?? null), prominence: prominenceOf(r.employer) };
+  const tags = withExtras({ ...tagListing(r.title, d.description), abroad: countryOf(r.title, r.location ?? null) }, r.employer);
   const start_status = startStatus(tags, earliestStart);
   const written = findSalary(d.description);
   const salary_min = r.salary_min ?? d.salaryMin ?? written?.min ?? null;
@@ -820,6 +830,7 @@ async function main() {
 
   try {
     earliestStart = await setting("feed.earliest_start", earliestStart);
+    defaultStartYear = Number(String(await setting("visa.assumed_approval_date", "2027-10-31")).slice(0, 4)) || 2027;
     prominenceOf = prominenceIndex(await selectAll<CompanyFacts>((from, to) => db.from("companies").select("key,wikidata_id,employees").order("key").range(from, to)));
     const { sponsors, refreshed } = await refreshSponsors(db);
     stats.sponsors = sponsors.length;

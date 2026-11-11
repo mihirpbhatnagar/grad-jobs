@@ -29,7 +29,27 @@ export type RoleTags = {
   prominence?: number;
   // The latest year the title names ("Graduate Scheme 2026" -> 2026, "2026/27" -> 2027), if any.
   titleYear?: number | null;
+  // When the scheme ends (start + stated length), for the "within my visa" filter. Only set
+  // when the listing states a length.
+  endDate?: string;
 };
+
+// The date a scheme ends: its start plus its stated length. Mirrors src/lib/visa.ts (schemeStart
+// and addMonths): a start given only as a year, or not at all, is taken as September, and month
+// arithmetic stays inside the month.
+export function schemeEnd(tags: { startDate?: string | null; startText?: string | null; lengthMonths?: number | null }, defaultYear: number): string | null {
+  if (!tags.lengthMonths) return null;
+  const yearOnly = /^\d{4}$/.test(tags.startText ?? "") || (!!tags.startDate && !tags.startText);
+  const start = tags.startDate && !yearOnly ? tags.startDate : `${tags.startDate ? tags.startDate.slice(0, 4) : defaultYear}-09-01`;
+  const d = new Date(start);
+  if (Number.isNaN(d.getTime())) return null;
+  const day = d.getUTCDate();
+  d.setUTCDate(1);
+  d.setUTCMonth(d.getUTCMonth() + tags.lengthMonths);
+  const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  d.setUTCDate(Math.min(day, lastDay));
+  return d.toISOString().slice(0, 10);
+}
 
 // The latest year a title names. "2026/27" and "2026-27" count as 2027.
 export function titleYear(title: string): number | null {

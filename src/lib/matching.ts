@@ -74,6 +74,8 @@ export function rankForYou(
   roles: (Role & { description?: string | null; last_seen?: string | null })[],
   a: ProfileAnswers,
   similarity: Map<number, number> = new Map(),
+  // The date the user's Graduate visa ends ("2029-04-30"), for the "run past my visa" switch.
+  visaEnds?: string,
 ): Match[] {
   const fields = (a.fields.forYou ? FIELDS.filter((f) => a.fields.value.includes(f.id)) : []).map((f) => {
     const keywords = f.keywords.filter((k) => !TOO_BROAD[f.id]?.includes(k));
@@ -103,6 +105,7 @@ export function rankForYou(
     if (d.nonSponsors && role.sponsor_status === "not_listed") continue;
     if (d.drivingLicence && t.drivingLicence) continue;
     if (d.longSchemes && t.lengthMonths && t.lengthMonths > 18) continue;
+    if (d.pastVisa && visaEnds && t.endDate && t.endDate > visaEnds) continue;
     if (d.beforeJune && start && start < "2027-06-01") continue;
     if (d.afterSept && start && start > "2027-09-30") continue;
     if (d.otherLocations && wantedPlaces.length && !inLocations(role, wantedPlaces)) continue;

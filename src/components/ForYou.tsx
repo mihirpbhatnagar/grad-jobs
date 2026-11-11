@@ -9,17 +9,17 @@ import { rankForYou } from "@/lib/matching";
 import { withDefaults } from "@/lib/profile";
 import { ROLE_COLUMNS, type Role } from "@/lib/roles";
 import { publicClient } from "@/lib/supabase";
-import { visaSettings } from "@/lib/visa";
+import { addMonths, visaSettings } from "@/lib/visa";
 
 const SHOW = 30;
 const NEW_SHOWN = 8;
 
 // The shortlist only changes when the profile or the daily data does, so it is kept for a few
 // minutes: saving a role or coming back to the page doesn't work it all out again.
-async function shortlistFor(answersJson: string, goalEmbedding: string | null): Promise<Shortlist> {
+async function shortlistFor(answersJson: string, goalEmbedding: string | null, visaEnds: string): Promise<Shortlist> {
   "use cache";
   cacheLife("minutes");
-  return forYouShortlist(publicClient()!, JSON.parse(answersJson), goalEmbedding);
+  return forYouShortlist(publicClient()!, JSON.parse(answersJson), goalEmbedding, visaEnds);
 }
 
 function Prompt({ title, body, href, cta }: { title: string; body: string; href: string; cta: string }) {
@@ -47,15 +47,16 @@ export async function ForYou() {
   }
 
   // Step 1: the best matches on everything except the description (see lib/forYouRoles.ts).
-  const shortlist = await shortlistFor(JSON.stringify(answers), profile?.goal_embedding ? String(profile.goal_embedding) : null);
+  const visa = await visaSettings();
+  const visaEnds = addMonths(visa.approvalDate, visa.graduateMonths).toISOString().slice(0, 10);
+  const shortlist = await shortlistFor(JSON.stringify(answers), profile?.goal_embedding ? String(profile.goal_embedding) : null, visaEnds);
   // Step 2: those few in full, ranked again with their descriptions.
   const pub = publicClient()!;
-  const [{ data }, visa, { data: saved }] = await Promise.all([
+  const [{ data }, { data: saved }] = await Promise.all([
     shortlist.ids.length ? pub.from("roles").select(`${ROLE_COLUMNS},description`).in("id", shortlist.ids).eq("is_open", true) : Promise.resolve({ data: [] }),
-    visaSettings(),
     db.from("saved_roles").select("role_id"),
   ]);
-  const matches = rankForYou((data ?? []) as unknown as (Role & { description: string | null; last_seen: string | null })[], answers, new Map(shortlist.similarity));
+  const matches = rankForYou((data ?? []) as unknown as (Role & { description: string | null; last_seen: string | null })[], answers, new Map(shortlist.similarity), visaEnds);
   const total = Math.max(shortlist.total, matches.length);
 
   // New matches first, so a daily visit starts with what wasn't there yesterday; then the best.

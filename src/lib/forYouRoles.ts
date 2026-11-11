@@ -20,7 +20,7 @@ const LIGHT_COLUMNS = "id,title,employer,location,locations,salary_min,salary_ma
 type Row = { id: number } & Record<string, unknown>;
 export type Shortlist = { total: number; ids: number[]; similarity: [number, number][] };
 
-export async function forYouShortlist(pub: SupabaseClient, a: ProfileAnswers, goalEmbedding: string | null): Promise<Shortlist> {
+export async function forYouShortlist(pub: SupabaseClient, a: ProfileAnswers, goalEmbedding: string | null, visaEnds?: string): Promise<Shortlist> {
   const base = () =>
     pub.from("roles").select(LIGHT_COLUMNS).eq("is_open", true).eq("kind", "job").eq("part_time", false).in("start_status", ["confirmed", "likely"]);
   const rowsOf = (res: { data: unknown }) => (res.data ?? []) as Row[];
@@ -64,7 +64,7 @@ export async function forYouShortlist(pub: SupabaseClient, a: ProfileAnswers, go
   // No fields switched on and no goals yet: the newest roles.
   if (!byId.size) for (const r of rowsOf(await base().order("id", { ascending: false }).limit(PAGE))) byId.set(r.id, r);
 
-  const ranked = rankForYou([...byId.values()] as unknown as Role[], a, similarity);
+  const ranked = rankForYou([...byId.values()] as unknown as Role[], a, similarity, visaEnds);
   const ids = ranked.slice(0, SHORTLIST).map((m) => m.role.id);
   return { total: ranked.length, ids, similarity: ids.filter((id) => similarity.has(id)).map((id) => [id, similarity.get(id)!]) };
 }
