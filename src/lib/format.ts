@@ -92,7 +92,11 @@ export function contractLabel(contractType: string | null | undefined, title: st
 export function distinctPlaces(location: string | null | undefined, locations: string[] | null | undefined): string[] {
   const out: string[] = [];
   const towns = new Set<string>();
-  for (const raw of [location, ...(locations ?? [])]) {
+  const all = [location, ...(locations ?? [])].filter((p): p is string => !!p?.trim());
+  // "Anywhere" / "United Kingdom" say nothing once a real town is listed.
+  const vague = (p: string) => /^(anywhere|nationwide|various|multiple locations?|uk|united kingdom|england|remote)$/i.test(p.trim());
+  const named = all.some((p) => !vague(p)) ? all.filter((p) => !vague(p)) : all;
+  for (const raw of named) {
     if (!raw?.trim()) continue;
     const place = tidyPlace(raw);
     const parts = place.toLowerCase().split(",").map((p) => p.trim());

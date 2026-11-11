@@ -16,7 +16,7 @@ function TabLink({ href, label, count, active }: { href: string; label: string; 
       href={href}
       scroll={false}
       aria-current={active ? "page" : undefined}
-      className={`flex items-center gap-2 rounded-lg px-4 py-2 font-medium transition-colors ${active ? "bg-surface text-foreground shadow-sm ring-1 ring-border" : "text-muted hover:text-foreground"}`}
+      className={`flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 font-medium transition-colors sm:px-4 ${active ? "bg-surface text-foreground shadow-sm ring-1 ring-border" : "text-muted hover:text-foreground"}`}
     >
       {label}
       {count !== undefined && <span className={`rounded-full px-1.5 text-xs tabular-nums ${active ? "bg-accent-soft text-accent" : "bg-surface text-muted"}`}>{count}</span>}

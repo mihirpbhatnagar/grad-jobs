@@ -1,4 +1,5 @@
 import { GRAD_EMPLOYERS } from "../data/gradEmployers.ts";
+import { brandKey } from "../../src/lib/brand.ts";
 import { INTERMEDIARY } from "../../src/lib/matching.ts";
 import { companyKey } from "./normalise.ts";
 import { isBoardName } from "./tags.ts";
@@ -16,10 +17,7 @@ const ALSO_MAJOR = [
   "Better", "GLL", "Two Circles", "IMG", "Wasserman", "Octagon", "Sportradar", "Genius Sports", "Stats Perform", "DAZN", "Premier League", "The FA", "LTA", "RFU", "Silverstone",
 ];
 
-// "UNIQLO EUROPE LIMITED" and "Tesco UK" are Uniqlo and Tesco: drop the words that only say
-// which arm of the company posted the advert.
-const ARM_WORDS = /\b(uk|gb|europe|emea|group|holdings|plc|careers|early careers|international|global|ireland|and|in|the|usa|services|trading)\b/g;
-export const brandKey = (key: string) => key.replace(ARM_WORDS, " ").replace(/\s+/g, " ").trim();
+export { brandKey };
 
 export type CompanyFacts = { key: string; wikidata_id: string | null; employees: number | null };
 
@@ -28,7 +26,7 @@ export function prominenceIndex(companies: CompanyFacts[]): (employer: string) =
   const major = new Set<string>();
   for (const name of [...GRAD_EMPLOYERS, ...ALSO_MAJOR]) {
     major.add(companyKey(name));
-    if (brandKey(companyKey(name))) major.add(brandKey(companyKey(name)));
+    if (brandKey(companyKey(name)).length >= 3) major.add(brandKey(companyKey(name)));
   }
   const byKey = new Map<string, 0 | 1 | 2>();
   for (const c of companies) {
@@ -39,7 +37,7 @@ export function prominenceIndex(companies: CompanyFacts[]): (employer: string) =
     const name = employer.trim();
     if (!name || isBoardName(name) || INTERMEDIARY.test(name) || /^reed\b/i.test(name)) return 0;
     const key = companyKey(name);
-    const brand = brandKey(key);
+    const brand = brandKey(key).length >= 3 ? brandKey(key) : "";
     if (major.has(key) || (brand && major.has(brand))) return 2;
     return Math.max(byKey.get(key) ?? 0, brand && brand !== key ? (byKey.get(brand) ?? 0) : 0) as 0 | 1 | 2;
   };
