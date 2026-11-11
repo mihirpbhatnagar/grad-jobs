@@ -12,7 +12,7 @@ import { lookupCompanies } from "./lib/companies.ts";
 import { healthCheck } from "./lib/health.ts";
 import { closeReposts } from "./lib/reposts.ts";
 import { closeGonePages, GONE_REASON } from "./lib/closedPages.ts";
-import { prominenceIndex, type CompanyFacts } from "./lib/prominence.ts";
+import { brandKey, prominenceIndex, type CompanyFacts } from "./lib/prominence.ts";
 import { isEmployerPage, readJobPage, USER_AGENT } from "./lib/employerPages.ts";
 import { discoverFromWebsite, feedFromUrl, newFeedRun, pickSitemap, probe, readFeed } from "./sources/feeds.ts";
 import { companyKey, dedupeKey, prettyLocation } from "./lib/normalise.ts";
@@ -60,13 +60,15 @@ type ExistingRole = { id: number; dedupe_key: string; sources: string[]; locatio
 const keyOf = (l: Listing) => dedupeKey(l.employer, l.title, l.description);
 
 // How complete and clearly-2027 a listing is: the default "best match" order in All roles.
-type QualityInput = { tags: RoleTags; start_status: string | null; salary_min: number | null; salary_max: number | null; sponsor_status: string | null; description: string | null; expires_at: string | null };
+type QualityInput = { last_seen?: string | null; tags: RoleTags; start_status: string | null; salary_min: number | null; salary_max: number | null; sponsor_status: string | null; description: string | null; expires_at: string | null };
 // Well-known employers rank higher in All roles: +5 major, +2 established (tags.prominence).
 const PROMINENCE_BONUS = [0, 2, 5];
 let prominenceOf: (employer: string) => number = () => 0;
 function roleQuality(r: QualityInput): number {
   return (
-    (PROMINENCE_BONUS[r.tags.prominence ?? 0] ?? 0) +
+    (PROMINENCE_BONUS[r.tags.prominence ?? 0] ?? 0) -
+    // Not confirmed by any source for over a week: below roles that were.
+    (r.last_seen && Date.now() - Date.parse(r.last_seen) > 7 * 86_400_000 ? 4 : 0) +
     (r.start_status === "confirmed" ? 3 : r.start_status === "likely" ? 1 : 0) +
     (r.tags.graduateScheme || r.tags.programmeTitle ? 2 : 0) +
     (r.salary_min || r.salary_max ? 1 : 0) +
@@ -321,8 +323,13 @@ async function setting<T>(key: string, fallback: T): Promise<T> {
 
 // Sources that ran successfully this morning. A role only counts as gone when every source
 // that lists it ran and didn't see it; a paused or failed source never closes roles. Anything
-// unseen for 60 days closes regardless (long enough that pausing Google Jobs, whose roles can't
-// be re-checked while it's off, doesn't empty the list).
+// unseen for 60 days closes regardless.
+// Roles found only by Google Jobs can't be re-checked while Google is paused, and most are copies
+// on repost sites. After 14 days unseen they close too when either the employer's own site is
+// read every day and doesn't list them, or the employer isn't a well-known one (nothing to check
+// them against). Kept: roles stating a closing date that hasn't passed, and well-known employers
+// whose own site we can't read yet (shown as "not re-checked"). Found again, a role reopens.
+const GOOGLE_ONLY_CLOSE_AFTER_DAYS = 14;
 const ranSources = new Set<string>();
 let safetyStop: string | null = null;
 
@@ -330,11 +337,25 @@ async function closeStaleRoles(): Promise<number> {
   const cutoff = new Date(Date.now() - CLOSE_AFTER_DAYS * 86_400_000).toISOString();
   const longGone = new Date(Date.now() - 60 * 86_400_000).toISOString();
   const today = new Date().toISOString().slice(0, 10);
-  const candidates = await selectAll<{ id: number; sources: string[]; last_seen: string }>((from, to) =>
-    db.from("roles").select("id,sources,last_seen").eq("is_open", true).lt("last_seen", cutoff).order("id").range(from, to),
+  const candidates = await selectAll<{ id: number; sources: string[]; last_seen: string; expires_at: string | null; company_key: string | null; tags: { deadline?: string | null; prominence?: number } | null }>((from, to) =>
+    db.from("roles").select("id,sources,last_seen,expires_at,company_key,tags").eq("is_open", true).lt("last_seen", cutoff).order("id").range(from, to),
   );
-  const agedOut = candidates.filter((r) => r.last_seen < longGone).map((r) => r.id);
-  const staleIds = candidates.filter((r) => r.last_seen >= longGone && r.sources.every((src) => ranSources.has(src))).map((r) => r.id);
+  // Employers whose own careers site is being read successfully and has roles on it.
+  const working = new Set<string>();
+  for (const f of await selectAll<{ company_key: string; last_found: number | null }>((from, to) =>
+    db.from("employer_feeds").select("company_key,last_found").neq("ats", "none").eq("last_status", "ok").gt("last_found", 0).order("id").range(from, to),
+  )) {
+    working.add(f.company_key);
+    working.add(brandKey(f.company_key));
+  }
+  const checkable = (key: string | null) => !!key && (working.has(key) || working.has(brandKey(key)));
+  const googleGone = new Date(Date.now() - GOOGLE_ONLY_CLOSE_AFTER_DAYS * 86_400_000).toISOString();
+  const unseenGoogleOnly = (r: (typeof candidates)[number]) =>
+    r.last_seen < googleGone && r.sources.every((s) => s === "google_jobs") && !((r.tags?.deadline ?? r.expires_at ?? "") >= today) &&
+    (checkable(r.company_key) || (r.tags?.prominence ?? 0) === 0);
+  const agedOut = candidates.filter((r) => r.last_seen < longGone || unseenGoogleOnly(r)).map((r) => r.id);
+  const aged = new Set(agedOut);
+  const staleIds = candidates.filter((r) => !aged.has(r.id) && r.sources.every((src) => ranSources.has(src))).map((r) => r.id);
   // Safety net: never close more than 30% of open roles in one morning; that means something
   // upstream failed, not that the market vanished. Logged so the Coverage page shows it.
   const { count: openCount } = await db.from("roles").select("id", { count: "exact", head: true }).eq("is_open", true);
@@ -363,9 +384,9 @@ function sameJson(a: unknown, b: unknown): boolean {
 // Re-applies the early-career check, tagging and sponsor matching to open roles. Roles that
 // no longer pass the check are removed and remembered as excluded; only changed rows are written.
 async function retag(match: Matcher) {
-  type Row = { id: number; title: string; employer: string; location: string | null; description: string | null; tags: unknown; sponsor_status: string | null; sponsor_name: string | null; kind: string; start_status: string | null; locations: string[]; company_key: string | null; quality: number; salary_min: number | null; salary_max: number | null; expires_at: string | null; part_time: boolean };
+  type Row = { id: number; title: string; employer: string; location: string | null; description: string | null; tags: unknown; sponsor_status: string | null; sponsor_name: string | null; kind: string; start_status: string | null; locations: string[]; company_key: string | null; quality: number; salary_min: number | null; salary_max: number | null; expires_at: string | null; part_time: boolean; last_seen: string };
   const roles = await selectAll<Row>((from, to) =>
-    db.from("roles").select("id,title,employer,location,locations,description,tags,sponsor_status,sponsor_name,kind,start_status,company_key,quality,salary_min,salary_max,expires_at,part_time").eq("is_open", true).order("id").range(from, to),
+    db.from("roles").select("id,title,employer,location,locations,description,tags,sponsor_status,sponsor_name,kind,start_status,company_key,quality,salary_min,salary_max,expires_at,part_time,last_seen").eq("is_open", true).order("id").range(from, to),
   );
 
   const outOfScope = roles.filter((r) => isPlacementOrApprenticeship(r.title) || (r.description ? !isEarlyCareer(r.title, r.description) : isSeniorTitle(r.title)));

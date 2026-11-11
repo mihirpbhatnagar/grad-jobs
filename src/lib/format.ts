@@ -61,6 +61,8 @@ export function tidyPlace(location: string): string {
     // Notes in brackets ("3 days a week onsite", "PO Boxes") aren't part of the town.
     .replace(/\s*\([^)]*\)/g, "")
     .replace(/^GB\s*-\s*/i, "")
+    // Workday office codes: "GBR-London-5 Canada Square" is London.
+    .replace(/^GBR-([^-]+)-.*$/i, "$1")
     .replace(/\bUNAVAILABLE\b/g, "")
     .split(",")
     .map((p) => p.trim())

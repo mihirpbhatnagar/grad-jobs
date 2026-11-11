@@ -1,7 +1,5 @@
-import { currentUser } from "@/lib/auth";
-import { contactsFromDescription, fieldLinks, networkingLinks } from "@/lib/contacts";
+import { contactsFromDescription, networkingLinks } from "@/lib/contacts";
 import { isBoardName } from "@/lib/format";
-import { FIELDS, withDefaults } from "@/lib/profile";
 
 const LINK_ICON = (
   <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
@@ -52,42 +50,5 @@ export function RoleContacts({ employer, description }: { employer: string; desc
       )}
       <p className="px-2 text-xs text-muted">LinkedIn opens in your own account. Keep the first message short: who you are, why them, one question.</p>
     </div>
-  );
-}
-
-// My jobs: people worth messaging, for the companies the user has saved and their fields.
-export async function PeopleToReachOut() {
-  const { db, user } = await currentUser();
-  if (!user) return null;
-  const [{ data: saved }, { data: profile }] = await Promise.all([
-    db.from("saved_roles").select("role:roles(employer)").order("saved_at", { ascending: false }).limit(40),
-    db.from("profiles").select("answers").maybeSingle(),
-  ]);
-  const companies = [
-    ...new Set(
-      ((saved ?? []) as unknown as { role: { employer: string } | null }[]).map((s) => s.role?.employer).filter((e): e is string => !!e && !isBoardName(e)),
-    ),
-  ].slice(0, 6);
-  const fields = FIELDS.filter((f) => withDefaults(profile?.answers).fields.value.includes(f.id)).slice(0, 3);
-
-  return (
-    <section className="rounded-2xl border border-border bg-surface p-5">
-      <h2 className="font-semibold tracking-tight">People to reach out to</h2>
-      <p className="mt-1 text-sm text-muted">Loughborough alumni and recent graduates: the people most likely to reply.</p>
-      {companies.length === 0 && fields.length === 0 ? (
-        <p className="mt-3 text-sm text-muted">Save a few roles or add fields to your profile and contacts for those companies will appear here.</p>
-      ) : (
-        <div className="mt-3 space-y-1">
-          {companies.map((c) => {
-            const [alumni] = networkingLinks(c);
-            return <LinkRow key={c} label={alumni.label} detail="From your saved roles" href={alumni.href} />;
-          })}
-          {fields.map((f) => {
-            const l = fieldLinks(f.label);
-            return <LinkRow key={f.id} label={l.label} detail="From your profile fields" href={l.href} />;
-          })}
-        </div>
-      )}
-    </section>
   );
 }

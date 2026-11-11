@@ -59,12 +59,15 @@ export async function ForYou() {
   const total = Math.max(shortlist.total, matches.length);
 
   // New matches first, so a daily visit starts with what wasn't there yesterday; then the best.
-  const fresh = matches.filter((m) => isNewRole(m.role.first_seen)).slice(0, NEW_SHOWN);
+  // Roles already saved live in the Saved tab, so they don't take up the top of this list.
+  const savedIds = new Set((saved ?? []).map((s) => s.role_id));
+  const alreadySaved = matches.filter((m) => savedIds.has(m.role.id)).length;
+  const unsaved = matches.filter((m) => !savedIds.has(m.role.id));
+  const fresh = unsaved.filter((m) => isNewRole(m.role.first_seen)).slice(0, NEW_SHOWN);
   const freshIds = new Set(fresh.map((m) => m.role.id));
-  const best = matches.filter((m) => !freshIds.has(m.role.id)).slice(0, SHOW);
+  const best = unsaved.filter((m) => !freshIds.has(m.role.id)).slice(0, SHOW);
   const shown = [...fresh, ...best];
   const companies = await companiesFor(shown.map((m) => m.role.company_key));
-  const savedIds = new Set((saved ?? []).map((s) => s.role_id));
 
   if (matches.length === 0) {
     return <Prompt title="No matches yet" body="Nothing matches your profile today. Try ticking more fields, or check All roles." href="/profile" cta="Edit profile" />;
@@ -85,6 +88,15 @@ export async function ForYou() {
     <div className="space-y-3">
       <p className="text-sm text-muted">
         {total.toLocaleString("en-GB")} role{total === 1 ? "" : "s"} match your profile. {fresh.length ? "New matches first, then the best." : "Best matches first; nothing new in the last two days."}
+        {alreadySaved > 0 && (
+          <>
+            {" "}
+            <Link href="/my-jobs?tab=saved" className="font-medium text-accent hover:underline">
+              {alreadySaved} you&apos;ve saved
+            </Link>{" "}
+            {alreadySaved === 1 ? "is" : "are"} in the Saved tab.
+          </>
+        )}
       </p>
       {fresh.length > 0 && <h2 className="pt-1 text-sm font-semibold tracking-tight">New for you · {fresh.length}</h2>}
       {fresh.map(card)}

@@ -27,7 +27,16 @@ export type RoleTags = {
   aimedAt2027: boolean;
   // How well known the employer is: 2 major, 1 established, 0 other (set in the daily job).
   prominence?: number;
+  // The latest year the title names ("Graduate Scheme 2026" -> 2026, "2026/27" -> 2027), if any.
+  titleYear?: number | null;
 };
+
+// The latest year a title names. "2026/27" and "2026-27" count as 2027.
+export function titleYear(title: string): number | null {
+  const years = (title.match(/\b20[2-3]\d\b/g) ?? []).map(Number);
+  for (const m of title.matchAll(/\b20(\d\d)\s*[/-]\s*(\d\d)\b/g)) years.push(2000 + Number(m[2]));
+  return years.length ? Math.max(...years) : null;
+}
 
 const MONTHS = [
   "january", "february", "march", "april", "may", "june",
@@ -273,6 +282,9 @@ export function countryOf(title: string, location: string | null): string | null
 
 export function isOutsideUk(title: string, location: string | null): boolean {
   const place = location ?? "";
+  // "Graduate Associate, relocate to Dubai" is a job abroad even when the advert is placed in London.
+  const movingTo = title.match(/\brelocat(?:e|es|ing|ion)\s+to\s+([^,|–-]{2,40})/i)?.[1];
+  if (movingTo && ABROAD.test(movingTo)) return true;
   if (/\b(uk|united kingdom|england|scotland|wales|northern ireland|london)\b/i.test(place)) return false;
   return ABROAD.test(place) || ABROAD.test(title.replace(/\b(international|global|europe|emea)\b/gi, ""));
 }
@@ -334,6 +346,10 @@ export function startStatus(tags: RoleTags, earliestStart: string): StartStatus 
     return Number(tags.startText) >= Number(earliestStart.slice(0, 4)) ? "likely" : "before";
   }
   if (tags.aimedAt2027) return "likely";
+  // A title naming only an earlier year ("Graduate Scheme UK 2026", "2025 Graduate Associate") is
+  // an old intake, or at best one we can't call a 2027 start: it leaves the main list.
+  const firstYear = Number(earliestStart.slice(0, 4));
+  if (tags.titleYear && tags.titleYear < firstYear) return tags.titleYear < firstYear - 1 ? "before" : "unknown";
   // A graduate scheme or programme advertised in this recruiting season (autumn 2026 onwards)
   // is for the 2027 intake, even when the listing doesn't repeat the date.
   if (tags.programmeTitle || tags.graduateTitle) return "likely";
@@ -392,6 +408,7 @@ export function tagListing(title: string, description: string): RoleTags {
     salaryCompetitive: /\b(competitive (salary|pay|package|remuneration|starting salary|base)|salary:?\s*(is\s*)?competitive|salary\s*-\s*competitive)\b/i.test(text),
     graduateScheme: /\bgraduate\s+(scheme|programme|program|trainee|development programme|training scheme)\b/i.test(text),
     immediateStart: /\b(immediate(ly)? start|start(ing)? (asap|immediately|straight away)|asap start|available to start immediately|start date:?\s*(asap|immediate))/i.test(text),
+    titleYear: titleYear(title),
     aimedAt2027: /\b(graduate|programme|program|scheme|intake|rotation|cohort)\b[^\n.]{0,40}\b2027\b|\b2027\b[^\n.]{0,25}\b(graduate|programme|program|scheme|intake|cohort)\b|\b(class of 2027|2027 (graduates?|intake|cohort|start|entry)|graduating (in |summer )?2027|final[- ]year (students?|undergraduates?)|penultimate[- ]year|(due to )?graduate in 2027|for 2027 start)\b/i.test(text),
   };
 }

@@ -5,6 +5,7 @@ import { SaveButton } from "@/components/SaveButton";
 import { StageSelect } from "@/components/StageControls";
 import { currentUser } from "@/lib/auth";
 import { companiesFor, type Company } from "@/lib/companies";
+import { networkingLinks } from "@/lib/contacts";
 import { dateShort, daysUntil, distinctPlaces, employerLabel, isBoardName, salaryShort, startLabel } from "@/lib/format";
 import { RESPONDED, STAGES, type Stage } from "@/lib/pipeline";
 import type { Role } from "@/lib/roles";
@@ -52,6 +53,19 @@ const mayHaveClosed = (row: JobRow) => (!!row.role && !row.role.is_open) || (clo
 const hrefOf = (row: JobRow) => (row.role ? `/roles/${row.role.id}` : `/applications/${row.id}`);
 const employerOf = (row: JobRow) => (row.role ? employerLabel(row.role.employer) : (row.company ?? ""));
 const titleOf = (row: JobRow) => row.role?.title ?? row.title ?? "";
+// People to reach out to live with the role: a search for Loughborough alumni at that employer
+// (a LinkedIn link the user opens themselves).
+function AlumniLink({ row }: { row: JobRow }) {
+  const employer = row.role?.employer ?? row.company;
+  if (!employer || isBoardName(employer)) return null;
+  const [alumni] = networkingLinks(employer);
+  return (
+    <a href={alumni.href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted hover:border-accent/40 hover:text-accent">
+      Lboro alumni there ↗
+    </a>
+  );
+}
+
 const daysText = (days: number) => (days === 0 ? "Today" : days === 1 ? "Tomorrow" : `${days} days`);
 
 export const CLOSING_WITHIN_DAYS = 21;
@@ -150,10 +164,11 @@ function SavedRow({ row, jobs }: { row: JobRow; jobs: MyJobs }) {
               </Chip>
             )}
             {role.tags.sponsorship === "not_offered" && <Chip tone="rose">Says no sponsorship</Chip>}
+            <AlumniLink row={row} />
           </div>
         )}
       </div>
-      <div className="w-28 shrink-0 sm:text-right">
+      <div className="w-24 shrink-0 sm:text-right">
         {closed ? (
           <>
             <div className="text-sm font-semibold text-rose">May have closed</div>
@@ -172,7 +187,9 @@ function SavedRow({ row, jobs }: { row: JobRow; jobs: MyJobs }) {
         )}
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <StageSelect applicationId={row.id} stage={row.stage} />
+        <div className="w-[7.25rem] [&_select]:w-full [&_select]:px-2">
+          <StageSelect applicationId={row.id} stage={row.stage} />
+        </div>
         {applyUrl && (
           <a href={applyUrl} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white hover:opacity-90">
             Apply ↗
@@ -205,7 +222,7 @@ function Group({ title, note, rows, jobs }: { title: string; note?: string; rows
 }
 
 // Saved tab: every role saved but not yet applied for, soonest closing date first.
-export function SavedBoard({ jobs, aside }: { jobs: MyJobs; aside?: React.ReactNode }) {
+export function SavedBoard({ jobs }: { jobs: MyJobs }) {
   if (!jobs.signedIn) return <SignIn what="your saved roles" />;
   const rows = jobs.rows.filter(isToApply);
   const soon = closingSoon(jobs.rows).map((c) => c.row);
@@ -221,8 +238,7 @@ export function SavedBoard({ jobs, aside }: { jobs: MyJobs; aside?: React.ReactN
         <Tile value={undated.length} label="No closing date: apply early" />
         <Tile value={rows.filter((r) => r.stage === "applying").length} label="Application started" tone="accent" />
       </div>
-      <div className={aside ? "grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]" : ""}>
-        <div className="min-w-0 space-y-6">
+      <div className="min-w-0 space-y-6">
           {rows.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-border bg-surface p-10 text-center text-muted">
               Nothing saved yet. Tap the bookmark on any role and it appears here with its closing date.
@@ -241,8 +257,6 @@ export function SavedBoard({ jobs, aside }: { jobs: MyJobs; aside?: React.ReactN
               Add a role you found elsewhere
             </Link>
           </p>
-        </div>
-        {aside && <aside className="space-y-4">{aside}</aside>}
       </div>
     </div>
   );
@@ -290,6 +304,9 @@ export function ApplicationsBoard({ jobs }: { jobs: MyJobs }) {
                   <p className="mt-0.5 truncate text-sm text-muted">
                     <span className="font-medium text-foreground/90">{employerOf(row)}</span>
                   </p>
+                  <div className="mt-2">
+                    <AlumniLink row={row} />
+                  </div>
                 </div>
                 <div className="w-36 shrink-0 text-sm sm:text-right">
                   <div className="font-medium">{row.applied_at ? `Applied ${dateShort(row.applied_at)}` : "Applied date not set"}</div>

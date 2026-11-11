@@ -3,8 +3,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { ForYou } from "@/components/ForYou";
 import { GmailQuestion } from "@/components/GmailLink";
-import { ApplicationsBoard, ClosingSoonCard, isToApply, loadMyJobs, SavedBoard } from "@/components/MyJobsBoards";
-import { PeopleToReachOut } from "@/components/Networking";
+import { ApplicationsBoard, closingSoon, ClosingSoonCard, isToApply, loadMyJobs, SavedBoard } from "@/components/MyJobsBoards";
 
 // My jobs: three tabs across the full width. For you (matches, with what's closing soon
 // alongside), Saved (everything still to apply for, soonest deadline first) and Applications
@@ -40,11 +39,11 @@ async function MyJobs({ searchParams }: { searchParams: PageProps<"/my-jobs">["s
       </nav>
       <div className="mt-6">
         {tab === "saved" ? (
-          <SavedBoard jobs={jobs} aside={<PeopleToReachOut />} />
+          <SavedBoard jobs={jobs} />
         ) : tab === "applications" ? (
           <ApplicationsBoard jobs={jobs} />
         ) : (
-          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <div className={closingSoon(jobs.rows).length ? "grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]" : "mx-auto max-w-4xl"}>
             <div className="min-w-0 space-y-6">
               <div className="empty:hidden">
                 <GmailQuestion />
@@ -53,11 +52,8 @@ async function MyJobs({ searchParams }: { searchParams: PageProps<"/my-jobs">["s
                 <ForYou />
               </Suspense>
             </div>
-            <aside className="hidden md:block">
-              <div className="space-y-4 lg:sticky lg:top-20">
-                <ClosingSoonCard jobs={jobs} />
-                <PeopleToReachOut />
-              </div>
+            <aside className="hidden space-y-4 empty:hidden md:block">
+              <ClosingSoonCard jobs={jobs} />
             </aside>
           </div>
         )}
