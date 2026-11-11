@@ -379,8 +379,8 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
               <h2 className="font-semibold tracking-tight">{application ? "Your application workspace" : "Applying for this one?"}</h2>
               <p className="mt-0.5 text-sm text-muted">
                 {application
-                  ? "CV match, cover letter plan, application questions, people to reach out to, and what you sent."
-                  : "Save the role to open its workspace: CV match, cover letter plan, application questions and people to reach out to."}
+                  ? "CV match, cover letter plan, people to reach out to, and what you sent."
+                  : "Save the role to open its workspace: CV match, cover letter plan and people to reach out to."}
               </p>
             </div>
             {application ? (

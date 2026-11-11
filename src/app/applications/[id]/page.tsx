@@ -17,8 +17,8 @@ import type { Role } from "@/lib/roles";
 import { runsPastVisa, visaEndsLabel, visaSettings } from "@/lib/visa";
 
 // The application workspace for one saved role (or one added by hand): everything needed to
-// apply, in the order it's done. Know the company, tailor the CV, plan the cover letter, answer
-// the questions, find people to ask, then record what was sent.
+// apply, in the order it's done. Know the company, tailor the CV, plan the cover letter, find
+// people to ask, then record what was sent.
 
 type WorkRole = Pick<Role, "id" | "title" | "employer" | "company_key" | "location" | "locations" | "expires_at" | "apply_url" | "salary_min" | "salary_max" | "tags" | "start_status"> & {
   description: string | null;
@@ -29,7 +29,6 @@ const STEPS = [
   { id: "company", label: "Company" },
   { id: "cv", label: "Your CV" },
   { id: "cover", label: "Cover letter" },
-  { id: "questions", label: "Questions" },
   { id: "people", label: "People" },
 ];
 
@@ -152,7 +151,7 @@ async function Workspace({ params }: { params: PageProps<"/applications/[id]">["
             </a>
           ))}
           <a href="#sent" className="rounded-lg bg-chip px-3 py-1.5 font-medium text-muted hover:text-foreground">
-            6. Send and track
+            5. Send and track
           </a>
         </nav>
       </section>
@@ -218,11 +217,7 @@ async function Workspace({ params }: { params: PageProps<"/applications/[id]">["
             )}
           </Step>
 
-          <Step n={4} id="questions" title="Application questions" lead="Paste a question from the form for a structure and the stories of yours that answer it best.">
-            <FreeTools {...tools} tabs={["question"]} />
-          </Step>
-
-          <Step n={5} id="people" title="People to reach out to" lead="A short message to someone already there often gets you further than the form alone.">
+          <Step n={4} id="people" title="People to reach out to" lead="A short message to someone already there often gets you further than the form alone.">
             {role || app.company ? (
               <RoleContacts employer={role ? (company?.name ?? role.employer) : app.company!} description={role?.description ?? null} />
             ) : (
