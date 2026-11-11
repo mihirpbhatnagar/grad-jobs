@@ -50,7 +50,8 @@ export async function loadMyJobs(): Promise<MyJobs> {
 // The closing date we hold: the listing's own, or the one typed in for a role added by hand.
 const closingDate = (row: JobRow): string | null => (row.role ? (row.role.tags.deadline ?? row.role.expires_at) : row.closes_on);
 const mayHaveClosed = (row: JobRow) => (!!row.role && !row.role.is_open) || (closingDate(row) !== null && daysUntil(closingDate(row)!) < 0);
-const hrefOf = (row: JobRow) => (row.role ? `/roles/${row.role.id}` : `/applications/${row.id}`);
+// A saved role's hub is its application workspace (the full listing is one click from there).
+const hrefOf = (row: JobRow) => `/applications/${row.id}`;
 const employerOf = (row: JobRow) => (row.role ? employerLabel(row.role.employer) : (row.company ?? ""));
 const titleOf = (row: JobRow) => row.role?.title ?? row.title ?? "";
 // People to reach out to live with the role: a search for Loughborough alumni at that employer

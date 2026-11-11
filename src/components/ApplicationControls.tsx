@@ -3,7 +3,22 @@
 import { createBrowserClient } from "@supabase/ssr";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { addUpdate, deleteUpdate, recordDocument, removeApplication, setDates } from "@/lib/myjobs-actions";
+import { addUpdate, deleteUpdate, recordDocument, removeApplication, setDates, setStage } from "@/lib/myjobs-actions";
+
+// One click once the form is sent: sets the status to Applied (and today's date).
+export function MarkApplied({ applicationId }: { applicationId: number }) {
+  const [pending, start] = useTransition();
+  return (
+    <button
+      type="button"
+      disabled={pending}
+      onClick={() => start(() => setStage(applicationId, "applied"))}
+      className="rounded-xl border border-success/40 bg-success-soft px-4 py-2.5 text-sm font-semibold text-success hover:opacity-90 disabled:opacity-60"
+    >
+      {pending ? "Saving…" : "I've applied ✓"}
+    </button>
+  );
+}
 
 export function DateField({ applicationId, field, value }: { applicationId: number; field: "appliedOn" | "closesOn"; value: string | null }) {
   const [pending, start] = useTransition();

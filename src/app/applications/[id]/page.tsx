@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { MarkApplied } from "@/components/ApplicationControls";
 import { APPLICATION_COLUMNS, ApplicationPanel, type Application } from "@/components/ApplicationPanel";
 import { ApplyTools, type Saved } from "@/components/ApplyTools";
 import { CompanyLogo } from "@/components/CompanyLogo";
@@ -141,9 +142,16 @@ async function Workspace({ params }: { params: PageProps<"/applications/[id]">["
                   Apply on their site ↗
                 </a>
               )}
+              {(app.stage === "saved" || app.stage === "applying") && <MarkApplied applicationId={app.id} />}
             </div>
           </div>
         </div>
+        {job && (
+          <details className="mt-5 rounded-xl bg-chip px-4 py-3">
+            <summary className="cursor-pointer text-sm font-semibold">Read the job description</summary>
+            <div className="mt-3 max-h-[28rem] overflow-y-auto whitespace-pre-line pr-2 text-sm leading-6 text-foreground/85">{job}</div>
+          </details>
+        )}
         <nav aria-label="Steps" className="mt-5 flex flex-wrap gap-1.5 border-t border-border pt-4 text-sm">
           {STEPS.map((s, i) => (
             <a key={s.id} href={`#${s.id}`} className="rounded-lg bg-chip px-3 py-1.5 font-medium text-muted hover:text-foreground">
@@ -191,9 +199,9 @@ async function Workspace({ params }: { params: PageProps<"/applications/[id]">["
                 ))}
               </div>
             )}
-            {role && (
+            {role && aiOn && (
               <div className="mt-4">
-                <ApplyTools roleId={role.id} initial={aiSaved} enabled={aiOn} signedIn kinds={["brief"]} />
+                <ApplyTools roleId={role.id} initial={aiSaved} enabled={aiOn} signedIn kinds={["brief"]} quietWhenOff />
               </div>
             )}
           </Step>
@@ -210,9 +218,9 @@ async function Workspace({ params }: { params: PageProps<"/applications/[id]">["
 
           <Step n={3} id="cover" title="Plan your cover letter" lead="A structure and the points to make. You write the letter; the check below tells you if a draft sounds like AI.">
             <FreeTools {...tools} tabs={["cover", "ai"]} />
-            {role && (
+            {role && aiOn && (
               <div className="mt-5 border-t border-border pt-4">
-                <ApplyTools roleId={role.id} initial={aiSaved} enabled={aiOn} signedIn kinds={["cover"]} />
+                <ApplyTools roleId={role.id} initial={aiSaved} enabled={aiOn} signedIn kinds={["cover"]} quietWhenOff />
               </div>
             )}
           </Step>

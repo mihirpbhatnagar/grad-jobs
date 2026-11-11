@@ -45,7 +45,7 @@ function Formatted({ text }: { text: string }) {
   );
 }
 
-export function ApplyTools({ roleId, initial, enabled, signedIn, kinds }: { roleId: number; initial: Saved[]; enabled: boolean; signedIn: boolean; kinds?: ToolKind[] }) {
+export function ApplyTools({ roleId, initial, enabled, signedIn, kinds, quietWhenOff }: { roleId: number; initial: Saved[]; enabled: boolean; signedIn: boolean; kinds?: ToolKind[]; quietWhenOff?: boolean }) {
   const buttons = kinds ? BUTTONS.filter((b) => kinds.includes(b.kind)) : BUTTONS;
   const [results, setResults] = useState<Partial<Record<ToolKind, Saved>>>(() => Object.fromEntries(initial.map((s) => [s.kind, s])));
   const [open, setOpen] = useState<ToolKind | null>(initial.find((s) => buttons.some((b) => b.kind === s.kind))?.kind ?? null);
@@ -55,6 +55,7 @@ export function ApplyTools({ roleId, initial, enabled, signedIn, kinds }: { role
   const [, start] = useTransition();
 
   if (!signedIn) return <p className="text-sm text-muted">Sign in to use the Apply tools.</p>;
+  if (!enabled && quietWhenOff) return null;
   if (!enabled) {
     return (
       <p className="rounded-xl border border-dashed border-border px-3 py-2 text-sm text-muted">
