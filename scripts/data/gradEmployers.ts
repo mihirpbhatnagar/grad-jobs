@@ -124,6 +124,8 @@ export const KNOWN_FEEDS: { name: string; ats: string; ats_id: string }[] = [
   { name: "Lloyds Banking Group", ats: "workday", ats_id: "lbg.wd3.myworkdayjobs.com/lbg/Graduate_careers" },
   { name: "Babcock International", ats: "sitemap", ats_id: "https://jobs.babcockinternational.com/sitemap.xml" },
   { name: "Capgemini", ats: "sitemap", ats_id: "https://careers.capgemini.com/sitemap.xml" },
+  // Job pages give no place; the town is the first word of the address ("/job/Leeds-Graduate-...").
+  { name: "Mott MacDonald", ats: "sitemap", ats_id: "https://apply.mottmac.com/sitemap.xml" },
   // Careers-site sitemaps, tried one by one on 4 Nov 2026 (the automatic search had missed these,
   // or had picked another company's or another country's site).
   { name: "Softwire", ats: "sitemap", ats_id: "https://www.softwire.com/sitemap.xml" },

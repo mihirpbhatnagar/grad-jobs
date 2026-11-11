@@ -2,7 +2,7 @@ import { gunzipSync } from "node:zlib";
 import { USER_AGENT, readJobPage, readPlainPage } from "../lib/employerPages.ts";
 import { htmlToText, prettyLocation } from "../lib/normalise.ts";
 import { dueForCheck, pageGone } from "../lib/closedPages.ts";
-import { isOutsideUk, isPlacementOrApprenticeship } from "../lib/tags.ts";
+import { isOutsideUk, isPlacementOrApprenticeship, placesInTitle } from "../lib/tags.ts";
 import type { Listing } from "./types.ts";
 
 // Employers' own hiring systems, read through their public job-board feeds (the same data
@@ -531,7 +531,7 @@ async function sitemap(feed: Feed, run: FeedRun): Promise<Listing[] | null> {
       run.ruledOut.set(idOf(u), "not early-career");
       continue;
     }
-    out.push(listing(feed, u, { title, url: u, location: location ?? (inUk(words) ? null : "United Kingdom"), description: page.description, salaryMin: page.salaryMin, salaryMax: page.salaryMax, expiresAt: page.deadline, contractType: page.employmentType }));
+    out.push(listing(feed, u, { title, url: u, location: location ?? placesInTitle(words)[0] ?? (inUk(words) ? null : "United Kingdom"), description: page.description, salaryMin: page.salaryMin, salaryMax: page.salaryMax, expiresAt: page.deadline, contractType: page.employmentType }));
   }
   return out;
 }
