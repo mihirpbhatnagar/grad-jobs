@@ -25,6 +25,8 @@ export type RoleTags = {
   abroad: string | null;
   immediateStart: boolean;
   aimedAt2027: boolean;
+  // How well known the employer is: 2 major, 1 established, 0 other (set in the daily job).
+  prominence?: number;
 };
 
 const MONTHS = [

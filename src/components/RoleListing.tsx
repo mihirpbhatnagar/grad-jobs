@@ -1,4 +1,4 @@
-import { ukToday, weekAhead } from "@/lib/format";
+import { NEW_FOR_DAYS, ukToday, weekAhead } from "@/lib/format";
 import Link from "next/link";
 import { connection } from "next/server";
 import { FilterBar } from "@/components/FilterBar";
@@ -26,13 +26,15 @@ async function mainStats() {
     db.from("roles").select("id", { count: "exact", head: true }).eq("is_open", true).eq("kind", "job").eq("part_time", false)
       .in("start_status", ["confirmed", "likely"]).is("tags->>abroad", null).or(`expires_at.is.null,expires_at.gte.${today}`).or(`tags->>deadline.is.null,tags->>deadline.gte.${today}`);
   const week = weekAhead();
-  const [all, closing, sponsors, schemes] = await Promise.all([
+  const since = new Date(Date.now() - NEW_FOR_DAYS * 86_400_000).toISOString();
+  const [all, fresh, closing, sponsors, schemes] = await Promise.all([
     base(),
+    base().gte("first_seen", since),
     base().or(`expires_at.lte.${week},tags->>deadline.lte.${week}`),
     base().eq("sponsor_status", "likely"),
     base().eq("tags->>graduateScheme", "true"),
   ]);
-  return { all: all.count ?? 0, closing: closing.count ?? 0, sponsors: sponsors.count ?? 0, schemes: schemes.count ?? 0 };
+  return { all: all.count ?? 0, fresh: fresh.count ?? 0, closing: closing.count ?? 0, sponsors: sponsors.count ?? 0, schemes: schemes.count ?? 0 };
 }
 
 function Stat({ value, label, href }: { value: number; label: string; href: string }) {
@@ -104,8 +106,9 @@ export async function RoleListing({
           {result?.updatedAt && <span className="text-white/60"> · {updatedLabel(result.updatedAt)}</span>}
         </p>
         {stats && (
-          <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-5">
             <Stat value={stats.all} label="Graduate roles" href={path} />
+            <Stat value={stats.fresh} label="New in the last 2 days" href={filtersToQuery(f, { sort: "newest" }, path)} />
             <Stat value={stats.closing} label="Closing this week" href={filtersToQuery(f, { closingSoon: true, sort: "closing" }, path)} />
             <Stat value={stats.schemes} label="Graduate schemes" href={filtersToQuery(f, { schemes: true }, path)} />
             <Stat value={stats.sponsors} label="Licensed sponsors" href={filtersToQuery(f, { sponsor: "likely" }, path)} />

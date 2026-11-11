@@ -1,37 +1,78 @@
+import Link from "next/link";
+import { connection } from "next/server";
 import { Suspense } from "react";
 import { ForYou } from "@/components/ForYou";
 import { GmailQuestion } from "@/components/GmailLink";
+import { ApplicationsBoard, ClosingSoonCard, isToApply, loadMyJobs, SavedBoard } from "@/components/MyJobsBoards";
 import { PeopleToReachOut } from "@/components/Networking";
-import { Tracker } from "@/components/Tracker";
 
-// Desktop and iPad: For you alongside the application tracker. On phones the tracker
-// lives in the Apply tab instead, so this page shows For you only.
-export default function MyJobsPage() {
+// My jobs: three tabs across the full width. For you (matches, with what's closing soon
+// alongside), Saved (everything still to apply for, soonest deadline first) and Applications
+// (everything applied for, by stage).
+type Tab = "for-you" | "saved" | "applications";
+
+function TabLink({ href, label, count, active }: { href: string; label: string; count?: number; active: boolean }) {
   return (
-    <main className="mx-auto grid w-full max-w-6xl gap-8 px-4 pb-24 pt-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-      <div className="min-w-0">
-        <h1 className="text-3xl font-semibold tracking-tight">For you</h1>
-        <Suspense>
-          <div className="mt-6 empty:hidden">
-            <GmailQuestion />
-          </div>
-        </Suspense>
-        <div className="mt-6">
-          <Suspense fallback={<div className="h-96 animate-pulse rounded-2xl bg-chip" />}>
-            <ForYou />
-          </Suspense>
-        </div>
-      </div>
-      <aside className="hidden md:block lg:pt-[60px]">
-        <div className="lg:sticky lg:top-20">
-          <Suspense fallback={<div className="h-80 animate-pulse rounded-2xl bg-chip" />}>
-            <div className="space-y-4">
-              <Tracker />
-              <PeopleToReachOut />
+    <Link
+      href={href}
+      scroll={false}
+      aria-current={active ? "page" : undefined}
+      className={`flex items-center gap-2 rounded-lg px-4 py-2 font-medium transition-colors ${active ? "bg-surface text-foreground shadow-sm ring-1 ring-border" : "text-muted hover:text-foreground"}`}
+    >
+      {label}
+      {count !== undefined && <span className={`rounded-full px-1.5 text-xs tabular-nums ${active ? "bg-accent-soft text-accent" : "bg-surface text-muted"}`}>{count}</span>}
+    </Link>
+  );
+}
+
+async function MyJobs({ searchParams }: { searchParams: PageProps<"/my-jobs">["searchParams"] }) {
+  await connection();
+  const { tab: raw } = await searchParams;
+  const tab: Tab = raw === "saved" ? "saved" : raw === "applications" ? "applications" : "for-you";
+  const jobs = await loadMyJobs();
+  const toApply = jobs.rows.filter(isToApply).length;
+  return (
+    <>
+      <nav aria-label="My jobs" className="mt-5 inline-flex max-w-full gap-1 overflow-x-auto rounded-xl bg-chip p-1 text-sm">
+        <TabLink href="/my-jobs" label="For you" active={tab === "for-you"} />
+        <TabLink href="/my-jobs?tab=saved" label="Saved" count={jobs.signedIn ? toApply : undefined} active={tab === "saved"} />
+        <TabLink href="/my-jobs?tab=applications" label="Applications" count={jobs.signedIn ? jobs.rows.length - toApply : undefined} active={tab === "applications"} />
+      </nav>
+      <div className="mt-6">
+        {tab === "saved" ? (
+          <SavedBoard jobs={jobs} aside={<PeopleToReachOut />} />
+        ) : tab === "applications" ? (
+          <ApplicationsBoard jobs={jobs} />
+        ) : (
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
+            <div className="min-w-0 space-y-6">
+              <div className="empty:hidden">
+                <GmailQuestion />
+              </div>
+              <Suspense fallback={<div className="h-96 animate-pulse rounded-2xl bg-chip" />}>
+                <ForYou />
+              </Suspense>
             </div>
-          </Suspense>
-        </div>
-      </aside>
+            <aside className="hidden md:block">
+              <div className="space-y-4 lg:sticky lg:top-20">
+                <ClosingSoonCard jobs={jobs} />
+                <PeopleToReachOut />
+              </div>
+            </aside>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+export default function MyJobsPage(props: PageProps<"/my-jobs">) {
+  return (
+    <main className="mx-auto w-full max-w-6xl px-4 pb-24 pt-8 sm:px-6">
+      <h1 className="text-3xl font-semibold tracking-tight">My jobs</h1>
+      <Suspense fallback={<div className="mt-6 h-96 animate-pulse rounded-2xl bg-chip" />}>
+        <MyJobs searchParams={props.searchParams} />
+      </Suspense>
     </main>
   );
 }

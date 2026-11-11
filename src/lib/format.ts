@@ -117,6 +117,10 @@ export function isRepostOnly(role: { apply_url: string | null; sources: string[]
   }
 }
 
+// A role the app first found in the last two days.
+export const NEW_FOR_DAYS = 2;
+export const isNewRole = (firstSeen: string | null | undefined) => !!firstSeen && Date.now() - Date.parse(firstSeen) < NEW_FOR_DAYS * 86_400_000;
+
 // Job boards sometimes appear as the "employer" (Google Jobs lists the board that posted it).
 const BOARDS = /^(targetjobs|efinancialcareers|graduate talent|brighterbox|bright network|gradcracker|milkround|prospects|ratemyplacement|trackr|jobteaser|higherin|inspiring interns|give a grad a go|grb|graduate recruitment bureau|jobleads|jooble|totaljobs|cv-library|indeed|linkedin|glassdoor)\b/i;
 export function isBoardName(employer: string): boolean {

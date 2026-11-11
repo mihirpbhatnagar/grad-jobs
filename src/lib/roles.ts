@@ -17,6 +17,8 @@ export type RoleTags = {
   abroad?: string | null;
   aimedAt2027: boolean;
   startDate?: string | null;
+  // How well known the employer is: 2 major, 1 established, 0 other.
+  prominence?: number;
 };
 
 export type Role = {
@@ -39,11 +41,13 @@ export type Role = {
   company_key: string | null;
   // When a source last confirmed the listing was still up.
   last_seen?: string | null;
+  // When the app first found the role.
+  first_seen?: string | null;
   description_length?: number;
 };
 
 export const ROLE_COLUMNS =
-  "id,title,employer,location,locations,salary_min,salary_max,salary_text,apply_url,posted_at,expires_at,tags,sponsor_status,sponsor_name,sources,start_status,company_key,last_seen";
+  "id,title,employer,location,locations,salary_min,salary_max,salary_text,apply_url,posted_at,expires_at,tags,sponsor_status,sponsor_name,sources,start_status,company_key,last_seen,first_seen";
 
 export type RoleFilters = {
   q: string;
@@ -176,7 +180,8 @@ export async function fetchRoles(f: RoleFilters, scope: RoleScope = "main") {
   }
   if (f.source) query = query.contains("sources", [f.source]);
   if (f.sort === "closing") query = query.order("expires_at", { ascending: true, nullsFirst: false });
-  else if (f.sort === "newest") query = query.order("posted_at", { ascending: false, nullsFirst: false });
+  // Newest = most recently found by the app (many listings give no posting date).
+  else if (f.sort === "newest") query = query.order("first_seen", { ascending: false }).order("quality", { ascending: false });
   else query = query.order("quality", { ascending: false }).order("posted_at", { ascending: false, nullsFirst: false });
 
   const from = (f.page - 1) * PAGE_SIZE;

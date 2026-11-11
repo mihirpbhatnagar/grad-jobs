@@ -12,6 +12,7 @@ import { lookupCompanies } from "./lib/companies.ts";
 import { healthCheck } from "./lib/health.ts";
 import { closeReposts } from "./lib/reposts.ts";
 import { closeGonePages, GONE_REASON } from "./lib/closedPages.ts";
+import { prominenceIndex, type CompanyFacts } from "./lib/prominence.ts";
 import { isEmployerPage, readJobPage, USER_AGENT } from "./lib/employerPages.ts";
 import { discoverFromWebsite, feedFromUrl, newFeedRun, pickSitemap, probe, readFeed } from "./sources/feeds.ts";
 import { companyKey, dedupeKey, prettyLocation } from "./lib/normalise.ts";
@@ -60,8 +61,12 @@ const keyOf = (l: Listing) => dedupeKey(l.employer, l.title, l.description);
 
 // How complete and clearly-2027 a listing is: the default "best match" order in All roles.
 type QualityInput = { tags: RoleTags; start_status: string | null; salary_min: number | null; salary_max: number | null; sponsor_status: string | null; description: string | null; expires_at: string | null };
+// Well-known employers rank higher in All roles: +5 major, +2 established (tags.prominence).
+const PROMINENCE_BONUS = [0, 2, 5];
+let prominenceOf: (employer: string) => number = () => 0;
 function roleQuality(r: QualityInput): number {
   return (
+    (PROMINENCE_BONUS[r.tags.prominence ?? 0] ?? 0) +
     (r.start_status === "confirmed" ? 3 : r.start_status === "likely" ? 1 : 0) +
     (r.tags.graduateScheme || r.tags.programmeTitle ? 2 : 0) +
     (r.salary_min || r.salary_max ? 1 : 0) +
@@ -72,7 +77,7 @@ function roleQuality(r: QualityInput): number {
 }
 
 function roleRow(l: Listing, match: SponsorMatch, existing: ExistingRole | undefined, now: string) {
-  const tags = { ...tagListing(l.title, l.description), abroad: countryOf(l.title, l.location) };
+  const tags = { ...tagListing(l.title, l.description), abroad: countryOf(l.title, l.location), prominence: prominenceOf(l.employer) };
   const locations = [...new Set([...(existing?.locations ?? []), ...(l.location ? [l.location] : [])])];
   const start_status = startStatus(tags, earliestStart);
   // The source's salary fields, else a salary written in the description ("£35,000 per annum").
@@ -257,7 +262,7 @@ async function saveCrossCheck(source: string, all: Listing[], match: Matcher, by
   let described = 0;
   for (const ids of chunks([...withText.keys()], 200)) {
     const empty = (await must(() =>
-      db.from("roles").select("id,title,location,salary_min,salary_max,expires_at,contract_type,sponsor_status").in("id", ids).or("description.is.null,description.eq."),
+      db.from("roles").select("id,title,employer,location,salary_min,salary_max,expires_at,contract_type,sponsor_status").in("id", ids).or("description.is.null,description.eq."),
     )) as DescribeRow[];
     for (const r of empty) {
       const l = withText.get(r.id)!;
@@ -373,13 +378,13 @@ async function retag(match: Matcher) {
     await must(() => db.from("roles").delete().in("id", batch));
   }
 
-  let changed = 0;
   const removed = new Set(removeIds);
+  const pending: { r: Row; next: { quality: number; company_key: string; kind: string } & Record<string, unknown> }[] = [];
   for (const r of roles) {
     if (removed.has(r.id)) continue;
-    const tags = { ...tagListing(r.title, r.description ?? ""), abroad: countryOf(r.title, r.location) };
     // A job board listed as the employer: use the real employer named in the title, if any.
     const employer = isBoardName(r.employer) ? (employerFromTitle(r.title) ?? r.employer) : r.employer;
+    const tags = { ...tagListing(r.title, r.description ?? ""), abroad: countryOf(r.title, r.location), prominence: prominenceOf(employer) };
     const m = match(employer, r.location);
     const start_status = startStatus(tags, earliestStart);
     const written = r.salary_min || r.salary_max ? null : findSalary(r.description ?? "");
@@ -402,6 +407,23 @@ async function retag(match: Matcher) {
       quality: roleQuality({ ...r, tags, start_status, salary_min, salary_max, sponsor_status: m.status }),
       part_time: isPartTime(r.part_time, r.title),
     };
+    pending.push({ r, next });
+  }
+
+  // One employer's scheme posted in many versions (BDO has 20) shouldn't fill the top of the list:
+  // an employer's best two roles keep their score, the next two lose a point, and so on (at most 3).
+  const byEmployer = new Map<string, typeof pending>();
+  for (const p of pending) {
+    const k = `${p.next.company_key}|${p.next.kind}`;
+    byEmployer.set(k, [...(byEmployer.get(k) ?? []), p]);
+  }
+  for (const group of byEmployer.values()) {
+    group.sort((a, b) => b.next.quality - a.next.quality || a.r.id - b.r.id);
+    group.forEach((p, i) => (p.next.quality -= Math.min(3, Math.floor(i / 2))));
+  }
+
+  let changed = 0;
+  for (const { r, next } of pending) {
     const current = { part_time: r.part_time, salary_min: r.salary_min, salary_max: r.salary_max, employer: r.employer, tags: r.tags, sponsor_status: r.sponsor_status, sponsor_name: r.sponsor_name, kind: r.kind, start_status: r.start_status, location: r.location, locations: r.locations, company_key: r.company_key, quality: r.quality };
     if (sameJson(next, current)) continue;
     await must(() => db.from("roles").update(next).eq("id", r.id));
@@ -410,12 +432,12 @@ async function retag(match: Matcher) {
   return { removedOutOfScope: removeIds.length, updated: changed };
 }
 
-type DescribeRow = { id: number; title: string; location?: string | null; salary_min: number | null; salary_max: number | null; expires_at: string | null; contract_type: string | null; sponsor_status: string | null };
+type DescribeRow = { id: number; title: string; employer: string; location?: string | null; salary_min: number | null; salary_max: number | null; expires_at: string | null; contract_type: string | null; sponsor_status: string | null };
 type Details = { description: string; salaryMin: number | null; salaryMax: number | null; deadline: string | null; employmentType: string | null };
 
 // Gives a role its full description (from an employer page or feed) and re-tags it.
 async function applyDescription(r: DescribeRow, d: Details) {
-  const tags = { ...tagListing(r.title, d.description), abroad: countryOf(r.title, r.location ?? null) };
+  const tags = { ...tagListing(r.title, d.description), abroad: countryOf(r.title, r.location ?? null), prominence: prominenceOf(r.employer) };
   const start_status = startStatus(tags, earliestStart);
   const written = findSalary(d.description);
   const salary_min = r.salary_min ?? d.salaryMin ?? written?.min ?? null;
@@ -777,6 +799,7 @@ async function main() {
 
   try {
     earliestStart = await setting("feed.earliest_start", earliestStart);
+    prominenceOf = prominenceIndex(await selectAll<CompanyFacts>((from, to) => db.from("companies").select("key,wikidata_id,employees").order("key").range(from, to)));
     const { sponsors, refreshed } = await refreshSponsors(db);
     stats.sponsors = sponsors.length;
     stats.sponsorRegisterRefreshed = refreshed;

@@ -168,7 +168,7 @@ export function FilterBar({ filters, path = "/", showStart = true, myFields = []
             <select
               value={filters.sort}
               onChange={(e) => go({ ...filters, sort: e.target.value as RoleFilters["sort"] })}
-              title="Default order: the most complete, clearly-2027 roles first, within your search and filters"
+              title="Default order: well-known employers and the most complete, clearly-2027 roles first, within your search and filters"
               className="w-full appearance-none bg-transparent py-3 pl-4 pr-9 font-semibold text-foreground outline-none"
             >
               <option value="">Sort by</option>

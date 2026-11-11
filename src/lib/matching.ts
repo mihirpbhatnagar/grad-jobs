@@ -62,7 +62,7 @@ export function isSportsEmployer(employer: string): boolean {
 
 // Recruiters, job boards and sites that repost other firms' jobs: the listing may be real, but
 // it isn't the employer's own, so it ranks below one that is.
-const INTERMEDIARY =
+export const INTERMEDIARY =
   /\b(recruitment|recruiters?|resourcing|staffing|personnel|headhunt\w*|talent solutions|search consultancy|pareto|bms performance|bridgewater resources|office angels|randstad|hays|michael page|page personnel|adecco|manpower|robert walters|robert half|celsius graduate|ernest gordon|timberseed|this is prime|career change|it career switch|itol recruit|joinrs|studysmarter|brighterbox|jobs in fitness|the graduate|client network|setsales|united media|hrtechx|cfo ?insights|retail insights|firstmind)\b|\bsearch$|^(targetjobs|efinancialcareers|graduate talent|bright network|gradcracker|milkround|prospects|ratemyplacement|trackr|jobteaser|higherin|inspiring interns|give a grad a go|grb|graduate recruitment bureau|jobleads|jooble|totaljobs|cv-library|indeed|linkedin|glassdoor)\b/i;
 
 // Roles no source has confirmed for this long may have closed, so they rank lower.
@@ -162,6 +162,8 @@ export function rankForYou(
     if (t.startText) tags.push(`${t.startText} start`);
     if (role.last_seen && role.last_seen < staleBefore) score -= 6;
     if (INTERMEDIARY.test(role.employer.trim()) || repost) score -= 8;
+    // Well-known employers first (not for repost-site listings, which the employer may not have posted).
+    else score += [0, 3, 6][(t as { prominence?: number }).prominence ?? 0] ?? 0;
 
     matches.push({ role, score, tags: [...new Set(tags)] });
   }

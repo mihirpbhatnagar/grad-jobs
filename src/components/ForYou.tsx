@@ -4,6 +4,7 @@ import { RoleCard } from "@/components/RoleCard";
 import { currentUser } from "@/lib/auth";
 import { companiesFor } from "@/lib/companies";
 import { forYouShortlist, type Shortlist } from "@/lib/forYouRoles";
+import { isNewRole } from "@/lib/format";
 import { rankForYou } from "@/lib/matching";
 import { withDefaults } from "@/lib/profile";
 import { ROLE_COLUMNS, type Role } from "@/lib/roles";
@@ -11,6 +12,7 @@ import { publicClient } from "@/lib/supabase";
 import { visaSettings } from "@/lib/visa";
 
 const SHOW = 30;
+const NEW_SHOWN = 8;
 
 // The shortlist only changes when the profile or the daily data does, so it is kept for a few
 // minutes: saving a role or coming back to the page doesn't work it all out again.
@@ -56,7 +58,11 @@ export async function ForYou() {
   const matches = rankForYou((data ?? []) as unknown as (Role & { description: string | null; last_seen: string | null })[], answers, new Map(shortlist.similarity));
   const total = Math.max(shortlist.total, matches.length);
 
-  const shown = matches.slice(0, SHOW);
+  // New matches first, so a daily visit starts with what wasn't there yesterday; then the best.
+  const fresh = matches.filter((m) => isNewRole(m.role.first_seen)).slice(0, NEW_SHOWN);
+  const freshIds = new Set(fresh.map((m) => m.role.id));
+  const best = matches.filter((m) => !freshIds.has(m.role.id)).slice(0, SHOW);
+  const shown = [...fresh, ...best];
   const companies = await companiesFor(shown.map((m) => m.role.company_key));
   const savedIds = new Set((saved ?? []).map((s) => s.role_id));
 
@@ -64,22 +70,26 @@ export async function ForYou() {
     return <Prompt title="No matches yet" body="Nothing matches your profile today. Try ticking more fields, or check All roles." href="/profile" cta="Edit profile" />;
   }
 
+  const card = (m: (typeof matches)[number]) => (
+    <RoleCard
+      key={m.role.id}
+      role={m.role}
+      company={m.role.company_key ? companies.get(m.role.company_key) : null}
+      saved={savedIds.has(m.role.id)}
+      signedIn
+      matchTags={m.tags}
+      visa={visa}
+    />
+  );
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted">
-        {total.toLocaleString("en-GB")} role{total === 1 ? "" : "s"} match your profile. Best matches first.
+        {total.toLocaleString("en-GB")} role{total === 1 ? "" : "s"} match your profile. {fresh.length ? "New matches first, then the best." : "Best matches first; nothing new in the last two days."}
       </p>
-      {shown.map((m) => (
-        <RoleCard
-          key={m.role.id}
-          role={m.role}
-          company={m.role.company_key ? companies.get(m.role.company_key) : null}
-          saved={savedIds.has(m.role.id)}
-          signedIn
-          matchTags={m.tags}
-          visa={visa}
-        />
-      ))}
+      {fresh.length > 0 && <h2 className="pt-1 text-sm font-semibold tracking-tight">New for you · {fresh.length}</h2>}
+      {fresh.map(card)}
+      {fresh.length > 0 && <h2 className="pt-3 text-sm font-semibold tracking-tight">Best matches</h2>}
+      {best.map(card)}
     </div>
   );
 }

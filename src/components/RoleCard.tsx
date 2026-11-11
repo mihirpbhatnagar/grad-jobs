@@ -4,7 +4,7 @@ import { SaveButton } from "@/components/SaveButton";
 import type { Company } from "@/lib/companies";
 import type { Role } from "@/lib/roles";
 import { runsPastVisa, visaEndsLabel, type VisaSettings } from "@/lib/visa";
-import { dateShort, daysUntil, employerLabel, isBoardName, distinctPlaces, isCompetitive, isRepostOnly, postedAgo, salaryShort, startLabel } from "@/lib/format";
+import { dateShort, daysUntil, employerLabel, isBoardName, distinctPlaces, isCompetitive, isNewRole, isRepostOnly, postedAgo, salaryShort, startLabel } from "@/lib/format";
 
 export function Chip({ children, tone = "plain", title }: { children: React.ReactNode; tone?: "plain" | "accent" | "success" | "amber" | "rose"; title?: string }) {
   const tones = {
@@ -114,6 +114,7 @@ export function RoleCard({
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-1.5 sm:pl-[68px]">
+        {isNewRole(role.first_seen) && <Chip tone="success">New</Chip>}
         <Chip tone="accent">{startLabel(role)}</Chip>
         {t.abroad && (
           <Chip tone={t.sponsorship === "offered" ? "success" : t.sponsorship === "not_offered" ? "rose" : "amber"}>
