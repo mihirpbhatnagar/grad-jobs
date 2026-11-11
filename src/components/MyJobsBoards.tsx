@@ -190,8 +190,11 @@ function SavedRow({ row, jobs }: { row: JobRow; jobs: MyJobs }) {
         <div className="w-[7.25rem] [&_select]:w-full [&_select]:px-2">
           <StageSelect applicationId={row.id} stage={row.stage} />
         </div>
+        <Link href={`/applications/${row.id}`} className="rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white hover:opacity-90">
+          Prepare
+        </Link>
         {applyUrl && (
-          <a href={applyUrl} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white hover:opacity-90">
+          <a href={applyUrl} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-border px-3 py-2 text-sm font-medium hover:border-foreground/30">
             Apply ↗
           </a>
         )}
@@ -252,7 +255,8 @@ export function SavedBoard({ jobs }: { jobs: MyJobs }) {
             </>
           )}
           <p className="text-sm text-muted">
-            Set a role to <span className="font-medium text-foreground">Applied</span> and it moves to the Applications tab.{" "}
+<span className="font-medium text-foreground">Prepare</span> opens the role&apos;s workspace: CV match, cover letter plan and what you sent. Set a role to{" "}
+            <span className="font-medium text-foreground">Applied</span> and it moves to the Applications tab.{" "}
             <Link href="/applications/new" className="font-medium text-accent hover:underline">
               Add a role you found elsewhere
             </Link>
@@ -313,6 +317,9 @@ export function ApplicationsBoard({ jobs }: { jobs: MyJobs }) {
                   <div className={`text-xs ${chase ? "font-medium text-rose" : "text-muted"}`}>{chase ? `No reply for ${weeks} weeks` : `Updated ${dateShort(row.updated_at)}`}</div>
                 </div>
                 <StageSelect applicationId={row.id} stage={row.stage} />
+                <Link href={`/applications/${row.id}`} className="rounded-lg border border-border px-3 py-2 text-sm font-medium hover:border-foreground/30">
+                  Open
+                </Link>
               </article>
             );
           })}

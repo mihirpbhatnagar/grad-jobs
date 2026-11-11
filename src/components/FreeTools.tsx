@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { aiPhraseCheck, bulletNotes, coverLetterPlan, cvBullets, cvCheck, keywordMatch, listingFlags, questionPlan, storyEntries } from "@/lib/cv-coach";
 import { embedManyInBrowser } from "@/lib/embed-browser";
 
-type Tab = "keywords" | "stories" | "bullets" | "question" | "cover" | "ai";
+export type FreeTab = "keywords" | "stories" | "bullets" | "question" | "cover" | "ai";
+type Tab = FreeTab;
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "keywords", label: "Keyword match" },
@@ -42,15 +43,18 @@ function useRanked(job: string, texts: string[]): { ranked: string[]; scores: Ma
 const Empty = ({ children }: { children: React.ReactNode }) => <p className="text-sm text-muted">{children}</p>;
 
 // Instant, free help for one role: no AI, nothing leaves the browser except what's already saved.
-export function FreeTools({ job, company, title, cvText, storyBank }: { job: string; company: string; title: string; cvText: string; storyBank: string }) {
-  const [tab, setTab] = useState<Tab>("keywords");
+// `tabs` limits it to some of the tools (the application workspace shows them step by step).
+export function FreeTools({ job, company, title, cvText, storyBank, tabs: only }: { job: string; company: string; title: string; cvText: string; storyBank: string; tabs?: FreeTab[] }) {
+  const shownTabs = only ? TABS.filter((t) => only.includes(t.id)) : TABS;
+  const uses = (...ids: Tab[]) => shownTabs.some((t) => ids.includes(t.id));
+  const [tab, setTab] = useState<Tab>(shownTabs[0].id);
   const [draft, setDraft] = useState("");
   const [question, setQuestion] = useState("");
   const keywords = useMemo(() => keywordMatch(job, cvText, storyBank), [job, cvText, storyBank]);
   const stories = useMemo(() => storyEntries(storyBank), [storyBank]);
   const bullets = useMemo(() => cvBullets(cvText), [cvText]);
-  const rankedStories = useRanked(job, stories);
-  const rankedBullets = useRanked(job, bullets);
+  const rankedStories = useRanked(job, uses("stories", "cover") ? stories : []);
+  const rankedBullets = useRanked(job, uses("bullets") ? bullets : []);
   const notes = useMemo(() => new Map(bulletNotes(bullets).map((b) => [b.text, b.issues])), [bullets]);
   const missing = keywords.filter((k) => !k.inCv).map((k) => k.term);
   const check = draft.trim() ? aiPhraseCheck(draft) : null;
@@ -62,8 +66,8 @@ export function FreeTools({ job, company, title, cvText, storyBank }: { job: str
 
   return (
     <div>
-      <div className="flex flex-wrap gap-1.5">
-        {TABS.map((t) => (
+      <div className={shownTabs.length > 1 ? "flex flex-wrap gap-1.5" : "hidden"}>
+        {shownTabs.map((t) => (
           <button
             key={t.id}
             type="button"

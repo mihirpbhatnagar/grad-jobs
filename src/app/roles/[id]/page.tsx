@@ -2,15 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { APPLICATION_COLUMNS, ApplicationPanel, type Application } from "@/components/ApplicationPanel";
-import { ApplyTools, type Saved } from "@/components/ApplyTools";
-import { FreeTools } from "@/components/FreeTools";
 import { CompanyLogo } from "@/components/CompanyLogo";
-import { aiAvailable } from "@/lib/ai";
 import { FollowButton } from "@/components/FollowButton";
 import { RoleContacts } from "@/components/Networking";
 import { Chip, SponsorTick } from "@/components/RoleCard";
 import { SaveButton } from "@/components/SaveButton";
+import { StageSelect } from "@/components/StageControls";
 import { currentUser } from "@/lib/auth";
 import { companyFor, sizeLabel, type Company } from "@/lib/companies";
 import { dateLong, daysUntil, decodeEntities, employerLabel, isBoardName, contractLabel, distinctPlaces, isCompetitive, isRepostOnly, money, startLabel } from "@/lib/format";
@@ -272,24 +269,16 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
     .maybeSingle();
   if (!data) notFound();
   const r = data as FullRole;
-  const [{ db: userDb, user }, company, ctx, visa, { data: settings }, aiOn] = await Promise.all([
+  const [{ db: userDb, user }, company, ctx, visa, { data: settings }] = await Promise.all([
     currentUser(),
     isBoardName(r.employer) ? null : companyFor(r.company_key),
     salaryContext(),
     visaSettings(),
     db.from("settings").select("value").eq("key", "visa.standard_salary_gbp").maybeSingle(),
-    aiAvailable(),
   ]);
-  const [{ data: aiRows }, { data: mine }] = user
-    ? await Promise.all([
-        userDb.from("ai_outputs").select("kind,content,created_at").eq("role_id", r.id).in("kind", ["brief", "cv", "rewrite", "cover"]).order("created_at", { ascending: false }).limit(20),
-        userDb.from("profiles").select("cv_text,story_bank").maybeSingle(),
-      ])
-    : [{ data: [] }, { data: null }];
-  const aiSaved = [...new Map(((aiRows ?? []) as Saved[]).map((x) => [x.kind, x])).values()];
   const [application, followed] = user
     ? await Promise.all([
-        userDb.from("saved_roles").select(APPLICATION_COLUMNS).eq("role_id", r.id).maybeSingle().then((x) => x.data as Application | null),
+        userDb.from("saved_roles").select("id,stage").eq("role_id", r.id).maybeSingle().then((x) => x.data as { id: number; stage: string } | null),
         r.company_key ? userDb.from("follows").select("company_key").eq("company_key", r.company_key).maybeSingle().then((x) => !!x.data) : false,
       ])
     : [null, false];
@@ -385,7 +374,26 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-4">
-          {application && user && <ApplicationPanel app={application} userId={user.id} roleCloses={closes} />}
+          <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-accent/25 bg-surface p-5">
+            <div className="min-w-0">
+              <h2 className="font-semibold tracking-tight">{application ? "Your application workspace" : "Applying for this one?"}</h2>
+              <p className="mt-0.5 text-sm text-muted">
+                {application
+                  ? "CV match, cover letter plan, application questions, people to reach out to, and what you sent."
+                  : "Save the role to open its workspace: CV match, cover letter plan, application questions and people to reach out to."}
+              </p>
+            </div>
+            {application ? (
+              <div className="flex shrink-0 items-center gap-2">
+                <StageSelect applicationId={application.id} stage={application.stage} />
+                <Link href={`/applications/${application.id}`} className="rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90">
+                  Open workspace
+                </Link>
+              </div>
+            ) : (
+              <SaveButton roleId={r.id} saved={false} signedIn={!!user} large />
+            )}
+          </section>
           <section className="rounded-2xl border border-border bg-surface p-6 sm:p-8">
             <h2 className="text-xl font-semibold tracking-tight">About the role</h2>
             {blocks.length > 0 ? (
@@ -409,21 +417,6 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
               </div>
             )}
           </section>
-
-          <Panel title="Apply tools" icon="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z">
-            {user && (
-              <>
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Free and instant</p>
-                <div className="mt-2">
-                  <FreeTools job={r.description ? decodeEntities(r.description) : ""} company={company?.name ?? r.employer} title={r.title} cvText={mine?.cv_text ?? ""} storyBank={mine?.story_bank ?? ""} />
-                </div>
-                <p className="mt-6 text-xs font-semibold uppercase tracking-wide text-muted">AI tools</p>
-              </>
-            )}
-            <div className="mt-2">
-              <ApplyTools roleId={r.id} initial={aiSaved} enabled={aiOn} signedIn={!!user} />
-            </div>
-          </Panel>
 
           <Panel title="Requirements" icon="M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9">
             <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">

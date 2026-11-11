@@ -45,16 +45,23 @@ function Formatted({ text }: { text: string }) {
   );
 }
 
-export function ApplyTools({ roleId, initial, enabled, signedIn }: { roleId: number; initial: Saved[]; enabled: boolean; signedIn: boolean }) {
+export function ApplyTools({ roleId, initial, enabled, signedIn, kinds }: { roleId: number; initial: Saved[]; enabled: boolean; signedIn: boolean; kinds?: ToolKind[] }) {
+  const buttons = kinds ? BUTTONS.filter((b) => kinds.includes(b.kind)) : BUTTONS;
   const [results, setResults] = useState<Partial<Record<ToolKind, Saved>>>(() => Object.fromEntries(initial.map((s) => [s.kind, s])));
-  const [open, setOpen] = useState<ToolKind | null>(initial[0]?.kind ?? null);
+  const [open, setOpen] = useState<ToolKind | null>(initial.find((s) => buttons.some((b) => b.kind === s.kind))?.kind ?? null);
   const [busy, setBusy] = useState<ToolKind | null>(null);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
   const [, start] = useTransition();
 
   if (!signedIn) return <p className="text-sm text-muted">Sign in to use the Apply tools.</p>;
-  if (!enabled) return <p className="text-sm text-muted">Company brief, CV recommendations, CV rewrite and cover letter pointers are switched off for now.</p>;
+  if (!enabled) {
+    return (
+      <p className="rounded-xl border border-dashed border-border px-3 py-2 text-sm text-muted">
+        <span className="font-medium text-foreground">AI help is switched off:</span> {buttons.map((b) => b.label.toLowerCase()).join(", ")}. The free tools above work now.
+      </p>
+    );
+  }
 
   const run = (kind: ToolKind) =>
     start(async () => {
@@ -71,7 +78,7 @@ export function ApplyTools({ roleId, initial, enabled, signedIn }: { roleId: num
   return (
     <div className="space-y-4">
       <div className="grid gap-2 sm:grid-cols-2">
-        {BUTTONS.map((b) => (
+        {buttons.map((b) => (
           <button
             key={b.kind}
             type="button"
