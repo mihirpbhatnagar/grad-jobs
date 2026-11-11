@@ -123,6 +123,7 @@ export const KNOWN_FEEDS: { name: string; ats: string; ats_id: string }[] = [
   { name: "AECOM", ats: "smartrecruiters", ats_id: "AECOM2" },
   { name: "Lloyds Banking Group", ats: "workday", ats_id: "lbg.wd3.myworkdayjobs.com/lbg/Graduate_careers" },
   { name: "Babcock International", ats: "sitemap", ats_id: "https://jobs.babcockinternational.com/sitemap.xml" },
+  { name: "Capgemini", ats: "sitemap", ats_id: "https://careers.capgemini.com/sitemap.xml" },
   // Careers-site sitemaps, tried one by one on 4 Nov 2026 (the automatic search had missed these,
   // or had picked another company's or another country's site).
   { name: "Softwire", ats: "sitemap", ats_id: "https://www.softwire.com/sitemap.xml" },
