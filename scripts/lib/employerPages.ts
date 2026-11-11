@@ -164,7 +164,8 @@ function findPosting(node: unknown): Record<string, unknown> | null {
 
 const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
 
-const UK_COUNTRY = /^(gb|gbr|uk|u\.k\.|united kingdom|great britain|britain|england|scotland|wales|northern ireland)$/i;
+// Tesco's pages give the country in full: "United Kingdom of Great Britain and Northern Ireland".
+const UK_COUNTRY = /^(gb|gbr|uk|u\.k\.|united kingdom( of great britain( and northern ireland)?)?|great britain|britain|england|scotland|wales|northern ireland)$/i;
 
 // The HTML inside the first element whose opening tag matches, counting nested tags of its kind.
 function innerHtml(html: string, opening: RegExp): string | null {

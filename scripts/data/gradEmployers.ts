@@ -112,6 +112,17 @@ export const KNOWN_FEEDS: { name: string; ats: string; ats_id: string }[] = [
   { name: "Aston Martin Aramco Formula One Team", ats: "pinpoint", ats_id: "astonmartinf1" },
   { name: "Surrey County Cricket Club", ats: "pinpoint", ats_id: "surreycricket" },
   { name: "DAZN", ats: "pinpoint", ats_id: "dazn" },
+  // Big graduate employers whose stored address found nothing; each re-tested on 11 Nov 2026.
+  { name: "Ramboll", ats: "smartrecruiters", ats_id: "Ramboll3" },
+  { name: "MHA", ats: "sitemap", ats_id: "https://careers.mha.co.uk/sitemap.xml" },
+  { name: "Amey", ats: "sitemap", ats_id: "https://careers.amey.co.uk/sitemap.xml" },
+  { name: "National Grid", ats: "sitemap", ats_id: "https://jobs-ats.nationalgrid.com/sitemap.xml" },
+  { name: "Centrica", ats: "workday", ats_id: "centrica.wd3.myworkdayjobs.com/centrica/Centrica" },
+  { name: "National Gas", ats: "sitemap", ats_id: "https://jobs.nationalgas.com/sitemap.xml" },
+  { name: "Tesco", ats: "sitemap", ats_id: "https://careers.tesco.com/en_GB/careers/sitemap.xml" },
+  { name: "AECOM", ats: "smartrecruiters", ats_id: "AECOM2" },
+  { name: "Lloyds Banking Group", ats: "workday", ats_id: "lbg.wd3.myworkdayjobs.com/lbg/Graduate_careers" },
+  { name: "Babcock International", ats: "sitemap", ats_id: "https://jobs.babcockinternational.com/sitemap.xml" },
   // Careers-site sitemaps, tried one by one on 4 Nov 2026 (the automatic search had missed these,
   // or had picked another company's or another country's site).
   { name: "Softwire", ats: "sitemap", ats_id: "https://www.softwire.com/sitemap.xml" },
