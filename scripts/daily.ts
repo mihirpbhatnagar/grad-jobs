@@ -586,6 +586,16 @@ async function discoverFeeds(probeLimit = 200, sitemapLimit = 40) {
 
   // 0. Hiring systems checked by hand for big employers.
   for (const k of KNOWN_FEEDS) add({ company_key: companyKey(k.name), name: k.name, ats: k.ats, ats_id: k.ats_id, added_by: "seed" });
+  // A feed first met through an apply link carries whatever the advert called the employer
+  // ("LLOYDS BANK PLC", "Capgemini Invent"). The hand-checked list knows the proper name.
+  for (const k of KNOWN_FEEDS) {
+    const row = feeds.find((f) => f.ats === k.ats && f.ats_id === k.ats_id);
+    if (row && row.name !== k.name) {
+      await must(() => db.from("employer_feeds").update({ name: k.name, company_key: companyKey(k.name) }).eq("id", row.id).select("id"));
+      row.name = k.name;
+      row.company_key = companyKey(k.name);
+    }
+  }
 
   // 1. Apply links on roles we already have.
   const roles = await selectAll<{ id: number; employer: string; company_key: string | null }>((from, to) =>
