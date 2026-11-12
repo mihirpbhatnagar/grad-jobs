@@ -69,7 +69,10 @@ async function Workspace({ params }: { params: PageProps<"/applications/[id]">["
   ]);
   const role = roleRow as WorkRole | null;
   const company = role && !isBoardName(role.employer) ? await companyFor(role.company_key) : null;
-  const aiSaved = [...new Map(((aiRows ?? []) as Saved[]).map((x) => [x.kind, x])).values()];
+  // The newest result of each kind (rows arrive newest first, so the first one seen wins).
+  const newest = new Map<string, Saved>();
+  for (const row of (aiRows ?? []) as Saved[]) if (!newest.has(row.kind)) newest.set(row.kind, row);
+  const aiSaved = [...newest.values()];
 
   const title = role?.title ?? app.title ?? "Application";
   const employer = role ? (company?.name ?? employerLabel(role.employer)) : (app.company ?? "");
