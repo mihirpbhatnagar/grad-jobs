@@ -63,7 +63,7 @@ const TASKS: Record<ToolKind, string> = {
 export type Usage = { input: number; output: number; cacheRead: number; cacheWrite: number; webSearches: number; costUsd: number };
 
 // Rough cost of one run, shown on each button before anyone presses it.
-export const ESTIMATE_PENCE: Partial<Record<ToolKind, number>> = { brief: 4, cv: 5, rewrite: 8, cover: 4 };
+export const ESTIMATE_PENCE: Partial<Record<ToolKind, number>> = { brief: 10, cv: 5, rewrite: 8, cover: 4 };
 
 export type ToolContext = {
   cvText: string | null;
@@ -101,9 +101,14 @@ export async function runTool(kind: ToolKind, ctx: ToolContext): Promise<{ text:
       output_config: { effort: tool.effort },
       system: [
         { type: "text", text: RULES },
-        { type: "text", text: profile, cache_control: { type: "ephemeral" } },
+        // Cached for the CV tools, which re-send the same CV for each role. Not for the web
+        // brief: there it only added a surcharge on the search results.
+        { type: "text", text: profile, ...(tool.web ? {} : { cache_control: { type: "ephemeral" } }) },
       ],
-      ...(tool.web ? { tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 4 }] } : {}),
+      // The plain search tool on purpose. Tested 12 Nov 2026: the newer variant drives searches
+      // through code, repeated one query until the limit ran out and returned a thin brief; this
+      // one made three different searches and found the mission, dated news and graduate criteria.
+      ...(tool.web ? { tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 5 }] } : {}),
       messages,
     } as Anthropic.MessageCreateParamsNonStreaming);
   let response = await request();
@@ -114,7 +119,10 @@ export async function runTool(kind: ToolKind, ctx: ToolContext): Promise<{ text:
   }
 
   if (response.stop_reason === "refusal") throw new Error("The request was declined. Try rephrasing your draft.");
+  // The answer is the text after the last search result (anything before it is working notes).
+  const lastResult = response.content.map((b) => b.type as string).lastIndexOf("web_search_tool_result");
   const text = response.content
+    .slice(lastResult + 1)
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
     .map((b) => b.text)
     .join("")
