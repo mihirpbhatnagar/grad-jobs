@@ -52,6 +52,7 @@ export function ApplyTools({ roleId, initial, enabled, signedIn, kinds, quietWhe
   const [busy, setBusy] = useState<ToolKind | null>(null);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const [, start] = useTransition();
 
   if (!signedIn) return <p className="text-sm text-muted">Sign in to use the Apply tools.</p>;
@@ -106,6 +107,18 @@ export function ApplyTools({ roleId, initial, enabled, signedIn, kinds, quietWhe
           <div className="mb-2 flex items-center justify-between gap-2">
             <span className="text-xs text-muted">Saved {new Date(shown.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</span>
             <span className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  void navigator.clipboard.writeText(shown.content).then(() => {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1500);
+                  });
+                }}
+                className="text-xs font-semibold text-accent hover:underline"
+              >
+                {copied ? "Copied ✓" : "Copy"}
+              </button>
               {shown.kind === "rewrite" && editing === null && (
                 <button type="button" onClick={() => setEditing(shown.content)} className="text-xs font-semibold text-accent hover:underline">
                   Edit as my version

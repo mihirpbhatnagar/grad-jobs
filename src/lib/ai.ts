@@ -19,7 +19,7 @@ export const TOOLS: Record<ToolKind, { label: string; model: string; effort: "lo
 // US$ per million tokens (Anthropic list prices); cache writes are 1.25x input.
 const PRICES: Record<string, { input: number; output: number; cacheRead: number }> = {
   "claude-opus-5-5": { input: 4, output: 20, cacheRead: 0.2 },
-  "claude-sonnet-5-5": { input: 2, output: 10, cacheRead: 0.2 },
+  "claude-sonnet-5-5": { input: 2, output: 10, cacheRead: 0.1 },
   "claude-haiku-5-5": { input: 0.1, output: 0.5, cacheRead: 0.01 },
 };
 const WEB_SEARCH_USD = 0.01;
@@ -93,17 +93,25 @@ export async function runTool(kind: ToolKind, ctx: ToolContext): Promise<{ text:
     : "";
   const ask = `${TASKS[kind]}\n\n${roleText}${ctx.draft ? `\n\n## The user's draft\n${ctx.draft.slice(0, 8000)}` : ""}`;
 
-  const response = await client.messages.create({
-    model: tool.model,
-    max_tokens: 16000,
-    output_config: { effort: tool.effort },
-    system: [
-      { type: "text", text: RULES },
-      { type: "text", text: profile, cache_control: { type: "ephemeral" } },
-    ],
-    ...(tool.web ? { tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 4 }] } : {}),
-    messages: [{ role: "user", content: ask }],
-  } as Anthropic.MessageCreateParamsNonStreaming);
+  const messages: Anthropic.MessageParam[] = [{ role: "user", content: ask }];
+  const request = () =>
+    client.messages.create({
+      model: tool.model,
+      max_tokens: 16000,
+      output_config: { effort: tool.effort },
+      system: [
+        { type: "text", text: RULES },
+        { type: "text", text: profile, cache_control: { type: "ephemeral" } },
+      ],
+      ...(tool.web ? { tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 4 }] } : {}),
+      messages,
+    } as Anthropic.MessageCreateParamsNonStreaming);
+  let response = await request();
+  // A web-search turn can pause part-way; sending the assistant's turn back resumes it.
+  for (let i = 0; i < 3 && response.stop_reason === "pause_turn"; i++) {
+    messages.push({ role: "assistant", content: response.content as Anthropic.ContentBlockParam[] });
+    response = await request();
+  }
 
   if (response.stop_reason === "refusal") throw new Error("The request was declined. Try rephrasing your draft.");
   const text = response.content
