@@ -579,7 +579,11 @@ async function discoverFeeds(probeLimit = 200, sitemapLimit = 40) {
   const have = new Set(feeds.map((f) => `${f.ats}|${f.ats_id}`));
   // Sorted for good once a feed finds roles. An employer we found nothing useful for is tried
   // again every 30 days: its site may have changed, or an earlier look may have just failed.
-  const retryBefore = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  const monthBack = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  // Discovery learned to follow careers pages to vacancy lists on 13 Nov 2026: an employer
+  // written off before then gets another look now rather than in a month.
+  const DISCOVERY_IMPROVED = "2026-11-13T12:00:00.000Z";
+  const retryBefore = monthBack > DISCOVERY_IMPROVED ? monthBack : DISCOVERY_IMPROVED;
   const watched = new Set(feeds.filter((f) => (f.ats !== "none" && (f.last_found ?? 0) > 0) || (f.ats === "none" && (f.last_checked ?? f.created_at) >= retryBefore)).map((f) => f.company_key));
   const added: Record<string, unknown>[] = [];
   const add = (row: { company_key: string; name: string; ats: string; ats_id: string; added_by: string }) => {
