@@ -254,6 +254,8 @@ async function saveCrossCheck(source: string, all: Listing[], match: Matcher, by
   const newTowns = new Map<number, Set<string>>();
   const rolesById = new Map(roles.map((r) => [r.id, r]));
   const notWanted: Listing[] = [];
+  // Roles known only from Google Jobs that the employer's own site now confirms.
+  const ownWords = new Map<number, Listing>();
   for (const l of listings) {
     if (isPlacementOrApprenticeship(l.title)) {
       notWanted.push(l);
@@ -264,6 +266,7 @@ async function saveCrossCheck(source: string, all: Listing[], match: Matcher, by
       links.push({ source: l.source, source_id: l.sourceId, role_id: roleId, url: l.sourceUrl, last_seen: now });
       if (l.location && !rolesById.get(roleId)!.locations.includes(l.location)) newTowns.set(roleId, (newTowns.get(roleId) ?? new Set()).add(l.location));
       if (l.description.length > 150) withText.set(roleId, l);
+      if (source === "employer" && rolesById.get(roleId)!.sources.every((x) => x === "google_jobs")) ownWords.set(roleId, l);
     } else if (isSeniorTitle(l.title)) senior.push(l);
     else unmatched.push(l);
   }
@@ -283,6 +286,9 @@ async function saveCrossCheck(source: string, all: Listing[], match: Matcher, by
   for (const batch of chunks(links, 500)) {
     await must(() => db.from("role_sources").upsert(batch, { onConflict: "source,source_id" }));
   }
+  // Google's copy of a role is often reworded and links to a repost site: once the employer's
+  // own site confirms the role, it takes the employer's title and link.
+  for (const [id, l] of ownWords) await must(() => db.from("roles").update({ title: l.title, apply_url: l.applyUrl }).eq("id", id).select("id"));
   // Add the source to each matched role, grouping roles that end up with the same list.
   const groups = new Map<string, number[]>();
   for (const id of new Set(links.map((l) => l.role_id))) {
