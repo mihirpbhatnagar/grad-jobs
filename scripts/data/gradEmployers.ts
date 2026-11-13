@@ -126,6 +126,8 @@ export const KNOWN_FEEDS: { name: string; ats: string; ats_id: string }[] = [
   { name: "Capgemini", ats: "sitemap", ats_id: "https://careers.capgemini.com/sitemap.xml" },
   // Job pages give no place; the town is the first word of the address ("/job/Leeds-Graduate-...").
   { name: "Mott MacDonald", ats: "sitemap", ats_id: "https://apply.mottmac.com/sitemap.xml" },
+  // Mercedes' F1 engine maker (Brixworth): graduate roles are on its PageUp vacancy list.
+  { name: "Mercedes AMG High Performance Powertrains", ats: "pageup", ats_id: "careersmanager.pageuppeople.com/920" },
   // Careers-site sitemaps, tried one by one on 4 Nov 2026 (the automatic search had missed these,
   // or had picked another company's or another country's site).
   { name: "Softwire", ats: "sitemap", ats_id: "https://www.softwire.com/sitemap.xml" },

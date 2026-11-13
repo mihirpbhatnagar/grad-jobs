@@ -13,7 +13,7 @@ export type Feed = { ats: string; ats_id: string; name: string };
 
 const EARLY = /\b(graduate|grad|graduates|trainee|entry[- ]level|early careers?|early talent|early professional|emerging talent|intern|interns|internship|summer analyst|summer associate|off[- ]cycle|spring week|spring insight|insight|junior|new grad|campus|futures?|undergraduate|vacation scheme|training contract|(analyst|associate|leadership|development|rotational|management) program(me)?)\b/i;
 const SENIOR = /\b(senior|snr|sr\.?|principal|head of|director|vp|vice president|chief|lead|manager|partner|staff|experienced)\b/i;
-const UK = /\b(uk|u\.k\.|united kingdom|great britain|england|scotland|wales|northern ireland|surrey|kent|essex|sussex|hampshire|berkshire|hertfordshire|buckinghamshire|oxfordshire|cambridgeshire|bedfordshire|leicestershire|nottinghamshire|derbyshire|staffordshire|warwickshire|west midlands|east midlands|yorkshire|lancashire|cheshire|cumbria|merseyside|tyne and wear|county durham|somerset|devon|cornwall|dorset|wiltshire|gloucestershire|worcestershire|shropshire|norfolk|suffolk|lincolnshire|bedford|stoke|sunderland|middlesbrough|darlington|carlisle|bolton|stockport|solihull|harlow|chelmsford|colchester|maidstone|canterbury|woking|staines|harrogate|huddersfield|bradford|wakefield|doncaster|london|manchester|birmingham|leeds|glasgow|edinburgh|bristol|cardiff|belfast|liverpool|newcastle|sheffield|nottingham|leicester|cambridge|oxford|reading|milton keynes|southampton|aberdeen|coventry|derby|warrington|york|brighton|guildford|farnborough|bath|exeter|plymouth|norwich|ipswich|swindon|slough|stevenage|crawley|chester|preston|lancaster|loughborough|cheltenham|gloucester|barrow|warton|portsmouth|basingstoke|bracknell|uxbridge|watford|hatfield|luton|peterborough|northampton|telford|wolverhampton|hull|dundee|inverness|swansea|newport|northamptonshire|silverstone|hemel hempstead|high wycombe|wrexham|knutsford|brighouse|welwyn|maidenhead|basildon|wigan|salford|rochdale|oldham|blackburn|burnley|blackpool|barnsley|rotherham|scunthorpe|grimsby|corby|nuneaton|lichfield|kidderminster|redditch|walsall|west bromwich|leamington|crewe|macclesfield|altrincham|runcorn|widnes|st helens|falkirk|kilmarnock|bridgend|llanelli|lisburn|londonderry|newry|county down|county antrim|aldershot|camberley|eastbourne|worthing|chichester|dartford|sevenoaks|tunbridge wells|tonbridge|folkestone|southend|romford|croydon|bromley|twickenham|hounslow|wembley|banbury|bicester|didcot|aylesbury|bournemouth|poole|yeovil|weybridge|leatherhead|redhill|reigate|daventry|wellingborough|burton upon trent|burton-on-trent|remote - uk|gb)\b/i;
+const UK = /\b(uk|u\.k\.|united kingdom|great britain|england|scotland|wales|northern ireland|surrey|kent|essex|sussex|hampshire|berkshire|hertfordshire|buckinghamshire|oxfordshire|cambridgeshire|bedfordshire|leicestershire|nottinghamshire|derbyshire|staffordshire|warwickshire|west midlands|east midlands|yorkshire|lancashire|cheshire|cumbria|merseyside|tyne and wear|county durham|somerset|devon|cornwall|dorset|wiltshire|gloucestershire|worcestershire|shropshire|norfolk|suffolk|lincolnshire|bedford|stoke|sunderland|middlesbrough|darlington|carlisle|bolton|stockport|solihull|harlow|chelmsford|colchester|maidstone|canterbury|woking|staines|harrogate|huddersfield|bradford|wakefield|doncaster|london|manchester|birmingham|leeds|glasgow|edinburgh|bristol|cardiff|belfast|liverpool|newcastle|sheffield|nottingham|leicester|cambridge|oxford|reading|milton keynes|southampton|aberdeen|coventry|derby|warrington|york|brighton|guildford|farnborough|bath|exeter|plymouth|norwich|ipswich|swindon|slough|stevenage|crawley|chester|preston|lancaster|loughborough|cheltenham|gloucester|barrow|warton|portsmouth|basingstoke|bracknell|uxbridge|watford|hatfield|luton|peterborough|northampton|telford|wolverhampton|hull|dundee|inverness|swansea|newport|northamptonshire|silverstone|brixworth|brackley|hemel hempstead|high wycombe|wrexham|knutsford|brighouse|welwyn|maidenhead|basildon|wigan|salford|rochdale|oldham|blackburn|burnley|blackpool|barnsley|rotherham|scunthorpe|grimsby|corby|nuneaton|lichfield|kidderminster|redditch|walsall|west bromwich|leamington|crewe|macclesfield|altrincham|runcorn|widnes|st helens|falkirk|kilmarnock|bridgend|llanelli|lisburn|londonderry|newry|county down|county antrim|aldershot|camberley|eastbourne|worthing|chichester|dartford|sevenoaks|tunbridge wells|tonbridge|folkestone|southend|romford|croydon|bromley|twickenham|hounslow|wembley|banbury|bicester|didcot|aylesbury|bournemouth|poole|yeovil|weybridge|leatherhead|redhill|reigate|daventry|wellingborough|burton upon trent|burton-on-trent|remote - uk|gb)\b/i;
 
 // "2027" counts unless it's part of a date ("FTC until 01/06/2027").
 const YEAR_2027 = /(?<![\d/.-])2027\b/;
@@ -536,12 +536,62 @@ async function sitemap(feed: Feed, run: FeedRun): Promise<Listing[] | null> {
   return out;
 }
 
+// PageUp (Mercedes AMG High Performance Powertrains): a paged vacancy list at
+// https://<host>/<site>/cw/en/listing; each job page gives the place, the advert and the closing
+// date. ats_id is "<host>/<site>", e.g. "careersmanager.pageuppeople.com/920". A PageUp site is
+// added by hand for a UK employer, so a town we don't recognise still counts as the UK unless it
+// names somewhere abroad.
+async function pageup(feed: Feed): Promise<Listing[] | null> {
+  const [host, site] = feed.ats_id.split("/");
+  const origin = `https://${host}`;
+  const jobs = new Map<string, { path: string; title: string }>();
+  for (let page = 1; page <= 10; page++) {
+    const html = await sitemapText(`${origin}/${site}/cw/en/listing/?page=${page}&page-items=50`);
+    if (html === null) {
+      if (page === 1) return null;
+      break;
+    }
+    const before = jobs.size;
+    for (const m of html.matchAll(/<a[^>]*href="(\/\d+\/cw\/en\/job\/(\d+)\/[^"]+)"[^>]*>([^<]+)<\/a>/g)) {
+      const title = htmlToText(m[3]).trim();
+      if (title && !/^apply$/i.test(title) && !jobs.has(m[2])) jobs.set(m[2], { path: m[1], title });
+    }
+    if (jobs.size === before) break;
+    await sleep(400);
+  }
+  const out: Listing[] = [];
+  for (const [id, job] of jobs) {
+    if (!wantedTitle(job.title)) continue;
+    const url = `${origin}${job.path}`;
+    const html = await sitemapText(url);
+    await sleep(400);
+    if (!html) continue;
+    const location = htmlToText(html.match(/<span class="location">([^<]*)</)?.[1] ?? "").trim() || null;
+    if (location && namesAbroad(location)) continue;
+    const start = html.indexOf('id="job-details"');
+    const end = html.indexOf("Advertised:", start);
+    const description = start < 0 ? "" : htmlToText(html.slice(html.indexOf(">", start) + 1, end > start ? end : start + 30000)).trim();
+    out.push(
+      listing(feed, id, {
+        title: job.title,
+        url,
+        location: location ?? "United Kingdom",
+        description,
+        postedAt: html.match(/class="open-date"><time datetime="(\d{4}-\d\d-\d\d)/)?.[1] ?? null,
+        expiresAt: html.match(/class="close-date"><time datetime="(\d{4}-\d\d-\d\d)/)?.[1] ?? null,
+      }),
+    );
+  }
+  return out;
+}
+
 export async function readFeed(feed: Feed, run: FeedRun = newFeedRun()): Promise<Listing[] | null> {
   switch (feed.ats) {
     case "greenhouse": return greenhouse(feed);
     case "lever": return lever(feed);
     case "ashby": return ashby(feed);
     case "pinpoint": return pinpoint(feed);
+    case "pageup": return pageup(feed);
     case "smartrecruiters": return smartrecruiters(feed);
     case "workable": return workable(feed);
     case "workday": return workday(feed);
@@ -572,6 +622,7 @@ export function feedFromUrl(url: string): { ats: string; ats_id: string } | null
   if (host === "jobs.lever.co" || host === "jobs.eu.lever.co") return parts[0] ? { ats: "lever", ats_id: parts[0].toLowerCase() } : null;
   if (host === "jobs.ashbyhq.com") return parts[0] ? { ats: "ashby", ats_id: parts[0] } : null;
   if (host.endsWith(".pinpointhq.com")) return { ats: "pinpoint", ats_id: host.split(".")[0] };
+  if (host.endsWith(".pageuppeople.com") && /^\d+$/.test(parts[0] ?? "")) return { ats: "pageup", ats_id: `${host}/${parts[0]}` };
   if (host === "jobs.smartrecruiters.com" || host === "careers.smartrecruiters.com") return parts[0] ? { ats: "smartrecruiters", ats_id: parts[0] } : null;
   if (host === "apply.workable.com") return parts[0] && parts[0] !== "j" ? { ats: "workable", ats_id: parts[0].toLowerCase() } : null;
   const oc = host.match(/^[a-z0-9-]+\.fa\.[a-z0-9]+\.oraclecloud\.com$/);
