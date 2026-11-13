@@ -718,6 +718,8 @@ async function page(url: string): Promise<{ html: string; finalUrl: string } | n
 const NAV_TEXT = /^(our |all |view (all )?|see (all )?|explore |search |find |browse )?(the )?(graduates?|early careers?|early talent|students?|interns?|internships?|trainees?|apprentices?|(students?|interns?|apprentices?)( and | & |, )graduates?|graduates?( and | & |, )(students?|interns?|apprentices?|internships?|placements?)|(graduate|intern(ship)?|trainee|student|early careers?) (jobs?|roles?|programmes?|programs?|schemes?|opportunities|careers?|vacancies|recruitment|hub|faqs?|events?|stories|blog|development|training))( \d{4})?$/i;
 // "Explore our graduate opportunities", "Meet our interns": an invitation to read on, not a job title.
 const INVITATION = /^(explore|discover|find|learn|meet|read|view|see|join|apply|search|browse|our|why|how|what|life|hear|register|sign|about|more|all|get|start|kick|launch|build|shape|your|welcome|introducing|watch|download|faqs?)\b|\?$/i;
+const JOB_ADDRESS = /(\/|=|-)(jobs?|vacanc(y|ies)|roles?|positions?|postings?|requisitions?|openings?|opportunit(y|ies)|adverts?|jobdetail|jobid)([\/=?&_-]|\d|$)/i;
+const NOT_A_JOB = /\b(application|recruitment|selection|assessment|hiring) (process|stages?|tips|advice)\b|\bhow to apply\b|\bfaqs?\b|\b(stories|story|blog|news|case study|podcast|webinar|event)\b|>|\bday in the life\b/i;
 export function jobLinks(html: string, base: string): { url: string; title: string }[] {
   const out = new Map<string, string>();
   for (const m of html.matchAll(/<a\b[^>]*href=["']([^"'#]+)["'][^>]*>([\s\S]{0,400}?)<\/a>/gi)) {
@@ -730,6 +732,9 @@ export function jobLinks(html: string, base: string): { url: string; title: stri
       continue;
     }
     if (!/^https?:$/.test(url.protocol)) continue;
+    // The address must look like one job's page ("/job/123", "?jobId="), not a project, a news
+    // story or an "application process" page that happens to mention graduates.
+    if (!JOB_ADDRESS.test(url.pathname + url.search) || NOT_A_JOB.test(title)) continue;
     if (!out.has(url.href)) out.set(url.href, title);
   }
   return [...out].map(([url, title]) => ({ url, title }));
@@ -867,7 +872,8 @@ export async function discoverFromWebsite(domain: string): Promise<{ ats: string
   if (hits.size) return [...hits.values()];
   // Kept only if a trial read finds at least one real advert behind those links.
   const listed = best as { url: string; n: number } | null;
-  if (listed) {
+  // Never a site's front page: links there are to stories and projects, not to a list of jobs.
+  if (listed && new URL(listed.url).pathname.replace(/\/$/, "") !== "") {
     const trial = await listingPage({ name: "", ats: "listing", ats_id: listed.url }, newFeedRun(new Set(), new Set(), 4)).catch(() => null);
     if (trial?.length) return [{ ats: "listing", ats_id: listed.url }];
   }
