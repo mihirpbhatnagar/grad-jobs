@@ -694,7 +694,7 @@ async function pullEmployerFeeds(match: Matcher, byKey: Map<string, ExistingRole
   // ruled out by a rule that has since been corrected, so they are read again straight away.
   const monthAgo = new Date(Date.now() - 30 * 86_400_000).toISOString();
   const skip = new Set(
-    (await selectAll<{ source_id: string }>((from, to) => db.from("excluded_listings").select("source_id").eq("source", "employer").like("source_id", "sitemap:%").neq("reason", "recheck").gte("last_seen", monthAgo).order("source_id").range(from, to))).map((r) => r.source_id),
+    (await selectAll<{ source_id: string }>((from, to) => db.from("excluded_listings").select("source_id").eq("source", "employer").or("source_id.like.sitemap:%,source_id.like.listing:%").neq("reason", "recheck").gte("last_seen", monthAgo).order("source_id").range(from, to))).map((r) => r.source_id),
   );
   // Stored pages that have since gone (404): their sitemap entry no longer keeps the role open.
   const closed = new Set(

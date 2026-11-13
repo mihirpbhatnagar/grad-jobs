@@ -592,6 +592,7 @@ export async function readFeed(feed: Feed, run: FeedRun = newFeedRun()): Promise
     case "ashby": return ashby(feed);
     case "pinpoint": return pinpoint(feed);
     case "pageup": return pageup(feed);
+    case "listing": return listingPage(feed, run);
     case "smartrecruiters": return smartrecruiters(feed);
     case "workable": return workable(feed);
     case "workday": return workday(feed);
@@ -700,7 +701,7 @@ export function pickSitemap(maps: string[], origin: string): string | null {
   return absolute.sort((a, b) => score(b) - score(a))[0] ?? null;
 }
 
-const ATS_LINK = /https?:\/\/[^"'\s<>]*(myworkdayjobs\.com|greenhouse\.io|jobs\.lever\.co|jobs\.ashbyhq\.com|smartrecruiters\.com|apply\.workable\.com|oraclecloud\.com\/hcmUI|eightfold\.ai)[^"'\s<>]*/gi;
+const ATS_LINK = /https?:\/\/[^"'\s<>]*(myworkdayjobs\.com|greenhouse\.io|jobs\.lever\.co|jobs\.ashbyhq\.com|smartrecruiters\.com|apply\.workable\.com|oraclecloud\.com\/hcmUI|eightfold\.ai|pageuppeople\.com\/\d+|pinpointhq\.com)[^"'\s<>]*/gi;
 
 async function page(url: string): Promise<{ html: string; finalUrl: string } | null> {
   try {
@@ -712,6 +713,89 @@ async function page(url: string): Promise<{ html: string; finalUrl: string } | n
   }
 }
 
+// Links on a page whose text reads as one early-career job ("Programme Management Graduate (F1)"),
+// not as navigation ("Graduates", "Early careers", "Search jobs").
+const NAV_TEXT = /^(our |all |view (all )?|see (all )?|explore |search |find |browse )?(the )?(graduates?|early careers?|early talent|students?|interns?|internships?|trainees?|apprentices?|(students?|interns?|apprentices?)( and | & |, )graduates?|graduates?( and | & |, )(students?|interns?|apprentices?|internships?|placements?)|(graduate|intern(ship)?|trainee|student|early careers?) (jobs?|roles?|programmes?|programs?|schemes?|opportunities|careers?|vacancies|recruitment|hub|faqs?|events?|stories|blog|development|training))( \d{4})?$/i;
+// "Explore our graduate opportunities", "Meet our interns": an invitation to read on, not a job title.
+const INVITATION = /^(explore|discover|find|learn|meet|read|view|see|join|apply|search|browse|our|why|how|what|life|hear|register|sign|about|more|all|get|start|kick|launch|build|shape|your|welcome|introducing|watch|download|faqs?)\b|\?$/i;
+export function jobLinks(html: string, base: string): { url: string; title: string }[] {
+  const out = new Map<string, string>();
+  for (const m of html.matchAll(/<a\b[^>]*href=["']([^"'#]+)["'][^>]*>([\s\S]{0,400}?)<\/a>/gi)) {
+    const title = htmlToText(m[2]).replace(/\s+/g, " ").trim();
+    if (title.length < 8 || title.length > 140 || !wantedTitle(title) || NAV_TEXT.test(title) || INVITATION.test(title)) continue;
+    let url: URL;
+    try {
+      url = new URL(m[1].replace(/&amp;/g, "&"), base);
+    } catch {
+      continue;
+    }
+    if (!/^https?:$/.test(url.protocol)) continue;
+    if (!out.has(url.href)) out.set(url.href, title);
+  }
+  return [...out].map(([url, title]) => ({ url, title }));
+}
+
+// A vacancy page that lists its jobs as plain links, for employers whose hiring system has no
+// reader of its own. ats_id is the address of that page. Each link that reads as an early-career
+// job is opened once and read like a sitemap job page; a job stays open while the page still
+// links to it and closes when the link goes.
+async function listingPage(feed: Feed, run: FeedRun): Promise<Listing[] | null> {
+  const idOf = (u: string) => `listing:${feed.ats_id}:${u}`;
+  const jobs = new Map<string, string>();
+  const seenPages = new Set<string>();
+  let url: string | null = feed.ats_id;
+  for (let i = 0; url && i < 6 && !seenPages.has(url); i++) {
+    seenPages.add(url);
+    const got = await page(url);
+    if (!got) {
+      if (i === 0) return null;
+      break;
+    }
+    for (const j of jobLinks(got.html, got.finalUrl)) if (!jobs.has(j.url)) jobs.set(j.url, j.title);
+    const next: string | undefined =
+      got.html.match(/<a\b[^>]*rel=["']next["'][^>]*href=["']([^"']+)["']/i)?.[1] ??
+      got.html.match(/<a\b[^>]*href=["']([^"']+)["'][^>]*rel=["']next["']/i)?.[1] ??
+      got.html.match(/<a\b[^>]*href=["']([^"']*[?&]page=\d+[^"']*)["'][^>]*>\s*(?:<[^>]+>\s*)*(?:next|›|»|&gt;|&rsaquo;|&raquo;)/i)?.[1];
+    try {
+      url = next ? new URL(next.replace(/&amp;/g, "&"), got.finalUrl).href : null;
+    } catch {
+      url = null;
+    }
+    await sleep(400);
+  }
+  for (const u of jobs.keys()) if (run.known.has(idOf(u)) && !run.closed.has(idOf(u))) run.stillListed.add(idOf(u));
+
+  const out: Listing[] = [];
+  let opened = 0;
+  for (const [u, title] of jobs) {
+    if (run.known.has(idOf(u)) || run.skip.has(idOf(u))) continue;
+    if (opened >= 40 || run.pagesLeft <= 0) break;
+    opened++;
+    run.pagesLeft--;
+    const job = await readJobPage(u);
+    const plain = job ? null : await readPlainPage(u, true);
+    const description = job?.description ?? plain?.description ?? "";
+    // Without job data in the page, it must at least read like an advert (a link saying
+    // "Meet our graduates" leads to a story, not a job).
+    const advert = !!job || /\b(apply now|apply for this|how to apply|closing date|applications? close|job description|responsibilities|requirements|what you(?:'|’)ll (do|need|bring)|about the role|the role|salary|job no|job ref|reference number)\b/i.test(description);
+    if (description.length < 200 || !advert) {
+      run.ruledOut.set(idOf(u), "no job data on page");
+      continue;
+    }
+    const words = urlWords(u);
+    const stated = description.split("\n").find((l) => /^\s*location:/i.test(l))?.replace(/.*location:\s*/i, "").split(".")[0].trim();
+    const location = job?.location ?? (stated || null) ?? placesInTitle(`${title} ${words}`)[0] ?? null;
+    const abroad = !!location && namesAbroad(location);
+    const uk = job?.inUk ?? ((!!location && inUk(location)) || (!abroad && (ukByOtherSigns(u, words, description) || inUk(description.slice(0, 3000)))));
+    if (!uk) {
+      run.ruledOut.set(idOf(u), "outside the UK");
+      continue;
+    }
+    out.push(listing(feed, u, { title, url: u, location: location ?? "United Kingdom", description, salaryMin: job?.salaryMin, salaryMax: job?.salaryMax, expiresAt: job?.deadline, contractType: job?.employmentType }));
+  }
+  return out;
+}
+
 // Looks at the company's careers pages (careers.<domain>, jobs.<domain>, <domain>/careers and
 // links from them) for links into a hiring system we can read; otherwise the careers site's
 // own sitemap. Returns what it found (possibly nothing).
@@ -721,6 +805,16 @@ export async function discoverFromWebsite(domain: string): Promise<{ ats: string
   const seen = new Set<string>();
   const hits = new Map<string, { ats: string; ats_id: string }>();
   const careerHosts = new Set<string>();
+  // "example.co.uk" keeps three labels, "example.com" two.
+  const labels = bare.split(".");
+  const root = labels.slice(/^(co|org|ac|gov|ltd|plc)$/.test(labels[labels.length - 2] ?? "") ? -3 : -2).join(".");
+  // The page listing the most jobs as plain links, and vacancy lists on other sites it links to.
+  let best: { url: string; n: number } | null = null;
+  const external = new Set<string>();
+  const noteListing = (html: string, at: string) => {
+    const n = jobLinks(html, at).length;
+    if (n >= 2 && n > (best?.n ?? 0)) best = { url: at, n };
+  };
   const queue = [...starts];
   for (let i = 0; i < queue.length && seen.size < 10; i++) {
     const url = queue[i];
@@ -734,6 +828,18 @@ export async function discoverFromWebsite(domain: string): Promise<{ ats: string
       const f = feedFromUrl(m[0].replace(/&amp;/g, "&"));
       if (f) hits.set(`${f.ats}|${f.ats_id}`, f);
     }
+    noteListing(got.html, got.finalUrl);
+    for (const m of got.html.matchAll(/<a\b[^>]*href=["'](https?:\/\/[^"']+)["'][^>]*>([\s\S]{0,200}?)<\/a>/gi)) {
+      if (external.size >= 4) break;
+      let ext: URL;
+      try {
+        ext = new URL(m[1].replace(/&amp;/g, "&"));
+      } catch {
+        continue;
+      }
+      if (ext.hostname.endsWith(root) || /linkedin|facebook|twitter|instagram|youtube|tiktok|glassdoor|indeed|google|apple\.com|whatsapp/i.test(ext.hostname)) continue;
+      if (/vacanc|\bjobs?\b|listing|opportunit|careers?/i.test(`${ext.pathname} ${htmlToText(m[2])}`)) external.add(ext.href);
+    }
     // Follow links that look like the careers or early-careers pages (same company only).
     for (const m of got.html.matchAll(/href=["']([^"']+)["']/gi)) {
       let next: URL;
@@ -742,11 +848,29 @@ export async function discoverFromWebsite(domain: string): Promise<{ ats: string
       } catch {
         continue;
       }
-      if (!next.hostname.endsWith(bare.split(".").slice(-2).join("."))) continue;
+      if (!next.hostname.endsWith(root)) continue;
       if (/(early-?careers|graduate|students|careers|jobs|search-jobs|vacancies)/i.test(next.pathname + next.hostname) && queue.length < 30) queue.push(next.href.split("#")[0]);
     }
   }
+  // A vacancy list on another site: a hiring system we know, or a plain list of job links.
+  if (!hits.size) {
+    for (const u of external) {
+      const f = feedFromUrl(u);
+      if (f) {
+        hits.set(`${f.ats}|${f.ats_id}`, f);
+        continue;
+      }
+      const got = await page(u);
+      if (got) noteListing(got.html, got.finalUrl);
+    }
+  }
   if (hits.size) return [...hits.values()];
+  // Kept only if a trial read finds at least one real advert behind those links.
+  const listed = best as { url: string; n: number } | null;
+  if (listed) {
+    const trial = await listingPage({ name: "", ats: "listing", ats_id: listed.url }, newFeedRun(new Set(), new Set(), 4)).catch(() => null);
+    if (trial?.length) return [{ ats: "listing", ats_id: listed.url }];
+  }
   // No known system: the careers site's sitemap (read with each job page's structured data).
   for (const origin of careerHosts) {
     try {
