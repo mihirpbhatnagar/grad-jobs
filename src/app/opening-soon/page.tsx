@@ -12,8 +12,8 @@ export default function OpeningSoonPage() {
       <PageBand title="Opening soon" lead="Graduate schemes that haven't opened yet, so you can be first in when they do." />
       <div className="grid gap-3 sm:grid-cols-3">
         {HOW.map((h, i) => (
-          <section key={h.title} className="rounded-2xl border border-border bg-surface p-5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-soft text-sm font-bold text-accent">{i + 1}</span>
+          <section key={h.title} className="rounded-xl border border-border bg-surface p-5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-accent-soft text-sm font-bold text-accent">{i + 1}</span>
             <h2 className="mt-3 font-semibold tracking-tight">{h.title}</h2>
             <p className="mt-1.5 text-sm leading-relaxed text-muted">{h.body}</p>
           </section>

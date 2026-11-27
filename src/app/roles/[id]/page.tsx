@@ -123,7 +123,7 @@ function Description({ blocks }: { blocks: Block[] }) {
     <div className="mt-4 space-y-4 text-[15px] leading-7 text-foreground/85">
       {blocks.map((b, i) =>
         b.kind === "kv" ? (
-          <dl key={i} className="grid gap-x-6 gap-y-2 rounded-xl bg-chip px-4 py-3 text-sm sm:grid-cols-2">
+          <dl key={i} className="grid gap-x-6 gap-y-2 rounded-lg bg-chip px-4 py-3 text-sm sm:grid-cols-2">
             {b.lines.map((l, j) => {
               const [, k, v] = l.match(FACT)!;
               return (
@@ -157,9 +157,9 @@ function Description({ blocks }: { blocks: Block[] }) {
 
 function Panel({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border border-border bg-surface p-5">
+    <section className="rounded-xl border border-border bg-surface p-5">
       <h2 className="flex items-center gap-2 font-semibold tracking-tight">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent-soft text-accent">
+        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-accent-soft text-accent">
           <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d={icon} />
           </svg>
@@ -173,7 +173,7 @@ function Panel({ title, icon, children }: { title: string; icon: string; childre
 
 function Fact({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: "rose" | "amber" }) {
   return (
-    <div className="rounded-2xl border border-border bg-surface px-4 py-3">
+    <div className="rounded-xl border border-border bg-surface px-4 py-3">
       <div className="text-xs font-medium text-muted">{label}</div>
       <div className={`mt-0.5 font-semibold leading-snug ${tone === "rose" ? "text-rose" : tone === "amber" ? "text-amber" : ""}`}>{value}</div>
       {sub && <div className="mt-0.5 text-xs text-muted">{sub}</div>}
@@ -217,7 +217,7 @@ function CompanyPanel({ company, employer, follow }: { company: Company | null; 
           ))}
         </dl>
       )}
-      <div className="mt-4 rounded-xl bg-chip px-3 py-2.5 text-xs text-muted">
+      <div className="mt-4 rounded-lg bg-chip px-3 py-2.5 text-xs text-muted">
         <span className="font-semibold text-foreground">Values, mission and recent news</span> come in the company brief when you move a role to Apply.
       </div>
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
@@ -316,13 +316,10 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
 
   return (
     <>
-      <section className="overflow-hidden rounded-3xl border border-border bg-surface shadow-sm">
-        <div className="brand-band h-20 sm:h-24" />
-        <div className="px-5 pb-6 sm:px-8">
-          <div className="-mt-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div className="rounded-2xl bg-surface p-1 shadow-lg shadow-black/10 sm:self-start">
-              <CompanyLogo name={r.employer} logoUrl={company?.logo_url} domain={company?.domain} size={80} />
-            </div>
+      <section className="rounded-2xl border border-border bg-surface">
+        <div className="px-5 py-6 sm:px-8 sm:py-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <CompanyLogo name={r.employer} logoUrl={company?.logo_url} domain={company?.domain} size={72} />
             <div className="flex gap-2">
               <SaveButton roleId={r.id} saved={!!application} signedIn={!!user} large />
               {r.apply_url && (
@@ -330,14 +327,17 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
                   href={r.apply_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center rounded-xl bg-accent px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-accent/30 hover:opacity-90"
+                  className="group flex items-center justify-center gap-2 rounded-lg bg-accent px-5 py-3 text-sm font-semibold text-on-accent transition-transform hover:opacity-90 active:scale-[0.98]"
                 >
-                  View and apply ↗
+                  View and apply
+                  <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M5 11 11 5M6 5h5v5" />
+                  </svg>
                 </a>
               )}
             </div>
           </div>
-          <h1 className="mt-4 text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">{r.title}</h1>
+          <h1 className="mt-5 text-2xl font-semibold leading-tight tracking-tight sm:text-[2rem]">{r.title}</h1>
           <p className="mt-1.5 text-muted">
             <span className="font-medium text-foreground">{company?.name ?? employerLabel(r.employer)}</span>
             {places.length > 0 && ` · ${places[0]}`}
@@ -374,7 +374,7 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-4">
-          <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-accent/25 bg-surface p-5">
+          <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent/30 bg-accent-soft/50 p-5">
             <div className="min-w-0">
               <h2 className="font-semibold tracking-tight">{application ? "Your application workspace" : "Applying for this one?"}</h2>
               <p className="mt-0.5 text-sm text-muted">
@@ -386,7 +386,7 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
             {application ? (
               <div className="flex shrink-0 items-center gap-2">
                 <StageSelect applicationId={application.id} stage={application.stage} />
-                <Link href={`/applications/${application.id}`} className="rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90">
+                <Link href={`/applications/${application.id}`} className="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-on-accent hover:opacity-90">
                   Open workspace
                 </Link>
               </div>
@@ -394,12 +394,12 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
               <SaveButton roleId={r.id} saved={false} signedIn={!!user} large />
             )}
           </section>
-          <section className="rounded-2xl border border-border bg-surface p-6 sm:p-8">
+          <section className="rounded-xl border border-border bg-surface p-6 sm:p-8">
             <h2 className="text-xl font-semibold tracking-tight">About the role</h2>
             {blocks.length > 0 ? (
               <Description blocks={blocks} />
             ) : (
-              <div className="mt-3 rounded-xl border border-dashed border-border p-5">
+              <div className="mt-3 rounded-lg border border-dashed border-border p-5">
                 <p className="text-muted">
                   This role was found through {siteName(r.apply_url)}, which doesn&apos;t share the full text. We check the employer&apos;s own careers site
                   every morning and add it here when we find it.
@@ -409,7 +409,7 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
                     href={r.apply_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-4 inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-semibold text-white hover:opacity-90"
+                    className="mt-4 inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-3 text-sm font-semibold text-on-accent hover:opacity-90"
                   >
                     Read the full description on {siteName(r.apply_url)} ↗
                   </a>
@@ -420,15 +420,15 @@ async function RoleDetail({ params }: { params: PageProps<"/roles/[id]">["params
 
           <Panel title="Requirements" icon="M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9">
             <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <div className="rounded-xl bg-chip px-3 py-2">
+              <div className="rounded-lg bg-chip px-3 py-2">
                 <dt className="text-xs text-muted">Degree</dt>
                 <dd className="font-semibold text-foreground">{t.degree ? `${t.degree} or above` : "Not stated"}</dd>
               </div>
-              <div className="rounded-xl bg-chip px-3 py-2">
+              <div className="rounded-lg bg-chip px-3 py-2">
                 <dt className="text-xs text-muted">Driving licence</dt>
                 <dd className="font-semibold text-foreground">{t.drivingLicence ? "Required" : "Not mentioned"}</dd>
               </div>
-              <div className="rounded-xl bg-chip px-3 py-2">
+              <div className="rounded-lg bg-chip px-3 py-2">
                 <dt className="text-xs text-muted">Sponsorship wording</dt>
                 <dd className="font-semibold text-foreground">{t.sponsorship === "not_offered" ? "Says none" : t.sponsorship === "offered" ? "Offered" : "Not mentioned"}</dd>
               </div>
@@ -510,7 +510,7 @@ export default function RolePage(props: PageProps<"/roles/[id]">) {
         ← All roles
       </Link>
       <div className="mt-4">
-        <Suspense fallback={<div className="h-[60vh] animate-pulse rounded-3xl bg-chip" />}>
+        <Suspense fallback={<div className="h-[60vh] animate-pulse rounded-2xl bg-chip" />}>
           <RoleDetail params={props.params} />
         </Suspense>
       </div>

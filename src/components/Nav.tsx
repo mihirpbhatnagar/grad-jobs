@@ -34,10 +34,10 @@ export function NavView({ pathname }: { pathname: string }) {
   return (
     <>
       <header className="sticky top-0 z-20 border-b border-border bg-background/85 backdrop-blur">
-        <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-6 px-4 sm:px-6">
+        <div className="mx-auto flex h-14 w-full max-w-7xl items-center gap-6 px-4 sm:px-6">
           <Link href="/" className="flex items-center gap-2.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={logoDataUri()} alt="" width={32} height={32} className="h-8 w-8" />
+            <img src={logoDataUri()} alt="" width={32} height={32} className="h-8 w-8 rounded-lg ring-1 ring-border" />
             <span className="font-semibold tracking-tight">Grad Jobs</span>
           </Link>
           <nav className="ml-4 hidden items-center gap-1 md:flex">
@@ -45,8 +45,9 @@ export function NavView({ pathname }: { pathname: string }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${
-                  isActive(pathname, item.href) ? "bg-chip font-medium text-foreground" : "text-muted hover:text-foreground"
+                aria-current={isActive(pathname, item.href) ? "page" : undefined}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  isActive(pathname, item.href) ? "bg-chip text-foreground" : "text-muted hover:bg-chip/60 hover:text-foreground"
                 }`}
               >
                 {item.label}
@@ -56,7 +57,7 @@ export function NavView({ pathname }: { pathname: string }) {
           <Link
             href="/profile"
             aria-label="Your profile"
-            className="ml-auto flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface text-muted hover:text-foreground"
+            className="ml-auto flex h-9 w-9 items-center justify-center rounded-full border border-border bg-surface text-muted transition-colors hover:border-foreground/40 hover:text-foreground"
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
               <circle cx="12" cy="8" r="4" />
@@ -74,7 +75,8 @@ export function NavView({ pathname }: { pathname: string }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-col items-center gap-1 py-2.5 text-[11px] ${active ? "text-foreground" : "text-muted"}`}
+                aria-current={active ? "page" : undefined}
+                className={`flex flex-col items-center gap-1 py-2.5 text-[11px] ${active ? "font-semibold text-accent" : "text-muted"}`}
               >
                 <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={active ? 2 : 1.6} strokeLinejoin="round" strokeLinecap="round" aria-hidden>
                   <path d={item.icon} />

@@ -72,7 +72,7 @@ export function FreeTools({ job, company, title, cvText, storyBank, tabs: only }
             key={t.id}
             type="button"
             onClick={() => setTab(t.id)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${tab === t.id ? "bg-foreground text-background" : "bg-chip text-muted hover:text-foreground"}`}
+            className={`rounded-md px-3 py-1.5 text-xs font-semibold ${tab === t.id ? "bg-foreground text-background" : "bg-chip text-muted hover:text-foreground"}`}
           >
             {t.label}
           </button>
@@ -107,7 +107,7 @@ export function FreeTools({ job, company, title, cvText, storyBank, tabs: only }
                 ))}
               </ul>
               {flags.length > 0 && (
-                <div className="mt-3 rounded-lg bg-amber-soft px-3 py-2 text-xs text-amber">
+                <div className="mt-3 rounded-md bg-amber-soft px-3 py-2 text-xs text-amber">
                   <p className="font-semibold">Worth knowing about this listing</p>
                   {flags.map((f) => (
                     <p key={f}>• {f}</p>
@@ -141,7 +141,7 @@ export function FreeTools({ job, company, title, cvText, storyBank, tabs: only }
           ) : (
             <>
               {cv && (
-                <div className="mb-4 rounded-lg border border-border px-3 py-2">
+                <div className="mb-4 rounded-md border border-border px-3 py-2">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted">Can screening software read it?</p>
                   {cv.fix.map((f) => (
                     <p key={f} className="text-amber">✗ {f}</p>
@@ -155,7 +155,7 @@ export function FreeTools({ job, company, title, cvText, storyBank, tabs: only }
               <p className="text-xs font-semibold uppercase tracking-wide text-muted">Lead with these for this role</p>
               <ul className="mt-1 space-y-1.5">
                 {rankedBullets.ranked.slice(0, 3).map((b) => (
-                  <li key={b} className="rounded-lg bg-success-soft px-3 py-2">{b}</li>
+                  <li key={b} className="rounded-md bg-success-soft px-3 py-2">{b}</li>
                 ))}
               </ul>
               <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted">Bullets to strengthen</p>
@@ -164,7 +164,7 @@ export function FreeTools({ job, company, title, cvText, storyBank, tabs: only }
                   .filter((b) => notes.get(b)?.length)
                   .slice(0, 8)
                   .map((b) => (
-                    <li key={b} className="rounded-lg border border-border px-3 py-2">
+                    <li key={b} className="rounded-md border border-border px-3 py-2">
                       <span>{b}</span>
                       {notes.get(b)!.map((n) => (
                         <span key={n} className="block text-xs text-amber">
@@ -184,7 +184,7 @@ export function FreeTools({ job, company, title, cvText, storyBank, tabs: only }
               onChange={(e) => setQuestion(e.target.value)}
               rows={2}
               placeholder="Paste a question from the application form, e.g. Tell us about a time you led a team"
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent"
             />
             {plan && (
               <div className="mt-2 space-y-2">
@@ -201,7 +201,7 @@ export function FreeTools({ job, company, title, cvText, storyBank, tabs: only }
                     <p className="text-xs font-semibold uppercase tracking-wide text-muted">Stories that fit this question</p>
                     <ul className="mt-1 space-y-1">
                       {questionStories.ranked.slice(0, 2).map((st) => (
-                        <li key={st} className="rounded-lg bg-chip px-3 py-1.5">{st}</li>
+                        <li key={st} className="rounded-md bg-chip px-3 py-1.5">{st}</li>
                       ))}
                     </ul>
                   </div>
@@ -238,7 +238,7 @@ export function FreeTools({ job, company, title, cvText, storyBank, tabs: only }
               onChange={(e) => setDraft(e.target.value)}
               rows={5}
               placeholder="Paste your own draft: cover letter, application answer or email"
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent"
             />
             {check && (
               <div className="mt-2">

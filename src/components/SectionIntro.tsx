@@ -1,9 +1,9 @@
 // Brand header for a section, plus an optional "being set up" card listing what's coming.
 export function PageBand({ title, lead, children }: { title: string; lead: string; children?: React.ReactNode }) {
   return (
-    <section className="brand-band overflow-hidden rounded-3xl px-5 py-7 text-white shadow-xl shadow-indigo-950/20 sm:px-8 sm:py-9">
-      <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h1>
-      <p className="mt-2 max-w-2xl text-white/80">{lead}</p>
+    <section className="border-b border-border pb-6 pt-2 sm:pt-4">
+      <h1 className="text-3xl font-semibold tracking-tight sm:text-[2.5rem] sm:leading-[1.1]">{title}</h1>
+      <p className="mt-2.5 max-w-2xl text-[15px] text-muted">{lead}</p>
       {children}
     </section>
   );
@@ -11,7 +11,7 @@ export function PageBand({ title, lead, children }: { title: string; lead: strin
 
 export function ComingCard({ title = "Being set up", items }: { title?: string; items: string[] }) {
   return (
-    <section className="rounded-2xl border border-dashed border-accent/40 bg-accent-soft/40 p-6">
+    <section className="rounded-xl border border-dashed border-accent/40 bg-accent-soft/40 p-6">
       <h2 className="flex items-center gap-2 text-sm font-semibold tracking-tight text-accent">
         <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />
         {title}

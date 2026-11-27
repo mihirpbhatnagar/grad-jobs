@@ -30,7 +30,7 @@ export default function ApplyPage() {
       <h1 className="text-3xl font-semibold tracking-tight">Apply</h1>
       <p className="mt-2 text-muted">Your saved roles and every application, in one place.</p>
       <div className="mt-6">
-        <Suspense fallback={<div className="h-80 animate-pulse rounded-2xl bg-chip" />}>
+        <Suspense fallback={<div className="h-80 animate-pulse rounded-xl bg-chip" />}>
           <Boards />
         </Suspense>
       </div>

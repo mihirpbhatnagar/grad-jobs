@@ -8,8 +8,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "UK graduate roles starting in 2027",
     start_url: "/my-jobs",
     display: "standalone",
-    background_color: "#f7f7f4",
-    theme_color: "#f7f7f4",
+    background_color: "#f6f5f2",
+    theme_color: "#f6f5f2",
     icons: [
       { src: "/icon/192", sizes: "192x192", type: "image/png" },
       { src: "/icon/512", sizes: "512x512", type: "image/png" },

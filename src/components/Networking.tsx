@@ -9,7 +9,7 @@ const LINK_ICON = (
 
 function LinkRow({ label, detail, href }: { label: string; detail?: string; href: string }) {
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" className="flex items-start justify-between gap-3 rounded-xl px-2 py-2 hover:bg-chip">
+    <a href={href} target="_blank" rel="noopener noreferrer" className="flex items-start justify-between gap-3 rounded-lg px-2 py-2 hover:bg-chip">
       <span className="min-w-0">
         <span className="block text-sm font-medium text-foreground">{label}</span>
         {detail && <span className="block text-xs text-muted">{detail}</span>}

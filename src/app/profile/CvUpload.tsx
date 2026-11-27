@@ -40,7 +40,7 @@ export function CvUpload({ url, publishableKey, userId, current }: {
 
   return (
     <div className="flex flex-wrap items-center gap-4">
-      <label className="inline-flex cursor-pointer items-center rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-medium hover:border-foreground/30">
+      <label className="inline-flex cursor-pointer items-center rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-medium hover:border-foreground/30">
         {status === "uploading" ? "Uploading…" : current ? "Replace CV" : "Upload CV"}
         <input
           type="file"

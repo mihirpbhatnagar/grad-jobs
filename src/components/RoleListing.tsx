@@ -39,9 +39,9 @@ async function mainStats() {
 
 function Stat({ value, label, href }: { value: number; label: string; href: string }) {
   return (
-    <Link href={href} scroll={false} className="rounded-2xl bg-white/10 px-4 py-3 ring-1 ring-white/15 transition-colors hover:bg-white/15">
-      <div className="text-2xl font-semibold tabular-nums tracking-tight">{value.toLocaleString("en-GB")}</div>
-      <div className="text-xs text-white/75">{label}</div>
+    <Link href={href} scroll={false} className="group bg-surface px-4 py-3.5 transition-colors last:col-span-2 hover:bg-accent-soft sm:last:col-span-1">
+      <div className="text-2xl font-semibold tabular-nums tracking-tight group-hover:text-accent">{value.toLocaleString("en-GB")}</div>
+      <div className="mt-0.5 text-xs text-muted">{label}</div>
     </Link>
   );
 }
@@ -98,15 +98,20 @@ export async function RoleListing({
 
   return (
     <>
-      <section className="brand-band relative overflow-hidden rounded-3xl px-5 pb-6 pt-7 text-white shadow-xl shadow-indigo-950/20 sm:px-8 sm:pt-9">
-        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h1>
-        <p className="mt-2 max-w-2xl text-white/80">
+      <section className="pt-2 sm:pt-4">
+        <h1 className="text-3xl font-semibold tracking-tight sm:text-[2.5rem] sm:leading-[1.1]">{title}</h1>
+        <p className="mt-2.5 max-w-2xl text-[15px] text-muted">
           {result ? lead(result.total, f) : "Connecting to the role database…"}
-          {fieldsDefault && <span className="text-white/80"> · in your fields</span>}
-          {result?.updatedAt && <span className="text-white/60"> · {updatedLabel(result.updatedAt)}</span>}
+          {fieldsDefault && <span> · in your fields</span>}
+          {result?.updatedAt && (
+            <span className="whitespace-nowrap">
+              {" "}· <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-success align-middle" aria-hidden />
+              {updatedLabel(result.updatedAt)}
+            </span>
+          )}
         </p>
         {stats && (
-          <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-5">
+          <div className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-5">
             <Stat value={stats.all} label="Graduate roles" href={path} />
             <Stat value={stats.fresh} label="New in the last 2 days" href={filtersToQuery(f, { sort: "newest" }, path)} />
             <Stat value={stats.closing} label="Closing this week" href={filtersToQuery(f, { closingSoon: true, sort: "closing" }, path)} />
@@ -114,14 +119,14 @@ export async function RoleListing({
             <Stat value={stats.sponsors} label="Licensed sponsors" href={filtersToQuery(f, { sponsor: "likely" }, path)} />
           </div>
         )}
-        <div className="mt-6">
+        <div className="mt-4">
           <FilterBar filters={f} path={path} showStart={scope === "main"} myFields={myFields} />
         </div>
         {myChips.length > 0 && (
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-            <span className="text-white/70">From your profile:</span>
+            <span className="text-muted">From your profile:</span>
             {myChips.map((c) => (
-              <Link key={c.label} href={c.href} scroll={false} className="rounded-full bg-white px-3 py-1 font-semibold text-accent hover:opacity-90">
+              <Link key={c.label} href={c.href} scroll={false} className="rounded-full bg-accent-soft px-3 py-1 font-semibold text-accent transition-colors hover:bg-accent hover:text-on-accent">
                 {c.label}
               </Link>
             ))}
@@ -152,7 +157,7 @@ export async function RoleListing({
           />
         ))}
         {result && result.roles.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-border bg-surface p-10 text-center text-muted">
+          <div className="rounded-xl border border-dashed border-border bg-surface p-10 text-center text-muted">
             No roles match. Try fewer words or clear a filter.
           </div>
         )}
@@ -161,14 +166,20 @@ export async function RoleListing({
       {pages > 1 && (
         <nav className="mt-8 flex items-center justify-between text-sm">
           {f.page > 1 ? (
-            <Link href={filtersToQuery(f, { page: f.page - 1 }, path)} className="rounded-xl border border-border bg-surface px-4 py-2 font-medium hover:border-accent/50">
-              ← Previous
+            <Link href={filtersToQuery(f, { page: f.page - 1 }, path)} className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2 font-medium transition-colors hover:border-foreground/40">
+              <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M16 10H4m5-5-5 5 5 5" />
+              </svg>
+              Previous
             </Link>
           ) : <span />}
           <span className="text-muted">Page {f.page} of {pages}</span>
           {f.page < pages ? (
-            <Link href={filtersToQuery(f, { page: f.page + 1 }, path)} className="rounded-xl border border-border bg-surface px-4 py-2 font-medium hover:border-accent/50">
-              Next →
+            <Link href={filtersToQuery(f, { page: f.page + 1 }, path)} className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2 font-medium transition-colors hover:border-foreground/40">
+              Next
+              <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M4 10h12m-5-5 5 5-5 5" />
+              </svg>
             </Link>
           ) : <span />}
         </nav>
@@ -180,9 +191,14 @@ export async function RoleListing({
 export function ListingSkeleton() {
   return (
     <div aria-hidden className="animate-pulse">
-      <div className="brand-band h-72 rounded-3xl opacity-80" />
+      <div className="pt-2 sm:pt-4">
+        <div className="h-10 w-2/3 rounded-lg bg-chip" />
+        <div className="mt-3 h-5 w-1/2 rounded-md bg-chip" />
+        <div className="mt-6 h-[74px] rounded-xl bg-chip" />
+        <div className="mt-4 h-12 rounded-lg bg-chip" />
+      </div>
       <div className="mt-6 space-y-3">
-        {[0, 1, 2, 3].map((i) => <div key={i} className="h-40 rounded-2xl bg-chip" />)}
+        {[0, 1, 2, 3].map((i) => <div key={i} className="h-40 rounded-xl bg-chip" />)}
       </div>
     </div>
   );

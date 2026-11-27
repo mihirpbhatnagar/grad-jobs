@@ -33,10 +33,10 @@ async function fetchSide() {
 
 function Block({ title, icon, href, children }: { title: string; icon: string; href: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border border-border bg-surface p-4">
+    <section className="rounded-xl border border-border bg-surface p-4">
       <div className="flex items-center justify-between">
         <h2 className="flex items-center gap-2 text-sm font-semibold tracking-tight">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent-soft text-accent">
+          <span className="flex h-7 w-7 items-center justify-center rounded-md bg-accent-soft text-accent">
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d={icon} />
             </svg>
@@ -110,7 +110,7 @@ export async function SidePanel() {
               return (
                 <li key={e.url}>
                   <a href={e.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 py-2.5 hover:opacity-80">
-                    <span className="flex h-[34px] w-[34px] shrink-0 flex-col items-center justify-center rounded-lg bg-[#f1ebf6] leading-none text-[#5b2c83] dark:bg-[#2c2235] dark:text-[#d6c2e6]">
+                    <span className="flex h-[34px] w-[34px] shrink-0 flex-col items-center justify-center rounded-md bg-[#f1ebf6] leading-none text-[#5b2c83] dark:bg-[#2c2235] dark:text-[#d6c2e6]">
                       <span className="text-[9px] font-semibold uppercase">{d.toLocaleDateString("en-GB", { month: "short" })}</span>
                       <span className="text-sm font-bold">{d.getDate()}</span>
                     </span>
@@ -125,7 +125,7 @@ export async function SidePanel() {
           </ul>
         )}
       </Block>
-      <Link href="/part-time" className="card-lift flex items-center justify-between rounded-2xl border border-border bg-surface p-4 text-sm">
+      <Link href="/part-time" className="card-lift flex items-center justify-between rounded-xl border border-border bg-surface p-4 text-sm">
         <span>
           <span className="font-semibold">Part-time roles</span>
           <span className="block text-xs text-muted">Kept out of the main list</span>

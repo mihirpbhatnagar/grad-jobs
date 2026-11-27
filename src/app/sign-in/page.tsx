@@ -13,7 +13,7 @@ export default function SignInPage(props: PageProps<"/sign-in">) {
       <h1 className="text-3xl font-semibold tracking-tight">Welcome</h1>
       <p className="mt-2 text-muted">Your saved roles, applications and profile are private to your account.</p>
       <div className="mt-8">
-        <Suspense fallback={<div className="h-80 animate-pulse rounded-2xl bg-chip" />}>
+        <Suspense fallback={<div className="h-80 animate-pulse rounded-xl bg-chip" />}>
           <Form searchParams={props.searchParams} />
         </Suspense>
       </div>

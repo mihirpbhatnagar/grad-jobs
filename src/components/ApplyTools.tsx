@@ -59,7 +59,7 @@ export function ApplyTools({ roleId, initial, enabled, signedIn, kinds, quietWhe
   if (!enabled && quietWhenOff) return null;
   if (!enabled) {
     return (
-      <p className="rounded-xl border border-dashed border-border px-3 py-2 text-sm text-muted">
+      <p className="rounded-lg border border-dashed border-border px-3 py-2 text-sm text-muted">
         <span className="font-medium text-foreground">Built, waiting to be switched on:</span> {buttons.map((b) => `${b.label.toLowerCase()} (about ${ESTIMATE_PENCE[b.kind]}p a go)`).join(", ")}. It uses paid AI, so it stays off until you say so.
       </p>
     );
@@ -86,7 +86,7 @@ export function ApplyTools({ roleId, initial, enabled, signedIn, kinds, quietWhe
             type="button"
             disabled={!!busy}
             onClick={() => (results[b.kind] ? setOpen(b.kind) : run(b.kind))}
-            className={`rounded-xl border px-3 py-2.5 text-left transition-colors disabled:opacity-60 ${open === b.kind ? "border-accent bg-accent-soft" : "border-border hover:border-accent/50"}`}
+            className={`rounded-lg border px-3 py-2.5 text-left transition-colors disabled:opacity-60 ${open === b.kind ? "border-accent bg-accent-soft" : "border-border hover:border-accent/50"}`}
           >
             <span className="block text-sm font-semibold">
               {busy === b.kind ? "Working… (up to a minute)" : b.label}
@@ -103,7 +103,7 @@ export function ApplyTools({ roleId, initial, enabled, signedIn, kinds, quietWhe
 
       {error && <p className="text-sm text-rose">{error}</p>}
       {shown && (
-        <div className="rounded-xl bg-chip p-4">
+        <div className="rounded-lg bg-chip p-4">
           <div className="mb-2 flex items-center justify-between gap-2">
             <span className="text-xs text-muted">Saved {new Date(shown.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</span>
             <span className="flex gap-3">
@@ -131,7 +131,7 @@ export function ApplyTools({ roleId, initial, enabled, signedIn, kinds, quietWhe
           </div>
           {shown.kind === "rewrite" && editing !== null ? (
             <div>
-              <textarea value={editing} onChange={(e) => setEditing(e.target.value)} rows={18} className="w-full rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs leading-5 outline-none focus:border-accent" />
+              <textarea value={editing} onChange={(e) => setEditing(e.target.value)} rows={18} className="w-full rounded-md border border-border bg-background px-3 py-2 font-mono text-xs leading-5 outline-none focus:border-accent" />
               <div className="mt-2 flex items-center justify-end gap-3">
                 <button type="button" onClick={() => setEditing(null)} className="text-xs text-muted hover:text-foreground">
                   Cancel
@@ -145,7 +145,7 @@ export function ApplyTools({ roleId, initial, enabled, signedIn, kinds, quietWhe
                       setEditing(null);
                     })
                   }
-                  className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white"
+                  className="rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-on-accent"
                 >
                   Save my version
                 </button>

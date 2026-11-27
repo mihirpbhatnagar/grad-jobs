@@ -19,15 +19,15 @@ async function AiSpend() {
   const all = (data ?? []).reduce((n, r) => n + Number(r.cost_usd), 0);
   const month = (data ?? []).filter((r) => r.created_at >= monthStart).reduce((n, r) => n + Number(r.cost_usd), 0);
   return (
-    <section className="rounded-2xl border border-border bg-surface p-5">
+    <section className="rounded-xl border border-border bg-surface p-5">
       <h2 className="font-semibold tracking-tight">Your AI costs</h2>
       <p className="mt-1 text-sm text-muted">Apply tools are charged at cost, from the exact tokens each request used.</p>
       <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-        <div className="rounded-xl bg-chip px-3 py-2">
+        <div className="rounded-lg bg-chip px-3 py-2">
           <div className="text-xs text-muted">This month</div>
           <div className="font-semibold">${month.toFixed(2)} <span className="text-xs font-normal text-muted">≈ £{(month * 0.79).toFixed(2)}</span></div>
         </div>
-        <div className="rounded-xl bg-chip px-3 py-2">
+        <div className="rounded-lg bg-chip px-3 py-2">
           <div className="text-xs text-muted">All time ({data?.length ?? 0} requests)</div>
           <div className="font-semibold">${all.toFixed(2)} <span className="text-xs font-normal text-muted">≈ £{(all * 0.79).toFixed(2)}</span></div>
         </div>
@@ -62,7 +62,7 @@ async function Profile({ searchParams }: { searchParams: PageProps<"/profile">["
       <StoryBankSection />
       <GmailSection result={typeof gmail === "string" ? gmail : undefined} />
       <AiSpend />
-      <Link href="/admin" className="card-lift flex items-center justify-between rounded-2xl border border-border bg-surface p-5">
+      <Link href="/admin" className="card-lift flex items-center justify-between rounded-xl border border-border bg-surface p-5">
         <span>
           <span className="font-semibold tracking-tight">Data coverage</span>
           <span className="block text-sm text-muted">How many UK graduate roles the app is catching, checked every morning</span>
@@ -83,13 +83,13 @@ export default function ProfilePage(props: PageProps<"/profile">) {
           <p className="mt-2 text-muted">Everything that shapes For you, editable any time.</p>
         </div>
         <form action={signOut}>
-          <button type="submit" className="rounded-xl border border-border px-4 py-2 text-sm text-muted hover:text-foreground">
+          <button type="submit" className="rounded-lg border border-border px-4 py-2 text-sm text-muted hover:text-foreground">
             Sign out
           </button>
         </form>
       </div>
       <div className="mt-8">
-        <Suspense fallback={<div className="h-[70vh] animate-pulse rounded-2xl bg-chip" />}>
+        <Suspense fallback={<div className="h-[70vh] animate-pulse rounded-xl bg-chip" />}>
           <Profile searchParams={props.searchParams} />
         </Suspense>
       </div>

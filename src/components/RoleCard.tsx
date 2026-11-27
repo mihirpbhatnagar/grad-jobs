@@ -59,10 +59,12 @@ export function RoleCard({
   const about = company?.description;
 
   return (
-    <article className="card-lift relative rounded-2xl border border-border bg-surface p-5">
+    <article className="card-lift relative rounded-xl border border-border bg-surface p-5">
       {matchTags && matchTags.length > 0 && (
         <p className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent">
-          <span aria-hidden>✦</span>
+          <svg viewBox="0 0 16 16" className="h-3 w-3" fill="currentColor" aria-hidden>
+            <path d="M8 1l1.6 4.4L14 7l-4.4 1.6L8 13l-1.6-4.4L2 7l4.4-1.6z" />
+          </svg>
           {matchTags.join(" · ")}
         </p>
       )}

@@ -25,7 +25,7 @@ export default function Home(props: PageProps<"/">) {
       </div>
 
       <aside className="hidden lg:block">
-        <Suspense fallback={<div className="h-96 animate-pulse rounded-2xl bg-chip" />}>
+        <Suspense fallback={<div className="h-96 animate-pulse rounded-xl bg-chip" />}>
           <SidePanel />
         </Suspense>
       </aside>

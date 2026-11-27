@@ -21,7 +21,7 @@ export function StageSelect({ applicationId, stage, compact = false }: { applica
       value={stage}
       disabled={pending}
       onChange={(e) => start(() => setStage(applicationId, e.target.value))}
-      className={`rounded-lg border font-medium ${tone} ${compact ? "max-w-full px-1.5 py-1 text-xs" : "px-3 py-2 text-sm"} ${pending ? "opacity-60" : ""}`}
+      className={`rounded-md border font-medium ${tone} ${compact ? "max-w-full px-1.5 py-1 text-xs" : "px-3 py-2 text-sm"} ${pending ? "opacity-60" : ""}`}
     >
       {STAGES.map((s) => (
         <option key={s.id} value={s.id}>

@@ -8,7 +8,7 @@ import { toggleFollow } from "@/lib/myjobs-actions";
 export function FollowButton({ companyKey, name, followed: initial, signedIn }: { companyKey: string; name: string; followed: boolean; signedIn: boolean }) {
   const [followed, setFollowed] = useState(initial);
   const [pending, start] = useTransition();
-  const cls = `inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-semibold transition-colors ${
+  const cls = `inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-semibold transition-colors ${
     followed ? "border-accent bg-accent-soft text-accent" : "border-border bg-surface text-foreground hover:border-accent/50"
   }`;
   if (!signedIn) {

@@ -28,7 +28,7 @@ export function Alerts({ initial, connected, botUsername, linkCode }: { initial:
   };
 
   return (
-    <section className="rounded-2xl border border-border bg-surface p-6">
+    <section className="rounded-xl border border-border bg-surface p-6">
       <h2 className="font-semibold tracking-tight">Alerts</h2>
       <p className="mt-1 text-sm text-muted">Deadline countdowns (7, 3 and 1 days, and closing day), closed-role warnings, a nudge for saved roles with no deadline, and new For you matches. Sent each morning.</p>
 
@@ -52,7 +52,7 @@ export function Alerts({ initial, connected, botUsername, linkCode }: { initial:
               <p>1. Open the bot and press <span className="font-semibold text-foreground">Start</span>.</p>
               <p>2. Come back and press <span className="font-semibold text-foreground">I&apos;ve pressed Start</span>.</p>
               <div className="mt-3 flex flex-wrap gap-2">
-                <a href={`https://t.me/${botUsername}?start=${linkCode}`} target="_blank" rel="noopener noreferrer" className="rounded-xl bg-accent px-4 py-2 font-semibold text-white">
+                <a href={`https://t.me/${botUsername}?start=${linkCode}`} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-accent px-4 py-2 font-semibold text-on-accent">
                   Open Telegram ↗
                 </a>
                 <button
@@ -65,7 +65,7 @@ export function Alerts({ initial, connected, botUsername, linkCode }: { initial:
                       setNote(ok ? "" : "Not found yet. Press Start in the bot chat, then try again.");
                     })
                   }
-                  className="rounded-xl border border-border px-4 py-2 font-semibold text-foreground hover:border-accent/50"
+                  className="rounded-lg border border-border px-4 py-2 font-semibold text-foreground hover:border-accent/50"
                 >
                   I&apos;ve pressed Start
                 </button>

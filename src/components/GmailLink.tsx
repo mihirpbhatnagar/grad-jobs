@@ -29,7 +29,7 @@ export async function GmailQuestion() {
   if (link) return <InboxAutoSync />;
   if (profile?.gmail_asked_at) return null;
   return (
-    <section className="rounded-2xl border-2 border-accent/25 bg-surface p-5">
+    <section className="rounded-xl border-2 border-accent/25 bg-surface p-5">
       <h2 className="flex items-center gap-2 font-semibold tracking-tight">
         <GmailIcon />
         Link your Gmail so applications update themselves?
@@ -39,11 +39,11 @@ export async function GmailQuestion() {
         Google will show &quot;Google hasn&apos;t verified this app&quot;: tap Advanced, then Go to Grad Jobs. It&apos;s a private app for a few friends.
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
-        <a href="/api/gmail/start" className="rounded-xl bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90">
+        <a href="/api/gmail/start" className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90">
           Link Gmail (read-only)
         </a>
         <form action={dismissGmailQuestion}>
-          <button type="submit" className="rounded-xl border border-border px-4 py-2 text-sm text-muted hover:text-foreground">
+          <button type="submit" className="rounded-lg border border-border px-4 py-2 text-sm text-muted hover:text-foreground">
             Not now
           </button>
         </form>
@@ -66,13 +66,13 @@ export async function GmailSection({ result }: { result?: string }) {
   const { data: link } = await db.from("gmail_links").select("email,linked_at,last_synced_at").maybeSingle();
   const message = result ? RESULT[result] : undefined;
   return (
-    <section id="gmail" className="rounded-2xl border border-border bg-surface p-5">
+    <section id="gmail" className="rounded-xl border border-border bg-surface p-5">
       <h2 className="flex items-center gap-2 font-semibold tracking-tight">
         <GmailIcon />
         Gmail
       </h2>
       <p className="mt-1 text-sm text-muted">{WHAT_IT_DOES}</p>
-      {message && <p className={`mt-3 rounded-xl px-4 py-2.5 text-sm ${message.good ? "bg-success-soft text-success" : "bg-rose-soft text-rose"}`}>{message.text}</p>}
+      {message && <p className={`mt-3 rounded-lg px-4 py-2.5 text-sm ${message.good ? "bg-success-soft text-success" : "bg-rose-soft text-rose"}`}>{message.text}</p>}
       {link ? (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <span className="text-sm">
@@ -84,14 +84,14 @@ export async function GmailSection({ result }: { result?: string }) {
           <span className="flex flex-wrap items-center gap-2">
             <CheckInboxNow />
             <form action={unlinkGmail}>
-            <button type="submit" className="rounded-xl border border-border px-4 py-2 text-sm text-muted hover:text-rose">
+            <button type="submit" className="rounded-lg border border-border px-4 py-2 text-sm text-muted hover:text-rose">
               Unlink
             </button>
             </form>
           </span>
         </div>
       ) : (
-        <a href="/api/gmail/start" className="mt-4 inline-flex rounded-xl bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90">
+        <a href="/api/gmail/start" className="mt-4 inline-flex rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90">
           Link Gmail (read-only)
         </a>
       )}

@@ -24,10 +24,10 @@ async function shortlistFor(answersJson: string, goalEmbedding: string | null, v
 
 function Prompt({ title, body, href, cta }: { title: string; body: string; href: string; cta: string }) {
   return (
-    <div className="rounded-2xl border border-border bg-surface p-8 text-center">
+    <div className="rounded-xl border border-border bg-surface p-8 text-center">
       <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
       <p className="mx-auto mt-2 max-w-md text-muted">{body}</p>
-      <Link href={href} className="mt-5 inline-flex rounded-xl bg-foreground px-5 py-2.5 text-sm font-medium text-background">
+      <Link href={href} className="mt-5 inline-flex rounded-lg bg-foreground px-5 py-2.5 text-sm font-medium text-background">
         {cta}
       </Link>
     </div>

@@ -17,12 +17,12 @@ export function StoryBank({ initial }: { initial: string }) {
 
   if (!open) {
     return (
-      <div className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-5 py-4">
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-5 py-4">
         <div>
           <p className="font-medium">Story bank</p>
           <p className="text-sm text-muted">{text.split("\n").filter(Boolean).length} notes on your experiences</p>
         </div>
-        <button type="button" onClick={() => setOpen(true)} className="rounded-lg border border-border px-3 py-1.5 text-sm hover:border-foreground/30">
+        <button type="button" onClick={() => setOpen(true)} className="rounded-md border border-border px-3 py-1.5 text-sm hover:border-foreground/30">
           Edit
         </button>
       </div>
@@ -30,7 +30,7 @@ export function StoryBank({ initial }: { initial: string }) {
   }
 
   return (
-    <div className="rounded-2xl border border-accent/30 bg-surface p-5">
+    <div className="rounded-xl border border-accent/30 bg-surface p-5">
       <h2 className="font-semibold tracking-tight">Your story bank</h2>
       <p className="mt-1 text-sm text-muted">
         Jot down real things you&apos;ve done: jobs, societies, sport, projects, results. Rough notes are fine. CV suggestions will only ever use what&apos;s here.
@@ -43,7 +43,7 @@ export function StoryBank({ initial }: { initial: string }) {
         }}
         rows={7}
         placeholder={PROMPT}
-        className="mt-3 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm leading-relaxed outline-none focus:border-foreground/40"
+        className="mt-3 w-full rounded-lg border border-border bg-background px-4 py-3 text-sm leading-relaxed outline-none focus:border-foreground/40"
       />
       <div className="mt-3 flex items-center justify-end gap-3">
         {saved && <span className="text-sm text-accent">Saved</span>}
@@ -61,7 +61,7 @@ export function StoryBank({ initial }: { initial: string }) {
               setSaved(true);
             })
           }
-          className="rounded-xl bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50"
+          className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50"
         >
           {pending ? "Saving…" : "Save story bank"}
         </button>

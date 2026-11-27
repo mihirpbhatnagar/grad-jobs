@@ -28,7 +28,7 @@ export function CheckInboxNow() {
             setResult(changed ? `${changed} update${changed === 1 ? "" : "s"} found` : "No new employer emails");
           })
         }
-        className="rounded-xl border border-border px-4 py-2 text-sm hover:border-foreground/30"
+        className="rounded-lg border border-border px-4 py-2 text-sm hover:border-foreground/30"
       >
         {pending ? "Checking…" : "Check now"}
       </button>

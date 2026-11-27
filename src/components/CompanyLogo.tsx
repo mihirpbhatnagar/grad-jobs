@@ -3,10 +3,8 @@
 import { useState } from "react";
 
 // Company logo: the stored logo, else the company website's icon, else a coloured monogram.
-const PALETTE = [
-  ["#4f46e5", "#7c3aed"], ["#0e7490", "#0891b2"], ["#047857", "#10b981"], ["#b45309", "#f59e0b"],
-  ["#be123c", "#f43f5e"], ["#1d4ed8", "#3b82f6"], ["#6d28d9", "#a855f7"], ["#334155", "#64748b"],
-];
+// Flat, muted tiles (no gradients) so a monogram sits quietly beside real logos.
+const PALETTE = ["#1f3a5f", "#0f5e63", "#1f5c43", "#7a4a12", "#8a2c3a", "#1f4fd8", "#3d4654", "#5a4632"];
 
 function hash(text: string): number {
   let h = 0;
@@ -26,15 +24,15 @@ export function CompanyLogo({ name, logoUrl, domain, size = 48 }: { name: string
   const [index, setIndex] = useState(0);
   const src = sources[index];
   const box = { width: size, height: size };
-  const radius = size >= 64 ? "rounded-2xl" : "rounded-xl";
+  const radius = size >= 64 ? "rounded-xl" : "rounded-lg";
 
   if (!src) {
-    const [from, to] = PALETTE[hash(name) % PALETTE.length];
+    const fill = PALETTE[hash(name) % PALETTE.length];
     const letters = name.replace(/\(.*?\)/g, "").split(/\s+/).filter((w) => /^[A-Za-z0-9]/.test(w)).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
     return (
       <span
         aria-hidden
-        style={{ ...box, background: `linear-gradient(135deg, ${from}, ${to})`, fontSize: size * 0.36 }}
+        style={{ ...box, background: fill, fontSize: size * 0.36 }}
         className={`flex shrink-0 items-center justify-center font-semibold tracking-tight text-white ${radius}`}
       >
         {letters || "?"}

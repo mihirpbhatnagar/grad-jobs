@@ -16,7 +16,7 @@ function TabLink({ href, label, count, active }: { href: string; label: string; 
       href={href}
       scroll={false}
       aria-current={active ? "page" : undefined}
-      className={`flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 font-medium transition-colors sm:px-4 ${active ? "bg-surface text-foreground shadow-sm ring-1 ring-border" : "text-muted hover:text-foreground"}`}
+      className={`flex items-center gap-2 whitespace-nowrap rounded-md px-3 py-2 font-medium transition-colors sm:px-4 ${active ? "bg-surface text-foreground shadow-sm ring-1 ring-border" : "text-muted hover:text-foreground"}`}
     >
       {label}
       {count !== undefined && <span className={`rounded-full px-1.5 text-xs tabular-nums ${active ? "bg-accent-soft text-accent" : "bg-surface text-muted"}`}>{count}</span>}
@@ -32,7 +32,7 @@ async function MyJobs({ searchParams }: { searchParams: PageProps<"/my-jobs">["s
   const toApply = jobs.rows.filter(isToApply).length;
   return (
     <>
-      <nav aria-label="My jobs" className="mt-5 inline-flex max-w-full gap-1 overflow-x-auto rounded-xl bg-chip p-1 text-sm">
+      <nav aria-label="My jobs" className="mt-5 inline-flex max-w-full gap-1 overflow-x-auto rounded-lg bg-chip p-1 text-sm">
         <TabLink href="/my-jobs" label="For you" active={tab === "for-you"} />
         <TabLink href="/my-jobs?tab=saved" label="Saved" count={jobs.signedIn ? toApply : undefined} active={tab === "saved"} />
         <TabLink href="/my-jobs?tab=applications" label="Applications" count={jobs.signedIn ? jobs.rows.length - toApply : undefined} active={tab === "applications"} />
@@ -48,7 +48,7 @@ async function MyJobs({ searchParams }: { searchParams: PageProps<"/my-jobs">["s
               <div className="empty:hidden">
                 <GmailQuestion />
               </div>
-              <Suspense fallback={<div className="h-96 animate-pulse rounded-2xl bg-chip" />}>
+              <Suspense fallback={<div className="h-96 animate-pulse rounded-xl bg-chip" />}>
                 <ForYou />
               </Suspense>
             </div>
@@ -64,9 +64,9 @@ async function MyJobs({ searchParams }: { searchParams: PageProps<"/my-jobs">["s
 
 export default function MyJobsPage(props: PageProps<"/my-jobs">) {
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 pb-24 pt-8 sm:px-6">
+    <main className="mx-auto w-full max-w-7xl px-4 pb-24 pt-8 sm:px-6">
       <h1 className="text-3xl font-semibold tracking-tight">My jobs</h1>
-      <Suspense fallback={<div className="mt-6 h-96 animate-pulse rounded-2xl bg-chip" />}>
+      <Suspense fallback={<div className="mt-6 h-96 animate-pulse rounded-xl bg-chip" />}>
         <MyJobs searchParams={props.searchParams} />
       </Suspense>
     </main>

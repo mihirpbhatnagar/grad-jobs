@@ -16,19 +16,19 @@ export function StyleNotes({ initial }: { initial: string }) {
   const [pending, start] = useTransition();
   if (!open) {
     return (
-      <div className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-5 py-4">
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-5 py-4">
         <div>
           <p className="font-medium">How you like to sound</p>
           <p className="text-sm text-muted">{text.trim() ? "Your style notes guide every CV rewrite" : "Optional: tell the CV tools how to write like you"}</p>
         </div>
-        <button type="button" onClick={() => setOpen(true)} className="rounded-lg border border-border px-3 py-1.5 text-sm hover:border-foreground/30">
+        <button type="button" onClick={() => setOpen(true)} className="rounded-md border border-border px-3 py-1.5 text-sm hover:border-foreground/30">
           {text.trim() ? "Edit" : "Add"}
         </button>
       </div>
     );
   }
   return (
-    <div className="rounded-2xl border border-accent/30 bg-surface p-5">
+    <div className="rounded-xl border border-accent/30 bg-surface p-5">
       <h2 className="font-semibold tracking-tight">How you like to sound</h2>
       <p className="mt-1 text-sm text-muted">Words you use or avoid, tone, what to lead with. Editing a CV rewrite and saving it as your version teaches it too.</p>
       <textarea
@@ -39,7 +39,7 @@ export function StyleNotes({ initial }: { initial: string }) {
         }}
         rows={5}
         placeholder={EXAMPLE}
-        className="mt-3 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm leading-relaxed outline-none focus:border-foreground/40"
+        className="mt-3 w-full rounded-lg border border-border bg-background px-4 py-3 text-sm leading-relaxed outline-none focus:border-foreground/40"
       />
       <div className="mt-3 flex items-center justify-end gap-3">
         {saved && <span className="text-sm text-accent">Saved</span>}
@@ -55,7 +55,7 @@ export function StyleNotes({ initial }: { initial: string }) {
               setSaved(true);
             })
           }
-          className="rounded-xl bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-60"
+          className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-60"
         >
           Save
         </button>

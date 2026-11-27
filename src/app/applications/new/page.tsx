@@ -4,13 +4,13 @@ import { requireUser } from "@/lib/auth";
 import { addManualApplication } from "@/lib/myjobs-actions";
 import { STAGES } from "@/lib/pipeline";
 
-const input = "mt-1.5 w-full rounded-xl border border-border bg-background px-4 py-3 outline-none focus:border-foreground/40";
+const input = "mt-1.5 w-full rounded-lg border border-border bg-background px-4 py-3 outline-none focus:border-foreground/40";
 
 async function Form() {
   await requireUser("/applications/new");
   const today = new Date().toISOString().slice(0, 10);
   return (
-    <form action={addManualApplication} className="space-y-4 rounded-2xl border border-border bg-surface p-6 sm:p-8">
+    <form action={addManualApplication} className="space-y-4 rounded-xl border border-border bg-surface p-6 sm:p-8">
       <label className="block">
         <span className="text-sm font-medium">Company</span>
         <input name="company" required maxLength={120} placeholder="Unilever" className={input} />
@@ -43,7 +43,7 @@ async function Form() {
           <input name="closesOn" type="date" className={input} />
         </label>
       </div>
-      <button type="submit" className="w-full rounded-xl bg-foreground py-3 font-medium text-background hover:opacity-90">
+      <button type="submit" className="w-full rounded-lg bg-foreground py-3 font-medium text-background hover:opacity-90">
         Add application
       </button>
     </form>
@@ -60,7 +60,7 @@ export default function NewApplicationPage() {
       <h1 className="mt-4 text-3xl font-semibold tracking-tight">Add an application</h1>
       <p className="mt-2 text-muted">For a role you found somewhere else. You can add the CV and cover letter you sent on the next page.</p>
       <div className="mt-6">
-        <Suspense fallback={<div className="h-96 animate-pulse rounded-2xl bg-chip" />}>
+        <Suspense fallback={<div className="h-96 animate-pulse rounded-xl bg-chip" />}>
           <Form />
         </Suspense>
       </div>

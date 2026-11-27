@@ -30,7 +30,7 @@ export function SaveButton({
       <Link
         href={`/sign-in?next=/roles/${roleId}`}
         aria-label="Sign in to save"
-        className={`relative z-10 inline-flex items-center gap-2 rounded-xl border border-border bg-surface text-muted hover:text-foreground ${size}`}
+        className={`relative z-10 inline-flex items-center gap-2 rounded-lg border border-border bg-surface text-muted hover:text-foreground ${size}`}
       >
         {icon}
         {large && "Save"}
@@ -54,7 +54,7 @@ export function SaveButton({
           }
         })
       }
-      className={`relative z-10 inline-flex items-center gap-2 rounded-xl border transition-colors ${size} ${
+      className={`relative z-10 inline-flex items-center gap-2 rounded-lg border transition-colors ${size} ${
         saved ? "border-accent/30 bg-accent-soft text-accent" : "border-border bg-surface text-muted hover:text-foreground"
       }`}
     >

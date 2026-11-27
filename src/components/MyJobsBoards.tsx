@@ -80,9 +80,9 @@ export function closingSoon(rows: JobRow[]) {
 
 function SignIn({ what }: { what: string }) {
   return (
-    <div className="rounded-2xl border border-border bg-surface p-8 text-center">
+    <div className="rounded-xl border border-border bg-surface p-8 text-center">
       <h2 className="text-lg font-semibold tracking-tight">Sign in to see {what}</h2>
-      <Link href="/sign-in?next=/my-jobs" className="mt-4 inline-flex rounded-xl bg-foreground px-5 py-2.5 text-sm font-medium text-background">
+      <Link href="/sign-in?next=/my-jobs" className="mt-4 inline-flex rounded-lg bg-foreground px-5 py-2.5 text-sm font-medium text-background">
         Sign in
       </Link>
     </div>
@@ -92,7 +92,7 @@ function SignIn({ what }: { what: string }) {
 function Tile({ value, label, tone = "plain" }: { value: string | number; label: string; tone?: "plain" | "rose" | "accent" | "success" }) {
   const tones = { plain: "text-foreground", rose: "text-rose", accent: "text-accent", success: "text-success" };
   return (
-    <div className="rounded-2xl border border-border bg-surface px-4 py-3">
+    <div className="rounded-xl border border-border bg-surface px-4 py-3">
       <div className={`text-2xl font-semibold tabular-nums tracking-tight ${tones[tone]}`}>{value}</div>
       <div className="text-xs text-muted">{label}</div>
     </div>
@@ -104,7 +104,7 @@ export function ClosingSoonCard({ jobs }: { jobs: MyJobs }) {
   const closing = closingSoon(jobs.rows);
   if (!closing.length) return null;
   return (
-    <section className="rounded-2xl border border-rose/30 bg-surface p-5">
+    <section className="rounded-xl border border-rose/30 bg-surface p-5">
       <div className="flex items-center justify-between gap-3">
         <h2 className="font-semibold tracking-tight">Closing soon</h2>
         <Link href="/my-jobs?tab=saved" className="text-xs font-medium text-accent hover:underline">
@@ -114,7 +114,7 @@ export function ClosingSoonCard({ jobs }: { jobs: MyJobs }) {
       <ul className="mt-2 space-y-1">
         {closing.map(({ row, iso, days }) => (
           <li key={row.id}>
-            <Link href={hrefOf(row)} className="-mx-2 flex items-start justify-between gap-3 rounded-xl px-2 py-2 hover:bg-chip">
+            <Link href={hrefOf(row)} className="-mx-2 flex items-start justify-between gap-3 rounded-lg px-2 py-2 hover:bg-chip">
               <span className="min-w-0">
                 <span className="block truncate text-sm font-medium">{employerOf(row)}</span>
                 <span className="line-clamp-2 text-xs text-muted">{titleOf(row)}</span>
@@ -142,7 +142,7 @@ function SavedRow({ row, jobs }: { row: JobRow; jobs: MyJobs }) {
   const pay = role ? salaryShort(role.salary_min, role.salary_max) : null;
   const applyUrl = role?.apply_url ?? row.url;
   return (
-    <article className="flex flex-wrap items-start gap-x-4 gap-y-3 rounded-2xl border border-border bg-surface p-4 sm:flex-nowrap sm:items-center">
+    <article className="flex flex-wrap items-start gap-x-4 gap-y-3 rounded-xl border border-border bg-surface p-4 sm:flex-nowrap sm:items-center">
       <CompanyLogo name={role?.employer ?? row.company ?? "?"} logoUrl={company?.logo_url} domain={company?.domain} size={44} />
       <div className="min-w-0 flex-1 basis-[60%] sm:basis-auto">
         <h3 className="font-semibold leading-snug tracking-tight">
@@ -191,11 +191,11 @@ function SavedRow({ row, jobs }: { row: JobRow; jobs: MyJobs }) {
         <div className="w-[7.25rem] [&_select]:w-full [&_select]:px-2">
           <StageSelect applicationId={row.id} stage={row.stage} />
         </div>
-        <Link href={`/applications/${row.id}`} className="rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white hover:opacity-90">
+        <Link href={`/applications/${row.id}`} className="rounded-md bg-accent px-3 py-2 text-sm font-semibold text-on-accent hover:opacity-90">
           Prepare
         </Link>
         {applyUrl && (
-          <a href={applyUrl} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-border px-3 py-2 text-sm font-medium hover:border-foreground/30">
+          <a href={applyUrl} target="_blank" rel="noopener noreferrer" className="rounded-md border border-border px-3 py-2 text-sm font-medium hover:border-foreground/30">
             Apply ↗
           </a>
         )}
@@ -244,7 +244,7 @@ export function SavedBoard({ jobs }: { jobs: MyJobs }) {
       </div>
       <div className="min-w-0 space-y-6">
           {rows.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border bg-surface p-10 text-center text-muted">
+            <div className="rounded-xl border border-dashed border-border bg-surface p-10 text-center text-muted">
               Nothing saved yet. Tap the bookmark on any role and it appears here with its closing date.
             </div>
           ) : (
@@ -285,7 +285,7 @@ export function ApplicationsBoard({ jobs }: { jobs: MyJobs }) {
         <Tile value={rows.length ? `${Math.round((replied / rows.length) * 100)}%` : "–"} label="Replied" />
       </div>
       {rows.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border bg-surface p-10 text-center text-muted">
+        <div className="rounded-xl border border-dashed border-border bg-surface p-10 text-center text-muted">
           No applications yet. When you apply for a saved role, set its status to Applied and it shows here.{" "}
           <Link href="/applications/new" className="font-medium text-accent hover:underline">
             Add one you made elsewhere
@@ -298,7 +298,7 @@ export function ApplicationsBoard({ jobs }: { jobs: MyJobs }) {
             const weeks = Math.floor((Date.now() - new Date(row.updated_at).getTime()) / (7 * 86_400_000));
             const chase = row.stage === "applied" && weeks >= jobs.noReplyWeeks;
             return (
-              <article key={row.id} className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-2xl border border-border bg-surface p-4 sm:flex-nowrap">
+              <article key={row.id} className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl border border-border bg-surface p-4 sm:flex-nowrap">
                 <CompanyLogo name={row.role?.employer ?? row.company ?? "?"} logoUrl={company?.logo_url} domain={company?.domain} size={44} />
                 <div className="min-w-0 flex-1 basis-[60%] sm:basis-auto">
                   <h3 className="font-semibold leading-snug tracking-tight">
@@ -318,7 +318,7 @@ export function ApplicationsBoard({ jobs }: { jobs: MyJobs }) {
                   <div className={`text-xs ${chase ? "font-medium text-rose" : "text-muted"}`}>{chase ? `No reply for ${weeks} weeks` : `Updated ${dateShort(row.updated_at)}`}</div>
                 </div>
                 <StageSelect applicationId={row.id} stage={row.stage} />
-                <Link href={`/applications/${row.id}`} className="rounded-lg border border-border px-3 py-2 text-sm font-medium hover:border-foreground/30">
+                <Link href={`/applications/${row.id}`} className="rounded-md border border-border px-3 py-2 text-sm font-medium hover:border-foreground/30">
                   Open
                 </Link>
               </article>

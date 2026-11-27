@@ -1,45 +1,42 @@
 @import "tailwindcss";
 
-/* Design tokens: one place for colours so every page looks consistent. */
+/* Design tokens: one place for colours so every page looks consistent.
+   Warm paper, ink text, one cobalt accent. No gradients. */
 :root {
-  --background: #f3f4f8;
+  --background: #f6f5f2;
   --surface: #ffffff;
-  --foreground: #0f1729;
-  --muted: #5f6b7d;
-  --border: #e3e6ee;
-  --accent: #4f46e5;
-  --accent-soft: #eef0ff;
-  --chip: #f1f3f8;
-  --success: #047857;
-  --success-soft: #dcf5ea;
-  --amber: #9a5b00;
-  --amber-soft: #fdf0d8;
+  --foreground: #15171a;
+  --muted: #5d646e;
+  --border: #e3e1da;
+  --accent: #1f4fd8;
+  --on-accent: #ffffff;
+  --accent-soft: #e9eefc;
+  --chip: #eeede8;
+  --success: #0a6b4b;
+  --success-soft: #dff3ea;
+  --amber: #8a5300;
+  --amber-soft: #fbedd2;
   --rose: #b42335;
-  --rose-soft: #fde6e8;
-  --brand-from: #1e1b4b;
-  --brand-via: #3730a3;
-  --brand-to: #7c3aed;
+  --rose-soft: #fce8e6;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0b0e17;
-    --surface: #131826;
-    --foreground: #e9ecf4;
-    --muted: #96a0b3;
-    --border: #252c3d;
-    --accent: #8b87ff;
-    --accent-soft: #1f2146;
-    --chip: #1b2131;
-    --success: #4fd1a1;
-    --success-soft: #11322a;
+    --background: #0e1012;
+    --surface: #16191d;
+    --foreground: #eceef0;
+    --muted: #9aa1ab;
+    --border: #272b31;
+    --accent: #8aaaff;
+    --on-accent: #0b1220;
+    --accent-soft: #1a2545;
+    --chip: #1e2227;
+    --success: #56d3a4;
+    --success-soft: #11301f;
     --amber: #f0bd5c;
-    --amber-soft: #352914;
+    --amber-soft: #33270f;
     --rose: #f38b98;
-    --rose-soft: #3a1c22;
-    --brand-from: #17153a;
-    --brand-via: #2b2785;
-    --brand-to: #5b2bb8;
+    --rose-soft: #3a1c20;
   }
 }
 
@@ -50,6 +47,7 @@
   --color-muted: var(--muted);
   --color-border: var(--border);
   --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
   --color-accent-soft: var(--accent-soft);
   --color-chip: var(--chip);
   --color-success: var(--success);
@@ -66,21 +64,57 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
+  text-rendering: optimizeLegibility;
 }
 
-/* The brand band used at the top of main pages. */
-.brand-band {
-  background:
-    radial-gradient(1200px 400px at 85% -20%, rgba(167, 139, 250, 0.45), transparent 60%),
-    radial-gradient(800px 300px at 0% 120%, rgba(56, 189, 248, 0.25), transparent 60%),
-    linear-gradient(135deg, var(--brand-from), var(--brand-via) 55%, var(--brand-to));
+::selection {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
+/* Anything you can press shows a hand, and keyboard users always see where they are. */
+button:not(:disabled),
+[role="button"],
+summary,
+select,
+label[for] {
+  cursor: pointer;
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+/* Cards that link somewhere lift slightly under the pointer. */
 .card-lift {
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
 .card-lift:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 30px -12px rgba(15, 23, 41, 0.18);
-  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px -18px rgba(21, 23, 26, 0.35);
+  border-color: color-mix(in srgb, var(--foreground) 22%, var(--border));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .card-lift:hover {
+    transform: none;
+  }
 }

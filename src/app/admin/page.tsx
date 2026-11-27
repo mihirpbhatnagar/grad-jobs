@@ -18,7 +18,7 @@ type Coverage = {
 
 function Big({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-2xl border border-border bg-surface p-5">
+    <div className="rounded-xl border border-border bg-surface p-5">
       <div className="text-xs font-medium text-muted">{label}</div>
       <div className="mt-1 text-3xl font-semibold tabular-nums tracking-tight">{value}</div>
       {sub && <div className="mt-1 text-xs text-muted">{sub}</div>}
@@ -48,13 +48,13 @@ async function CoverageView() {
         <Big label="Main list" value={today.mainList.toLocaleString("en-GB")} sub="Full-time, starting June 2027+" />
       </div>
       {today.safetyStop && (
-        <section className="rounded-2xl border border-rose/40 bg-rose-soft p-5 text-rose">
+        <section className="rounded-xl border border-rose/40 bg-rose-soft p-5 text-rose">
           <h2 className="font-semibold">Safety stop this morning</h2>
           <p className="mt-1 text-sm">{today.safetyStop}</p>
         </section>
       )}
       {today.linkedIn && (
-        <section className="rounded-2xl border border-border bg-surface p-5">
+        <section className="rounded-xl border border-border bg-surface p-5">
           <h2 className="font-semibold tracking-tight">LinkedIn check</h2>
           <p className="mt-1 text-sm text-muted">Graduate roles Google Jobs shows &ldquo;via LinkedIn&rdquo;, checked against what the app already had.</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -65,7 +65,7 @@ async function CoverageView() {
         </section>
       )}
       {today.health && (
-        <section className="rounded-2xl border border-border bg-surface p-5">
+        <section className="rounded-xl border border-border bg-surface p-5">
           <h2 className="font-semibold tracking-tight">
             Health check · {today.health.passed}/{today.health.total} passed
           </h2>
@@ -91,7 +91,7 @@ async function CoverageView() {
           </div>
         </section>
       )}
-      <section className="rounded-2xl border border-border bg-surface p-5">
+      <section className="rounded-xl border border-border bg-surface p-5">
         <h2 className="font-semibold tracking-tight">Where main-list roles were found</h2>
         <div className="mt-4 space-y-3">
           {sources.map(([label, n]) => (
@@ -108,7 +108,7 @@ async function CoverageView() {
         </div>
         <p className="mt-3 text-xs text-muted">A role can be found by more than one source.</p>
       </section>
-      <section className="rounded-2xl border border-border bg-surface p-5">
+      <section className="rounded-xl border border-border bg-surface p-5">
         <h2 className="font-semibold tracking-tight">Last 30 days</h2>
         <table className="mt-3 w-full text-sm">
           <thead className="text-left text-xs text-muted">
@@ -142,7 +142,7 @@ export default function AdminPage() {
   return (
     <main className="mx-auto w-full max-w-5xl space-y-6 px-4 pb-24 pt-6 sm:px-6">
       <PageBand title="Coverage" lead="How much of the UK graduate market the app is catching, checked every morning." />
-      <Suspense fallback={<div className="h-64 animate-pulse rounded-2xl bg-chip" />}>
+      <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-chip" />}>
         <CoverageView />
       </Suspense>
     </main>

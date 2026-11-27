@@ -9,12 +9,12 @@ async function Events() {
   const events = upcomingEvents();
   if (events.length === 0) return <p className="text-sm text-muted">No events listed right now.</p>;
   return (
-    <ul className="divide-y divide-border rounded-2xl border border-border bg-surface">
+    <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
       {events.map((e) => {
         const d = new Date(e.start);
         return (
           <li key={e.url} className="flex items-center gap-4 p-4">
-            <div className="w-14 shrink-0 rounded-xl bg-[#f1ebf6] py-2 text-center text-[#5b2c83] dark:bg-[#2c2235] dark:text-[#d6c2e6]">
+            <div className="w-14 shrink-0 rounded-lg bg-[#f1ebf6] py-2 text-center text-[#5b2c83] dark:bg-[#2c2235] dark:text-[#d6c2e6]">
               <div className="text-[11px] font-semibold uppercase">{d.toLocaleDateString("en-GB", { month: "short" })}</div>
               <div className="text-lg font-bold leading-none">{d.getDate()}</div>
             </div>
@@ -24,7 +24,7 @@ async function Events() {
                 {d.toLocaleDateString("en-GB", { weekday: "short" })} {d.toTimeString().slice(0, 5)}–{e.end} · {e.where} · Loughborough
               </p>
             </div>
-            <a href={e.url} target="_blank" rel="noopener noreferrer" className="shrink-0 rounded-lg bg-foreground px-3 py-1.5 text-sm font-medium text-background hover:opacity-90">
+            <a href={e.url} target="_blank" rel="noopener noreferrer" className="shrink-0 rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background hover:opacity-90">
               Book ↗
             </a>
           </li>
@@ -41,7 +41,7 @@ export default function EventsPage() {
       <section>
         <h2 className="text-lg font-semibold tracking-tight">Loughborough workshops</h2>
         <div className="mt-3">
-          <Suspense fallback={<div className="h-64 animate-pulse rounded-2xl bg-chip" />}>
+          <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-chip" />}>
             <Events />
           </Suspense>
         </div>
@@ -50,7 +50,7 @@ export default function EventsPage() {
         <h2 className="text-lg font-semibold tracking-tight">Fairs and employer events</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           {FAIRS.map((f) => (
-            <a key={f.title} href={f.url} target="_blank" rel="noopener noreferrer" className="card-lift rounded-2xl border border-border bg-surface p-5">
+            <a key={f.title} href={f.url} target="_blank" rel="noopener noreferrer" className="card-lift rounded-xl border border-border bg-surface p-5">
               <h3 className="font-semibold tracking-tight">{f.title}</h3>
               <p className="mt-1.5 text-sm leading-relaxed text-muted">{f.detail}</p>
             </a>

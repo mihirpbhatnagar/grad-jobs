@@ -35,7 +35,7 @@ const STEPS = [
 
 function Step({ n, id, title, lead, children }: { n: number; id: string; title: string; lead: string; children: React.ReactNode }) {
   return (
-    <section id={id} className="scroll-mt-20 rounded-2xl border border-border bg-surface p-5 sm:p-6">
+    <section id={id} className="scroll-mt-20 rounded-xl border border-border bg-surface p-5 sm:p-6">
       <div className="flex items-start gap-3">
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-soft text-sm font-semibold text-accent">{n}</span>
         <div>
@@ -90,7 +90,7 @@ async function Workspace({ params }: { params: PageProps<"/applications/[id]">["
 
   return (
     <div className="space-y-4">
-      <section className="rounded-3xl border border-border bg-surface p-5 shadow-sm sm:p-7">
+      <section className="rounded-2xl border border-border bg-surface p-5 shadow-sm sm:p-7">
         <div className="flex flex-wrap items-start gap-4">
           <CompanyLogo name={role?.employer ?? app.company ?? "?"} logoUrl={company?.logo_url} domain={company?.domain} size={60} />
           <div className="min-w-0 flex-1 basis-64">
@@ -136,12 +136,12 @@ async function Workspace({ params }: { params: PageProps<"/applications/[id]">["
             </div>
             <div className="flex flex-wrap gap-2">
               {role && (
-                <Link href={`/roles/${role.id}`} className="rounded-xl border border-border px-4 py-2.5 text-sm font-medium hover:border-foreground/30">
+                <Link href={`/roles/${role.id}`} className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium hover:border-foreground/30">
                   Full listing
                 </Link>
               )}
               {applyUrl && (
-                <a href={applyUrl} target="_blank" rel="noopener noreferrer" className="rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90">
+                <a href={applyUrl} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-on-accent hover:opacity-90">
                   Apply on their site ↗
                 </a>
               )}
@@ -150,18 +150,18 @@ async function Workspace({ params }: { params: PageProps<"/applications/[id]">["
           </div>
         </div>
         {job && (
-          <details className="mt-5 rounded-xl bg-chip px-4 py-3">
+          <details className="mt-5 rounded-lg bg-chip px-4 py-3">
             <summary className="cursor-pointer text-sm font-semibold">Read the job description</summary>
             <div className="mt-3 max-h-[28rem] overflow-y-auto whitespace-pre-line pr-2 text-sm leading-6 text-foreground/85">{job}</div>
           </details>
         )}
         <nav aria-label="Steps" className="mt-5 flex flex-wrap gap-1.5 border-t border-border pt-4 text-sm">
           {STEPS.map((s, i) => (
-            <a key={s.id} href={`#${s.id}`} className="rounded-lg bg-chip px-3 py-1.5 font-medium text-muted hover:text-foreground">
+            <a key={s.id} href={`#${s.id}`} className="rounded-md bg-chip px-3 py-1.5 font-medium text-muted hover:text-foreground">
               {i + 1}. {s.label}
             </a>
           ))}
-          <a href="#sent" className="rounded-lg bg-chip px-3 py-1.5 font-medium text-muted hover:text-foreground">
+          <a href="#sent" className="rounded-md bg-chip px-3 py-1.5 font-medium text-muted hover:text-foreground">
             5. Send and track
           </a>
         </nav>
@@ -169,14 +169,14 @@ async function Workspace({ params }: { params: PageProps<"/applications/[id]">["
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="min-w-0 space-y-4">
-          <section className={`rounded-2xl border bg-surface p-5 sm:p-6 ${cvText && storyBank ? "border-border" : "border-2 border-accent/40"}`}>
+          <section className={`rounded-xl border bg-surface p-5 sm:p-6 ${cvText && storyBank ? "border-border" : "border-2 border-accent/40"}`}>
             <h2 className="text-lg font-semibold tracking-tight">{cvText && storyBank ? "Your CV and story bank" : "Start here: your CV and story bank"}</h2>
             <p className="mt-1 text-sm text-muted">
               Every step below works from these two. Your CV is what the employer sees; the story bank is rough notes on things you&apos;ve really done, which the
               tools draw on and never add to.
             </p>
             <div className="mt-4 space-y-3">
-              <div className="rounded-xl bg-chip px-4 py-3">
+              <div className="rounded-lg bg-chip px-4 py-3">
                 <p className="mb-2 text-sm font-medium">{cvText ? "Your CV" : "1. Upload your CV (PDF or Word)"}</p>
                 <CvUpload
                   url={process.env.SUPABASE_URL!}
@@ -210,7 +210,7 @@ async function Workspace({ params }: { params: PageProps<"/applications/[id]">["
           </Step>
 
           <Step n={2} id="cv" title="Tailor your CV" lead="See which of the listing's skills your CV already shows, and which of your real experiences to lead with.">
-            {!cvText && <p className="mb-3 rounded-xl bg-amber-soft px-3 py-2 text-sm text-amber">Upload your CV at the top of this page and this step fills in.</p>}
+            {!cvText && <p className="mb-3 rounded-lg bg-amber-soft px-3 py-2 text-sm text-amber">Upload your CV at the top of this page and this step fills in.</p>}
             <FreeTools {...tools} tabs={["keywords", "stories", "bullets"]} />
             {role && (
               <div className="mt-5 border-t border-border pt-4">
@@ -247,12 +247,12 @@ async function Workspace({ params }: { params: PageProps<"/applications/[id]">["
 
 export default function ApplicationPage(props: PageProps<"/applications/[id]">) {
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 pb-24 pt-6 sm:px-6">
+    <main className="mx-auto w-full max-w-7xl px-4 pb-24 pt-6 sm:px-6">
       <Link href="/my-jobs?tab=saved" className="text-sm font-medium text-muted hover:text-foreground">
         ← Saved roles
       </Link>
       <div className="mt-4">
-        <Suspense fallback={<div className="h-[60vh] animate-pulse rounded-3xl bg-chip" />}>
+        <Suspense fallback={<div className="h-[60vh] animate-pulse rounded-2xl bg-chip" />}>
           <Workspace params={props.params} />
         </Suspense>
       </div>

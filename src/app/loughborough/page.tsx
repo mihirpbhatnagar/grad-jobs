@@ -12,10 +12,10 @@ function External({ href, children, className = "" }: { href: string; children: 
 
 function Card({ title, detail, url, cta = "Open" }: { title: string; detail: string; url: string; cta?: string }) {
   return (
-    <div className="flex flex-col rounded-2xl border border-border bg-surface p-5">
+    <div className="flex flex-col rounded-xl border border-border bg-surface p-5">
       <h3 className="font-semibold tracking-tight">{title}</h3>
       <p className="mt-1.5 flex-1 text-sm leading-relaxed text-muted">{detail}</p>
-      <External href={url} className="mt-4 self-start rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:border-foreground/30">
+      <External href={url} className="mt-4 self-start rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:border-foreground/30">
         {cta} ↗
       </External>
     </div>
@@ -29,12 +29,12 @@ async function UpcomingEvents() {
     return <p className="text-sm text-muted">No workshops listed right now. New ones are advertised on Target Connect.</p>;
   }
   return (
-    <ul className="divide-y divide-border rounded-2xl border border-border bg-surface">
+    <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
       {upcoming.map((e) => {
         const d = new Date(e.start);
         return (
           <li key={e.url} className="flex items-center gap-4 p-4">
-            <div className="w-14 shrink-0 rounded-xl bg-[#f1ebf6] py-2 text-center text-[#5b2c83] dark:bg-[#2c2235] dark:text-[#d6c2e6]">
+            <div className="w-14 shrink-0 rounded-lg bg-[#f1ebf6] py-2 text-center text-[#5b2c83] dark:bg-[#2c2235] dark:text-[#d6c2e6]">
               <div className="text-[11px] font-medium uppercase">{d.toLocaleDateString("en-GB", { month: "short" })}</div>
               <div className="text-lg font-semibold leading-none">{d.getDate()}</div>
             </div>
@@ -44,7 +44,7 @@ async function UpcomingEvents() {
                 {d.toLocaleDateString("en-GB", { weekday: "short" })} {d.toTimeString().slice(0, 5)}–{e.end} · {e.where} · {e.series}
               </p>
             </div>
-            <External href={e.url} className="shrink-0 rounded-lg bg-foreground px-3 py-1.5 text-sm font-medium text-background hover:opacity-90">
+            <External href={e.url} className="shrink-0 rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background hover:opacity-90">
               Book ↗
             </External>
           </li>
@@ -56,9 +56,9 @@ async function UpcomingEvents() {
 
 export default function LoughboroughPage() {
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 pb-24 pt-8 sm:px-6">
+    <main className="mx-auto w-full max-w-7xl px-4 pb-24 pt-8 sm:px-6">
       <div className="flex items-center gap-4">
-        <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#5b2c83] text-sm font-bold tracking-tight text-white">LU</span>
+        <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#5b2c83] text-sm font-bold tracking-tight text-white">LU</span>
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Loughborough</h1>
           <p className="text-muted">Careers Network support for final-year students.</p>
@@ -70,7 +70,7 @@ export default function LoughboroughPage() {
           <section>
             <h2 className="text-lg font-semibold tracking-tight">Upcoming workshops</h2>
             <div className="mt-3">
-              <Suspense fallback={<div className="h-64 animate-pulse rounded-2xl bg-chip" />}>
+              <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-chip" />}>
                 <UpcomingEvents />
               </Suspense>
             </div>

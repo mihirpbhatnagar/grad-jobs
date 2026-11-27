@@ -18,7 +18,7 @@ function Pill({ on, onClick, children }: { on: boolean; onClick: () => void; chi
       type="button"
       onClick={onClick}
       aria-pressed={on}
-      className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${on ? "border-accent bg-accent text-white" : "border-border bg-surface text-foreground/80 hover:border-accent/50"}`}
+      className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${on ? "border-accent bg-accent text-on-accent" : "border-border bg-surface text-foreground/80 hover:border-accent/50"}`}
     >
       {children}
     </button>
@@ -57,10 +57,10 @@ function FieldPicker({ value, onChange, myFields }: { value: string[]; onChange:
               }
             }}
             placeholder="Type a field, e.g. marketing, audit, sport"
-            className="w-full rounded-xl border border-border bg-background px-3.5 py-2 text-sm outline-none focus:border-accent"
+            className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-sm outline-none focus:border-accent"
           />
           {matches.length > 0 && (
-            <ul className="absolute z-10 mt-1 w-full overflow-hidden rounded-xl border border-border bg-surface shadow-xl">
+            <ul className="absolute z-10 mt-1 w-full overflow-hidden rounded-lg border border-border bg-surface shadow-lg shadow-black/10">
               {matches.slice(0, 6).map((f) => (
                 <li key={f.id}>
                   <button
@@ -81,16 +81,18 @@ function FieldPicker({ value, onChange, myFields }: { value: string[]; onChange:
         </div>
         {myFields.length > 0 && (
           <Pill on={mineOn} onClick={() => onChange(mineOn ? value.filter((id) => !myFields.includes(id)) : [...new Set([...value, ...myFields])])}>
-            ✦ My fields
+            My fields
           </Pill>
         )}
       </div>
       {value.length > 0 && (
         <div className="mt-2.5 flex flex-wrap gap-2">
           {value.map((id) => (
-            <button key={id} type="button" onClick={() => onChange(value.filter((x) => x !== id))} className="inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 text-sm text-white">
+            <button key={id} type="button" onClick={() => onChange(value.filter((x) => x !== id))} className="inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 text-sm text-on-accent">
               {FIELDS.find((f) => f.id === id)?.label ?? id}
-              <span aria-hidden>×</span>
+              <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+                <path d="m2.5 2.5 7 7m0-7-7 7" />
+              </svg>
             </button>
           ))}
         </div>
@@ -132,7 +134,7 @@ export function FilterBar({ filters, path = "/", showStart = true, myFields = []
         }}
         className="flex flex-col gap-2 sm:flex-row"
       >
-        <label className="flex flex-1 items-center gap-3 rounded-2xl bg-surface px-4 py-3 shadow-lg shadow-black/10 ring-1 ring-border focus-within:ring-2 focus-within:ring-accent">
+        <label className="flex flex-1 items-center gap-3 rounded-lg border border-border bg-surface py-1.5 pl-4 pr-1.5 transition-colors focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/25">
           <svg aria-hidden viewBox="0 0 20 20" className="h-5 w-5 shrink-0 text-muted" fill="none" stroke="currentColor" strokeWidth="1.8">
             <circle cx="9" cy="9" r="6" />
             <path d="m14 14 4 4" strokeLinecap="round" />
@@ -141,9 +143,9 @@ export function FilterBar({ filters, path = "/", showStart = true, myFields = []
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search job title, company or town"
-            className="w-full bg-transparent text-[15px] text-foreground outline-none placeholder:text-muted"
+            className="w-full bg-transparent py-1.5 text-[15px] text-foreground outline-none placeholder:text-muted"
           />
-          <button type="submit" className="rounded-xl bg-accent px-4 py-1.5 text-sm font-semibold text-white hover:opacity-90">
+          <button type="submit" className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-on-accent transition-transform hover:opacity-90 active:scale-[0.97]">
             Search
           </button>
         </label>
@@ -155,15 +157,15 @@ export function FilterBar({ filters, path = "/", showStart = true, myFields = []
               setOpen((o) => !o);
             }}
             aria-expanded={open}
-            className={`flex flex-1 items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold shadow-lg shadow-black/10 ring-1 sm:flex-none ${open || count ? "bg-foreground text-background ring-foreground" : "bg-surface text-foreground ring-border hover:ring-accent"}`}
+            className={`flex flex-1 items-center justify-center gap-2 rounded-lg border px-4 py-3 text-sm font-semibold transition-colors sm:flex-none ${open || count ? "border-foreground bg-foreground text-background" : "border-border bg-surface text-foreground hover:border-foreground/40"}`}
           >
             <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
               <path d="M3 5h14M6 10h8M8.5 15h3" strokeLinecap="round" />
             </svg>
             Filters
-            {count > 0 && <span className="rounded-full bg-accent px-1.5 text-xs text-white">{count}</span>}
+            {count > 0 && <span className="rounded-full bg-accent px-1.5 text-xs text-on-accent">{count}</span>}
           </button>
-          <label className="relative flex flex-1 items-center rounded-2xl bg-surface text-sm shadow-lg shadow-black/10 ring-1 ring-border sm:flex-none">
+          <label className="relative flex flex-1 items-center rounded-lg border border-border bg-surface text-sm transition-colors hover:border-foreground/40 sm:flex-none">
             <span className="sr-only">Sort</span>
             <select
               value={filters.sort}
@@ -183,7 +185,7 @@ export function FilterBar({ filters, path = "/", showStart = true, myFields = []
       </form>
 
       {open && (
-        <div className="mt-3 rounded-2xl border border-border bg-surface p-5 text-foreground shadow-xl shadow-black/10">
+        <div className="mt-3 rounded-xl border border-border bg-surface p-5 text-foreground">
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="lg:col-span-2">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">Field</h3>
@@ -216,7 +218,7 @@ export function FilterBar({ filters, path = "/", showStart = true, myFields = []
             )}
             <Group title="Visa sponsorship">
               <Pill on={draft.sponsor === ""} onClick={() => set({ sponsor: "" })}>Any employer</Pill>
-              <Pill on={draft.sponsor === "likely"} onClick={() => set({ sponsor: "likely" })}>✓ Licensed sponsors only</Pill>
+              <Pill on={draft.sponsor === "likely"} onClick={() => set({ sponsor: "likely" })}>Licensed sponsors only</Pill>
             </Group>
             <Group title="Role type">
               <Pill on={draft.schemes} onClick={() => set({ schemes: !draft.schemes })}>Graduate schemes</Pill>
@@ -238,7 +240,7 @@ export function FilterBar({ filters, path = "/", showStart = true, myFields = []
                 setOpen(false);
                 go({ ...draft, q: q.trim() });
               }}
-              className="rounded-xl bg-accent px-5 py-2 text-sm font-semibold text-white hover:opacity-90"
+              className="rounded-lg bg-accent px-5 py-2 text-sm font-semibold text-on-accent hover:opacity-90"
             >
               Show roles
             </button>
@@ -250,12 +252,12 @@ export function FilterBar({ filters, path = "/", showStart = true, myFields = []
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {(
             [
-              ["✓ Licensed sponsors only", filters.sponsor === "likely", { sponsor: filters.sponsor === "likely" ? "" : "likely" }],
+              ["Licensed sponsors only", filters.sponsor === "likely", { sponsor: filters.sponsor === "likely" ? "" : "likely" }],
               ...(showStart ? [["Graduate schemes", filters.schemes, { schemes: !filters.schemes }]] : []),
               ["Within my visa", filters.withinVisa, { withinVisa: !filters.withinVisa }],
               ["Closing this week", filters.closingSoon, { closingSoon: !filters.closingSoon, sort: filters.closingSoon ? filters.sort : "closing" }],
               ...(myFields.length
-                ? [["✦ My fields", myFields.every((id) => filters.sectors.includes(id)), { sectors: myFields.every((id) => filters.sectors.includes(id)) ? filters.sectors.filter((id) => !myFields.includes(id)) : [...new Set([...filters.sectors, ...myFields])] }]]
+                ? [["My fields", myFields.every((id) => filters.sectors.includes(id)), { sectors: myFields.every((id) => filters.sectors.includes(id)) ? filters.sectors.filter((id) => !myFields.includes(id)) : [...new Set([...filters.sectors, ...myFields])] }]]
                 : []),
             ] as [string, boolean, Partial<RoleFilters>][]
           ).map(([label, on, change]) => (
@@ -264,8 +266,13 @@ export function FilterBar({ filters, path = "/", showStart = true, myFields = []
               type="button"
               aria-pressed={on}
               onClick={() => go({ ...filters, ...change })}
-              className={`rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${on ? "bg-white text-accent shadow" : "bg-white/10 text-white ring-1 ring-white/30 hover:bg-white/20"}`}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${on ? "border-foreground bg-foreground text-background" : "border-border bg-surface text-foreground/80 hover:border-foreground/40 hover:text-foreground"}`}
             >
+              {on && (
+                <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="m3.5 8.5 3 3 6-7" />
+                </svg>
+              )}
               {label}
             </button>
           ))}
@@ -279,13 +286,16 @@ export function FilterBar({ filters, path = "/", showStart = true, myFields = []
               key={a.label}
               type="button"
               onClick={() => go({ ...filters, ...a.remove })}
-              className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-medium text-white ring-1 ring-white/25 hover:bg-white/25"
+              aria-label={`Remove filter: ${a.label}`}
+              className="inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1 text-xs font-medium text-accent transition-colors hover:bg-accent hover:text-on-accent"
             >
               {a.label}
-              <span aria-hidden>×</span>
+              <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+                <path d="m2.5 2.5 7 7m0-7-7 7" />
+              </svg>
             </button>
           ))}
-          <button type="button" onClick={() => go({ ...filters, ...cleared })} className="text-xs font-medium text-white/80 underline-offset-2 hover:underline">
+          <button type="button" onClick={() => go({ ...filters, ...cleared })} className="text-xs font-medium text-muted underline-offset-2 hover:text-foreground hover:underline">
             Clear all
           </button>
         </div>

@@ -17,13 +17,13 @@ export default function EmployabilityPage() {
       <PageBand title="Careers" lead="Internships, schemes opening soon, events and part-time roles." />
       <div className="grid grid-cols-2 gap-3">
         {LINKS.map((l) => (
-          <Link key={l.href} href={l.href} className="card-lift rounded-2xl border border-border bg-surface p-4">
+          <Link key={l.href} href={l.href} className="card-lift rounded-xl border border-border bg-surface p-4">
             <span className="font-semibold tracking-tight">{l.title}</span>
             <span className="mt-0.5 block text-xs text-muted">{l.body}</span>
           </Link>
         ))}
       </div>
-      <Suspense fallback={<div className="h-96 animate-pulse rounded-2xl bg-chip" />}>
+      <Suspense fallback={<div className="h-96 animate-pulse rounded-xl bg-chip" />}>
         <SidePanel />
       </Suspense>
     </main>

@@ -36,22 +36,22 @@ export async function ApplicationPanel({ app, userId, roleCloses, removeRedirect
   const day = (iso: string | null) => (iso ? iso.slice(0, 10) : null);
 
   return (
-    <section className="rounded-2xl border-2 border-accent/25 bg-surface p-5">
+    <section className="rounded-xl border-2 border-accent/25 bg-surface p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-semibold tracking-tight">Your application</h2>
         <StageSelect applicationId={app.id} stage={app.stage} />
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-        <div className="rounded-xl bg-chip px-3 py-2.5">
+        <div className="rounded-lg bg-chip px-3 py-2.5">
           <div className="text-xs text-muted">Saved</div>
           <div className="mt-0.5 text-sm font-semibold">{dateLong(app.saved_at)}</div>
         </div>
-        <div className="rounded-xl bg-chip px-3 py-2.5">
+        <div className="rounded-lg bg-chip px-3 py-2.5">
           <div className="text-xs text-muted">Applied on</div>
           <DateField applicationId={app.id} field="appliedOn" value={day(app.applied_at)} />
         </div>
-        <div className="rounded-xl bg-chip px-3 py-2.5">
+        <div className="rounded-lg bg-chip px-3 py-2.5">
           <div className="text-xs text-muted">Closing date</div>
           {app.role_id ? (
             <div className="mt-0.5 text-sm font-semibold">{roleCloses ? dateLong(roleCloses) : "Not stated"}</div>
